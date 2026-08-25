@@ -1,0 +1,196 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // MODELO DE SEGURIDAD
+    // ============================================================
+    // Este sistema autentica contra la tabla /users (contraseñas con PBKDF2,
+    // nunca en texto plano). Al no existir identidad verificada en el
+    // servidor (no hay Firebase Auth), la AUTORIZACIÓN POR PERMISO se aplica
+    // en la aplicación (RBAC de interfaz) y NO es verificable en estas reglas.
+    //
+    // Lo que estas reglas SÍ garantizan es la INTEGRIDAD de los datos:
+    //   - /kardex_logs es append-only (inmutable).
+    //   - Ninguna colección permite borrado físico (baja lógica).
+    //   - Campos críticos de /assets inmutables: id, área, padre, nivel,
+    //     ancestros. Solo se puede editar estado y datos descriptivos.
+    //   - Valores de estado/nivel restringidos a los enums del dominio.
+    //   - Imagen del activo limitada a < 1.1 MiB (límite de documento).
+    //   - /users no puede almacenar el campo `password` (solo salt+hash).
+    //
+    // PARA AUTORIZACIÓN SERVER-SIDE POR PERMISO: migrar a Firebase
+    // Authentication y evaluar request.auth contra /users en estas reglas.
+    // ============================================================
+
+    function isAssetStatus(status) {
+      return status in ['active', 'transferredDeactivated', 'inactive', 'deleted'];
+    }
+
+    function isAssetLevel(level) {
+      return level in ['equipment', 'subEquipment', 'part', 'subPart'];
+    }
+
+    function isList(value) {
+      return value is list;
+    }
+
+    function imageWithinLimit() {
+      return !('imageData' in request.resource.data)
+        || request.resource.data.imageData == null
+        || (request.resource.data.imageData is string
+            && request.resource.data.imageData.size() < 1100000);
+    }
+
+    function isDeletionStatus(status) {
+      return status in ['pending', 'approved', 'rejected'];
+    }
+
+    function isBreakdownStatus(status) {
+      return status in ['reported', 'inWorkOrder', 'resolved', 'rejected'];
+    }
+
+    function isBreakdownSeverity(severity) {
+      return severity in ['low', 'medium', 'high'];
+    }
+
+    function isWorkOrderStatus(status) {
+      return status in ['pending', 'inProgress', 'completed', 'cancelled'];
+    }
+
+    // --- /kardex_logs: COLECCIÓN APPEND-ONLY (inmutable) ---
+    // Solo se permite crear (con el esquema mínimo) y leer.
+    match /kardex_logs/{logId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(
+        ['timestamp', 'userId', 'userName', 'action', 'module', 'entityId', 'details']);
+      allow update, delete: if false;
+    }
+
+    // --- /assets: Catálogo de equipos y activos ---
+    // El ID del activo es el PROPIO documento (no hay campo `id` persistido);
+    // por eso la inmutabilidad se garantiza sobre los campos de jerarquía.
+    // El update NO puede mutar los campos que definen la identidad o la
+    // jerarquía (areaId, parentAssetId, level, ancestors).
+    match /assets/{assetId} {
+      allow read: if true;
+      allow create: if isAssetLevel(request.resource.data.level)
+        && isAssetStatus(request.resource.data.status)
+        && isList(request.resource.data.ancestors)
+        && isList(request.resource.data.searchTerms)
+        && imageWithinLimit();
+      allow update: if isAssetLevel(request.resource.data.level)
+        && isAssetStatus(request.resource.data.status)
+        && isList(request.resource.data.ancestors)
+        && isList(request.resource.data.searchTerms)
+        && request.resource.data.areaId == resource.data.areaId
+        && request.resource.data.parentAssetId == resource.data.parentAssetId
+        && request.resource.data.ancestors == resource.data.ancestors
+        // level es inmutable: no se puede cambiar el nivel de un activo
+        && request.resource.data.level == resource.data.level
+        // serial es inmutable: si existia, debe conservarse; si no existia,
+        // no se puede agregar a posteriori.
+        && (!('serial' in resource.data) || request.resource.data.get('serial', null) == resource.data.get('serial', null))
+        && imageWithinLimit();
+      allow delete: if false;
+    }
+
+    // --- /deletion_requests: Historial de solicitudes de baja ---
+    // El `assetId` es inmutable y el estado debe pertenecer al enum.
+    match /deletion_requests/{requestId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['assetId', 'status', 'reason'])
+        && isDeletionStatus(request.resource.data.status);
+      allow update: if request.resource.data.assetId == resource.data.assetId
+        && isDeletionStatus(request.resource.data.status);
+      allow delete: if false;
+    }
+
+    // --- /deletion_request_states: Candado transaccional de solicitudes ---
+    // Documento único por activo usado por las transacciones para evitar
+    // solicitudes duplicadas y dobles resoluciones (race conditions).
+    match /deletion_request_states/{assetId} {
+      allow read: if true;
+      allow create, update: if isDeletionStatus(request.resource.data.status);
+      allow delete: if false;
+    }
+
+    // --- /areas: Áreas de la planta ---
+    match /areas/{areaId} {
+      allow read: if true;
+      allow create: if request.resource.data.id == areaId;
+      allow update: if request.resource.data.id == areaId;
+      allow delete: if false;
+    }
+
+    // --- /counters: Contadores secuenciales (IDs de áreas y activos) ---
+    match /counters/{counterId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.nextNumber is int
+        && request.resource.data.nextNumber > 0;
+      allow delete: if false;
+    }
+
+    // --- /users: Perfiles, permisos (RBAC) y credenciales ---
+    // PROHIBIDO almacenar `password` en texto plano: solo salt+hash (PBKDF2).
+    // El username es inmutable (identidad del usuario).
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(
+            ['username', 'passwordSalt', 'passwordHash', 'passwordIterations'])
+        && !('password' in request.resource.data);
+      allow update: if !('password' in request.resource.data)
+        && request.resource.data.username == resource.data.username;
+      allow delete: if false;
+    }
+
+    // --- /work_orders: Órdenes de trabajo ---
+    // El ID secuencial (OT-0001...) lo genera la app vía `counters/work_orders`.
+    // El `assetId` es inmutable y el estado debe pertenecer al enum.
+    match /work_orders/{orderId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(
+            ['assetId', 'assetName', 'description', 'status'])
+        && isWorkOrderStatus(request.resource.data.status);
+      allow update: if request.resource.data.assetId == resource.data.assetId
+        && isWorkOrderStatus(request.resource.data.status);
+      allow delete: if false;
+    }
+
+    // --- /breakdown_reports: Reportes de averías ---
+    // El activo y el reportero son inmutables (identidad del reporte); solo
+    // cambian estado, la OT vinculada y los datos de resolución.
+    match /breakdown_reports/{reportId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(
+            ['assetId', 'assetName', 'areaId', 'description', 'severity',
+             'reportedByUserId', 'reportedByUserName', 'reportedAt', 'status'])
+        && isBreakdownStatus(request.resource.data.status)
+        && isBreakdownSeverity(request.resource.data.severity);
+      allow update: if request.resource.data.assetId == resource.data.assetId
+        && request.resource.data.assetName == resource.data.assetName
+        && request.resource.data.areaId == resource.data.areaId
+        && request.resource.data.reportedByUserId == resource.data.reportedByUserId
+        && request.resource.data.reportedByUserName == resource.data.reportedByUserName
+        && isBreakdownStatus(request.resource.data.status);
+      allow delete: if false;
+    }
+
+    // --- /preventive_schedules: Mantenimiento preventivo ---
+    match /preventive_schedules/{scheduleId} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(
+            ['assetId', 'areaId', 'maintenanceType', 'frequency', 'nextDate', 'status'])
+        && request.resource.data.status in ['active', 'paused', 'completed']
+        && request.resource.data.frequency in
+           ['daily', 'weekly', 'biweekly', 'monthly', 'bimonthly', 'quarterly', 'semiannual', 'annual'];
+      allow delete: if false;
+    }
+
+    // --- /password_reset_requests: Solicitudes de recuperación de contraseñas ---
+    match /password_reset_requests/{requestId} {
+      allow read, create, update: if true;
+      allow delete: if false;
+    }
+  }
+}

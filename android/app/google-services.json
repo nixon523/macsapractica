@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "620336202061",
+    "project_id": "practica-macsa",
+    "storage_bucket": "practica-macsa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:620336202061:android:9bea19554f202c6b387704",
+        "android_client_info": {
+          "package_name": "com.example.macsapractica"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtodUT8YJlcPUCebMGi9qWChntWljssLU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
