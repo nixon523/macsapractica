@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../../../app/widgets/app_dialog.dart';
+import '../../../../core/utils/upper_case_formatter.dart';
 import '../viewmodels/auth_viewmodel.dart';
 
 class AuthView extends StatefulWidget {
@@ -55,36 +58,33 @@ class _AuthViewState extends State<AuthView> {
     await showDialog(
       context: context,
       builder: (ctx) => Consumer<AuthViewModel>(
-        builder: (context, authVm, child) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.lock_reset, color: Color(0xFF2563EB)),
-              SizedBox(width: 8),
-              Text('Recuperar Acceso'),
-            ],
-          ),
-          content: SizedBox(
-            width: 400,
-            child: Form(
+        builder: (context, authVm, child) {
+          final theme = Theme.of(context);
+          return AppDialog(
+            maxWidth: 460,
+            icon: Icon(Icons.lock_reset, color: theme.colorScheme.primary),
+            title: const Text('Recuperar Acceso'),
+            content: Form(
               key: resetFormKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Por políticas de seguridad de Grupo Macsa, las contraseñas son confidenciales y están cifradas. '
                     'Para restablecer tu acceso, ingresa tu usuario y el Administrador te generará una contraseña temporal segura.',
-                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                    style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: resetUsernameController,
                     decoration: const InputDecoration(
                       labelText: 'Nombre de Usuario *',
-                      hintText: 'Ej: admin',
+                      hintText: 'Ej: ADMIN',
                       prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
                     ),
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [UpperCaseTextFormatter()],
                     validator: (value) =>
                         (value == null || value.trim().isEmpty)
                             ? 'Ingresa tu usuario'
@@ -94,55 +94,53 @@ class _AuthViewState extends State<AuthView> {
                     const SizedBox(height: 12),
                     Text(
                       authVm.errorMessage,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                        fontSize: 12,
-                      ),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.error),
                     ),
                   ],
                 ],
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: authVm.isProcessing
-                  ? null
-                  : () {
-                      authVm.clearMessages();
-                      Navigator.pop(ctx);
-                    },
-              child: const Text('Cancelar'),
-            ),
-            FilledButton.icon(
-              onPressed: authVm.isProcessing
-                  ? null
-                  : () async {
-                      if (!resetFormKey.currentState!.validate()) return;
-                      final ok = await authVm.requestPasswordReset(
-                        username: resetUsernameController.text.trim(),
-                      );
-                      if (ok && ctx.mounted) {
+            actions: [
+              TextButton(
+                onPressed: authVm.isProcessing
+                    ? null
+                    : () {
+                        authVm.clearMessages();
                         Navigator.pop(ctx);
-                        _showResetSuccessDialog(
-                          resetUsernameController.text.trim(),
+                      },
+                child: const Text('Cancelar'),
+              ),
+              FilledButton.icon(
+                onPressed: authVm.isProcessing
+                    ? null
+                    : () async {
+                        if (!resetFormKey.currentState!.validate()) return;
+                        final ok = await authVm.requestPasswordReset(
+                          username: resetUsernameController.text.trim(),
                         );
-                      }
-                    },
-              icon: authVm.isProcessing
-                  ? const SizedBox(
-                      height: 16,
-                      width: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.send, size: 18),
-              label: const Text('Solicitar Clave'),
-            ),
-          ],
-        ),
+                        if (ok && ctx.mounted) {
+                          Navigator.pop(ctx);
+                          _showResetSuccessDialog(
+                            resetUsernameController.text.trim(),
+                          );
+                        }
+                      },
+                icon: authVm.isProcessing
+                    ? const SizedBox(
+                        height: 16,
+                        width: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.send, size: 18),
+                label: const Text('Solicitar Clave'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -178,7 +176,8 @@ class _AuthViewState extends State<AuthView> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: Center(
+      body: SafeArea(
+        child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
@@ -222,6 +221,8 @@ class _AuthViewState extends State<AuthView> {
                           prefixIcon: Icon(Icons.person_outline),
                           border: OutlineInputBorder(),
                         ),
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [UpperCaseTextFormatter()],
                         textInputAction: TextInputAction.next,
                         validator: (value) =>
                             (value == null || value.trim().isEmpty)
@@ -232,6 +233,10 @@ class _AuthViewState extends State<AuthView> {
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [UpperCaseTextFormatter()],
+                        enableSuggestions: false,
+                        autocorrect: false,
                         decoration: InputDecoration(
                           labelText: 'Contraseña',
                           prefixIcon: const Icon(Icons.lock_outline),
@@ -288,6 +293,7 @@ class _AuthViewState extends State<AuthView> {
               ),
             ),
           ),
+        ),
         ),
       ),
     );

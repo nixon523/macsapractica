@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
+import '../../../../app/widgets/app_dialog.dart';
+import '../../../../app/widgets/app_info_row.dart';
 import '../../../asset_deletion/domain/entities/asset_delete_request.dart';
 import '../../../asset_deletion/presentation/viewmodels/asset_deletion_request_viewmodel.dart';
 import '../../domain/entities/asset.dart';
@@ -214,7 +216,7 @@ class _AssetDetailViewState extends State<AssetDetailView> {
           ],
         ),
         content: SizedBox(
-          width: 440,
+          width: responsiveDialogWidth(context, 440),
           child: Form(
             key: formKey,
             child: Column(
@@ -808,22 +810,12 @@ class _AssetInfoCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             for (final (label, value) in rows)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 120,
-                      child: Text(
-                        label,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    Expanded(child: Text(value)),
-                  ],
+              AppInfoRow(
+                label: label,
+                value: Text(value),
+                labelWidth: 120,
+                labelStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
           ],
@@ -854,22 +846,12 @@ class _AttributesCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             for (final entry in attributes.entries)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 140,
-                      child: Text(
-                        entry.key,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    Expanded(child: Text('${entry.value}')),
-                  ],
+              AppInfoRow(
+                label: entry.key,
+                value: Text('${entry.value}'),
+                labelWidth: 140,
+                labelStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
           ],

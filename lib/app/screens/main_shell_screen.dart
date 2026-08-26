@@ -21,6 +21,8 @@ import '../../features/preventive_schedules/presentation/viewmodels/preventive_s
 import '../../core/audio/notification_sound.dart';
 import '../di/get_it.dart';
 import '../router/app_router.dart';
+import '../theme/app_breakpoints.dart';
+import '../theme/app_theme.dart';
 import 'sidebar_widget.dart';
 
 enum _ShellSection {
@@ -291,7 +293,6 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ..showSnackBar(
           SnackBar(
             duration: const Duration(seconds: 7),
-            backgroundColor: const Color(0xFF1E293B),
             dismissDirection: DismissDirection.horizontal,
             content: Row(
               children: [
@@ -300,7 +301,6 @@ class _MainShellScreenState extends State<MainShellScreen> {
                 Expanded(
                   child: Text(
                     'Solicitud de clave: ${requestUser.displayName ?? requestUser.username} (@${requestUser.username}) solicitó una clave temporal.',
-                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
               ],
@@ -362,6 +362,56 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ),
     ];
 
+    final isMobile = AppBreakpoints.isMobile(context);
+
+    void onSectionTap(int index) {
+      setState(() {
+        _selectedIndex = index;
+        if (sections[index] == _ShellSection.myReports) {
+          getIt<MyReportsNotificationsViewModel>().markSectionSeen();
+        }
+      });
+    }
+
+    void onLogout() {
+      context.read<AuthViewModel>().logout();
+      Navigator.pushReplacementNamed(context, AppRouter.login);
+    }
+
+    final sidebar = SidebarWidget(
+      items: items,
+      selectedIndex: safeIndex,
+      onTap: (index) {
+        onSectionTap(index);
+        // Cierra el drawer al elegir opción en móvil.
+        if (isMobile) Navigator.of(context).maybePop();
+      },
+      isExpanded: isMobile ? true : _sidebarExpanded,
+      onToggle: () => setState(() => _sidebarExpanded = !_sidebarExpanded),
+      userName: user.username,
+      userDisplayName: user.displayName,
+      onLogout: onLogout,
+    );
+
+    if (isMobile) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(_getTitle(safeIndex, user, sections)),
+          // En móvil el AppBar muestra el ícono de menú automáticamente.
+        ),
+        drawer: Drawer(
+          width: 240,
+          backgroundColor: AppTheme.sidebarBackground,
+          shape: const RoundedRectangleBorder(),
+          child: sidebar,
+        ),
+        body: SafeArea(
+          top: false,
+          child: _buildContent(sections[safeIndex]),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_getTitle(safeIndex, user, sections)),
@@ -369,25 +419,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       ),
       body: Row(
         children: [
-          SidebarWidget(
-            items: items,
-            selectedIndex: safeIndex,
-            onTap: (index) => setState(() {
-              _selectedIndex = index;
-              if (sections[index] == _ShellSection.myReports) {
-                getIt<MyReportsNotificationsViewModel>().markSectionSeen();
-              }
-            }),
-            isExpanded: _sidebarExpanded,
-            onToggle: () =>
-                setState(() => _sidebarExpanded = !_sidebarExpanded),
-            userName: user.username,
-            userDisplayName: user.displayName,
-            onLogout: () {
-              context.read<AuthViewModel>().logout();
-              Navigator.pushReplacementNamed(context, AppRouter.login);
-            },
-          ),
+          sidebar,
           Expanded(
             child: _buildContent(sections[safeIndex]),
           ),

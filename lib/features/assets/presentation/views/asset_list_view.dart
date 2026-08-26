@@ -305,63 +305,89 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onQueryChanged,
-              decoration: InputDecoration(
-                hintText: 'Buscar por N° de serie, nombre, ID, marca...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: controller,
-                  builder: (context, value, child) {
-                    if (value.text.isEmpty) {
-                      return const SizedBox.shrink();
-                    }
-                    return IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: onClear,
-                    );
-                  },
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
-              ),
-            ),
+    final searchField = TextField(
+      controller: controller,
+      onChanged: onQueryChanged,
+      decoration: InputDecoration(
+        hintText: 'Buscar por N° de serie, nombre, ID, marca...',
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, child) {
+            if (value.text.isEmpty) {
+              return const SizedBox.shrink();
+            }
+            return IconButton(
+              icon: const Icon(Icons.clear),
+              onPressed: onClear,
+            );
+          },
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        isDense: true,
+      ),
+    );
+
+    final statusDropdown = DropdownButtonHideUnderline(
+      child: DropdownButton<AssetStatus?>(
+        value: statusFilter,
+        isExpanded: true,
+        hint: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.filter_list),
+            SizedBox(width: 6),
+            Text('Estado'),
+          ],
+        ),
+        items: const [
+          DropdownMenuItem<AssetStatus?>(
+            value: null,
+            child: Text('Todos los estados'),
           ),
-          const SizedBox(width: 8),
-          DropdownButtonHideUnderline(
-            child: DropdownButton<AssetStatus?>(
-              value: statusFilter,
-              hint: const Icon(Icons.filter_list),
-              items: const [
-                DropdownMenuItem<AssetStatus?>(
-                  value: null,
-                  child: Text('Todos los estados'),
-                ),
-                DropdownMenuItem<AssetStatus?>(
-                  value: AssetStatus.active,
-                  child: Text('Activos'),
-                ),
-                DropdownMenuItem<AssetStatus?>(
-                  value: AssetStatus.transferredDeactivated,
-                  child: Text('Transferidos'),
-                ),
-                DropdownMenuItem<AssetStatus?>(
-                  value: AssetStatus.inactive,
-                  child: Text('Inactivos'),
-                ),
-              ],
-              onChanged: onStatusChanged,
-            ),
+          DropdownMenuItem<AssetStatus?>(
+            value: AssetStatus.active,
+            child: Text('Activos'),
+          ),
+          DropdownMenuItem<AssetStatus?>(
+            value: AssetStatus.transferredDeactivated,
+            child: Text('Transferidos'),
+          ),
+          DropdownMenuItem<AssetStatus?>(
+            value: AssetStatus.inactive,
+            child: Text('Inactivos'),
           ),
         ],
+        onChanged: onStatusChanged,
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // En pantallas estrechas apila la búsqueda y el filtro
+          // para que ambos sean cómodos de usar.
+          if (constraints.maxWidth < 500) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                searchField,
+                const SizedBox(height: 8),
+                statusDropdown,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: searchField),
+              const SizedBox(width: 8),
+              SizedBox(width: 190, child: statusDropdown),
+            ],
+          );
+        },
       ),
     );
   }

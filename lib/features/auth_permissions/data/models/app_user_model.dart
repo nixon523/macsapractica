@@ -23,10 +23,19 @@ class AppUserModel extends AppUser {
             map['Role'])
         ?.toString();
 
-    final rawPermissions = map['permissions'] ?? map['Permissions'];
+    final rawPermissions = map['permissions'] ??
+        map['Permissions'] ??
+        map['PermissionsCsv'] ??
+        map['permissionsCsv'];
     Set<String> perms = {};
     if (rawPermissions is List) {
       perms = rawPermissions.map((e) => e.toString()).toSet();
+    } else if (rawPermissions is String && rawPermissions.trim().isNotEmpty) {
+      perms = rawPermissions
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toSet();
     }
 
     return AppUserModel(

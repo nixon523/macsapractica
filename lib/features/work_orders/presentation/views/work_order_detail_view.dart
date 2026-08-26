@@ -3,6 +3,7 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
+import '../../../../app/widgets/app_info_row.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../breakdown_reports/domain/usecases/resolve_breakdown_report.dart';
 import '../../domain/entities/work_order.dart';
@@ -534,21 +535,14 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Expanded(child: Text(value)),
-        ],
-      ),
+    return AppInfoRow(
+      label: label,
+      value: Text(value),
+      labelWidth: 140,
+      labelStyle: Theme.of(context)
+          .textTheme
+          .bodyMedium
+          ?.copyWith(fontWeight: FontWeight.w600),
     );
   }
 }

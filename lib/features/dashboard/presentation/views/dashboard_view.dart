@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../app/theme/app_spacing.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 
@@ -157,8 +158,28 @@ class _SummaryCardsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: cards.map((card) => Expanded(child: card)).toList(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Adaptación por ancho:
+        //   < 500 dp  → 1 columna (móvil vertical)
+        //   500-900   → 2 columnas
+        //   >= 900    → todas las tarjetas en una fila
+        final columns = constraints.maxWidth < 500
+            ? 1
+            : (constraints.maxWidth < 900 ? 2 : cards.length);
+        const spacing = AppSpacing.md;
+        final totalSpacing = spacing * (columns - 1);
+        final itemWidth = (constraints.maxWidth - totalSpacing) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final card in cards)
+              SizedBox(width: itemWidth, child: card),
+          ],
+        );
+      },
     );
   }
 }

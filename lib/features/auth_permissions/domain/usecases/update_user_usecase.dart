@@ -8,12 +8,14 @@ class UpdateUserParams {
     this.displayName,
     this.role,
     this.newPassword,
+    this.permissions,
   });
 
   final String userId;
   final String? displayName;
   final UserRole? role;
   final String? newPassword;
+  final Set<String>? permissions;
 }
 
 class UpdateUserUseCase implements UseCase<void, UpdateUserParams> {
@@ -28,6 +30,8 @@ class UpdateUserUseCase implements UseCase<void, UpdateUserParams> {
       displayName: params.displayName,
       role: params.role,
       newPassword: params.newPassword,
+      permissions: params.permissions,
     );
   }
 }
+

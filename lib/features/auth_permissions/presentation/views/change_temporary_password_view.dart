@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/router/app_router.dart';
+import '../../../../core/utils/upper_case_formatter.dart';
 import '../viewmodels/auth_viewmodel.dart';
 
 class ChangeTemporaryPasswordView extends StatefulWidget {
@@ -139,7 +141,8 @@ class _ChangeTemporaryPasswordViewState
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        textCapitalization: TextCapitalization.none,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [UpperCaseTextFormatter()],
                         enableSuggestions: false,
                         autocorrect: false,
                         decoration: InputDecoration(
@@ -171,7 +174,8 @@ class _ChangeTemporaryPasswordViewState
                       TextFormField(
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirm,
-                        textCapitalization: TextCapitalization.none,
+                        textCapitalization: TextCapitalization.characters,
+                        inputFormatters: [UpperCaseTextFormatter()],
                         enableSuggestions: false,
                         autocorrect: false,
                         decoration: InputDecoration(

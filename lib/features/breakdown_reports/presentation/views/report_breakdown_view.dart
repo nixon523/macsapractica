@@ -72,7 +72,10 @@ class _ReportForm extends StatelessWidget {
     final vm = context.watch<ReportBreakdownViewModel>();
 
     return Material(
-      child: ListView(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Card(
@@ -209,6 +212,8 @@ class _ReportForm extends StatelessWidget {
             label: const Text('Enviar reporte'),
           ),
         ],
+      ),
+        ),
       ),
     );
   }

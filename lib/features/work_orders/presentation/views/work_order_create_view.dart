@@ -79,9 +79,14 @@ class _WorkOrderCreateViewState extends State<WorkOrderCreateView> {
                 : 'Nueva Orden de Trabajo (REG.GMC-MTN-001)',
           ),
         ),
-        body: _WorkOrderCreateForm(
-          viewModel: _viewModel,
-          onSubmit: _submit,
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: _WorkOrderCreateForm(
+              viewModel: _viewModel,
+              onSubmit: _submit,
+            ),
+          ),
         ),
       ),
     );
@@ -309,39 +314,60 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
         ),
         const SizedBox(height: 8),
 
-        Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: TextField(
-                controller: _matDescCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción de la refacción/material',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final descField = TextField(
+              controller: _matDescCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Descripción de la refacción/material',
+                border: OutlineInputBorder(),
+                isDense: true,
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 1,
-              child: TextField(
-                controller: _matQtyCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Cant.',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+            );
+            final qtyField = TextField(
+              controller: _matQtyCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Cant.',
+                border: OutlineInputBorder(),
+                isDense: true,
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filled(
+            );
+            final addButton = IconButton.filled(
               icon: const Icon(Icons.add),
               tooltip: 'Agregar material',
               onPressed: _addMaterial,
-            ),
-          ],
+            );
+
+            // Móvil (< 500 dp): descripción en línea completa,
+            // cantidad + botón en línea inferior.
+            if (constraints.maxWidth < 500) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  descField,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: qtyField),
+                      const SizedBox(width: 8),
+                      addButton,
+                    ],
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(flex: 3, child: descField),
+                const SizedBox(width: 8),
+                Expanded(flex: 1, child: qtyField),
+                const SizedBox(width: 8),
+                addButton,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 8),
 

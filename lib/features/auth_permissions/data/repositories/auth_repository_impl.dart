@@ -33,6 +33,7 @@ class AuthRepositoryImpl implements AuthRepository {
     required String displayName,
     required String password,
     required UserRole role,
+    Set<String> permissions = const {},
     bool mustChangePassword = true,
   }) {
     return _remoteDataSource.createUser(
@@ -40,6 +41,7 @@ class AuthRepositoryImpl implements AuthRepository {
       displayName: displayName,
       password: password,
       role: role,
+      permissions: permissions,
       mustChangePassword: mustChangePassword,
     );
   }
@@ -50,12 +52,14 @@ class AuthRepositoryImpl implements AuthRepository {
     String? displayName,
     UserRole? role,
     String? newPassword,
+    Set<String>? permissions,
   }) {
     return _remoteDataSource.updateUser(
       userId: userId,
       displayName: displayName,
       role: role,
       newPassword: newPassword,
+      permissions: permissions,
     );
   }
 

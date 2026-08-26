@@ -1,6 +1,6 @@
 /* ============================================================================
    MACSA CMMS - Sistema de Gestión de Mantenimiento Grupo Macsa
-   init.sql : Creación completa de base de datos SQL Server (T-SQL) en Español
+   init.sql : Base de Datos SQL Server con Tablas y Columnas en Español
    ============================================================================ */
 
 IF DB_ID(N'MacsaCMMS') IS NULL
@@ -56,25 +56,7 @@ DROP PROCEDURE IF EXISTS
     dbo.uspPlanPreventivoModificar, dbo.uspPlanPreventivoRegistrarEjecucion,
     dbo.uspPlanPreventivoAlternarEstado,
     dbo.uspKardexAgregar, dbo.uspKardexObtenerTodos, dbo.uspKardexObtenerPorEntidad,
-    dbo.uspDashboardObtenerEstadisticas,
-    -- Procedimientos anteriores en inglés
-    dbo.uspUserGetForLogin, dbo.uspLoginRegisterFailure, dbo.uspLoginResetAttempts,
-    dbo.uspUserCreate, dbo.uspUserUpdate, dbo.uspUserToggleDisabled,
-    dbo.uspUserChangePassword, dbo.uspUserResetTemporary,
-    dbo.uspPasswordResetRequest, dbo.uspPasswordResetPendingList, dbo.uspPasswordResetMarkResolved,
-    dbo.uspUserGetAll, dbo.uspUserGetById,
-    dbo.uspAreaGetAll, dbo.uspAssetGetByParent, dbo.uspAssetGetAllByArea, dbo.uspAssetSearch, dbo.uspAssetFindBySerial,
-    dbo.uspAssetCreate, dbo.uspAssetUpdate, dbo.uspAssetTransfer, dbo.uspAssetReactivate, dbo.uspAssetToggleStatus,
-    dbo.uspDeletionRequestCreate, dbo.uspDeletionRequestGetPending, dbo.uspDeletionRequestGetAll,
-    dbo.uspDeletionRequestGetPendingByAsset, dbo.uspDeletionRequestApprove, dbo.uspDeletionRequestReject,
-    dbo.uspWorkOrderGetAll, dbo.uspWorkOrderGetOpen, dbo.uspWorkOrderCreate,
-    dbo.uspWorkOrderUpdateStatus, dbo.uspWorkOrderUpdateDetails,
-    dbo.uspBreakdownReportCreate, dbo.uspBreakdownReportGetAll, dbo.uspBreakdownReportGetByUser,
-    dbo.uspBreakdownReportGetOpen, dbo.uspBreakdownReportLinkWorkOrder,
-    dbo.uspBreakdownReportResolve, dbo.uspBreakdownReportReject,
-    dbo.uspPreventiveScheduleGetAll, dbo.uspPreventiveScheduleCreate,
-    dbo.uspPreventiveScheduleAmend, dbo.uspPreventiveScheduleRecordExecution, dbo.uspPreventiveRecordExecution,
-    dbo.uspPreventiveScheduleToggleStatus, dbo.uspKardexLogAppend, dbo.uspKardexAppend, dbo.uspDashboardGetStats;
+    dbo.uspDashboardObtenerEstadisticas;
 GO
 
 DROP FUNCTION IF EXISTS dbo.fnFrecuenciaDias;
@@ -87,10 +69,6 @@ IF OBJECT_ID(N'dbo.OrdenTrabajo', N'U') IS NOT NULL
     ALTER TABLE dbo.OrdenTrabajo DROP CONSTRAINT IF EXISTS FK_OT_Reporte;
 IF OBJECT_ID(N'dbo.ReporteAveria', N'U') IS NOT NULL
     ALTER TABLE dbo.ReporteAveria DROP CONSTRAINT IF EXISTS FK_RA_OrdenTrabajo;
-IF OBJECT_ID(N'dbo.WorkOrder', N'U') IS NOT NULL
-    ALTER TABLE dbo.WorkOrder DROP CONSTRAINT IF EXISTS FK_WO_Report;
-IF OBJECT_ID(N'dbo.BreakdownReport', N'U') IS NOT NULL
-    ALTER TABLE dbo.BreakdownReport DROP CONSTRAINT IF EXISTS FK_BR_WorkOrder;
 GO
 
 DECLARE @dropFks NVARCHAR(MAX) =
@@ -106,11 +84,7 @@ DROP TABLE IF EXISTS
     dbo.MaterialPreventivo, dbo.PlanPreventivo, dbo.MaterialOrdenTrabajo, dbo.TipoTrabajoOrdenTrabajo,
     dbo.ReporteAveria, dbo.OrdenTrabajo, dbo.SolicitudBaja, dbo.CandadoBaja,
     dbo.BitacoraKardex, dbo.HistorialEstadoActivo, dbo.Activo, dbo.Area, dbo.UsuarioPermiso,
-    dbo.SolicitudReinicioPassword, dbo.Usuario, dbo.RolPermiso, dbo.Permiso, dbo.Rol, dbo.Contador,
-    dbo.PreventiveMaterial, dbo.PreventiveSchedule, dbo.WorkOrderMaterial, dbo.WorkOrderWorkType,
-    dbo.BreakdownReport, dbo.WorkOrder, dbo.DeletionRequest, dbo.DeletionLock,
-    dbo.KardexLog, dbo.AssetStatusHistory, dbo.Asset, dbo.UserPermission,
-    dbo.PasswordResetRequest, dbo.AppUser, dbo.RolePermission, dbo.Permission, dbo.Role, dbo.Counter;
+    dbo.SolicitudReinicioPassword, dbo.Usuario, dbo.RolPermiso, dbo.Permiso, dbo.Rol, dbo.Contador;
 GO
 
 DROP TYPE IF EXISTS dbo.TipoListaTexto;
@@ -122,305 +96,305 @@ DROP TYPE IF EXISTS dbo.PreventiveMaterialType;
 GO
 
 /* ==========================================================================
-   1. TABLAS EN ESPAÑOL
+   1. TABLAS CON COLUMNAS EN ESPAÑOL
    ========================================================================== */
 CREATE TABLE dbo.Rol (
-    RoleCode        NVARCHAR(20) NOT NULL CONSTRAINT PK_Rol PRIMARY KEY,
-    Label           NVARCHAR(50) NOT NULL
+    CodigoRol           NVARCHAR(20) NOT NULL CONSTRAINT PK_Rol PRIMARY KEY,
+    Nombre              NVARCHAR(50) NOT NULL
 );
 
 CREATE TABLE dbo.Permiso (
-    PermissionCode  NVARCHAR(50) NOT NULL CONSTRAINT PK_Permiso PRIMARY KEY
+    CodigoPermiso       NVARCHAR(50) NOT NULL CONSTRAINT PK_Permiso PRIMARY KEY
 );
 
 CREATE TABLE dbo.RolPermiso (
-    RoleCode        NVARCHAR(20) NOT NULL,
-    PermissionCode  NVARCHAR(50) NOT NULL,
-    CONSTRAINT PK_RolPermiso PRIMARY KEY (RoleCode, PermissionCode),
-    CONSTRAINT FK_RolPermiso_Rol     FOREIGN KEY (RoleCode)       REFERENCES dbo.Rol(RoleCode),
-    CONSTRAINT FK_RolPermiso_Permiso FOREIGN KEY (PermissionCode) REFERENCES dbo.Permiso(PermissionCode)
+    CodigoRol           NVARCHAR(20) NOT NULL,
+    CodigoPermiso       NVARCHAR(50) NOT NULL,
+    CONSTRAINT PK_RolPermiso PRIMARY KEY (CodigoRol, CodigoPermiso),
+    CONSTRAINT FK_RolPermiso_Rol     FOREIGN KEY (CodigoRol)     REFERENCES dbo.Rol(CodigoRol),
+    CONSTRAINT FK_RolPermiso_Permiso FOREIGN KEY (CodigoPermiso) REFERENCES dbo.Permiso(CodigoPermiso)
 );
 
 CREATE TABLE dbo.Contador (
-    Name        NVARCHAR(30) NOT NULL CONSTRAINT PK_Contador PRIMARY KEY,
-    NextNumber  INT          NOT NULL CONSTRAINT DF_Contador_NextNumber DEFAULT (1),
-    CONSTRAINT CK_Contador_NextNumber CHECK (NextNumber > 0)
+    Nombre              NVARCHAR(30) NOT NULL CONSTRAINT PK_Contador PRIMARY KEY,
+    SiguienteNumero     INT          NOT NULL CONSTRAINT DF_Contador_SiguienteNumero DEFAULT (1),
+    CONSTRAINT CK_Contador_SiguienteNumero CHECK (SiguienteNumero > 0)
 );
 GO
 
 CREATE TABLE dbo.Usuario (
-    UserId                   INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Usuario PRIMARY KEY,
-    Username                 NVARCHAR(50)  COLLATE Latin1_General_CI_AI NOT NULL CONSTRAINT UQ_Usuario_Username UNIQUE,
-    DisplayName              NVARCHAR(100) NOT NULL,
-    RoleCode                 NVARCHAR(20)  NOT NULL,
+    UsuarioId                INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Usuario PRIMARY KEY,
+    NombreUsuario            NVARCHAR(50)  COLLATE Latin1_General_CI_AI NOT NULL CONSTRAINT UQ_Usuario_NombreUsuario UNIQUE,
+    NombreCompleto           NVARCHAR(100) NOT NULL,
+    CodigoRol                NVARCHAR(20)  NOT NULL,
     PasswordSalt             NVARCHAR(64)  NOT NULL,
     PasswordHash             NVARCHAR(128) NOT NULL,
-    PasswordIterations       INT           NOT NULL CONSTRAINT DF_Usuario_Iters DEFAULT (20000),
-    Disabled                 BIT           NOT NULL CONSTRAINT DF_Usuario_Disabled DEFAULT (0),
-    MustChangePassword       BIT           NOT NULL CONSTRAINT DF_Usuario_MustChange DEFAULT (0),
-    PasswordResetRequested   BIT           NOT NULL CONSTRAINT DF_Usuario_ResetReq DEFAULT (0),
-    PasswordResetRequestedAt DATETIME2(3)  NULL,
-    FailedLoginAttempts      INT           NOT NULL CONSTRAINT DF_Usuario_Failed DEFAULT (0),
-    LockedUntil              DATETIME2(3)  NULL,
-    CreatedAt                DATETIME2(3)  NOT NULL CONSTRAINT DF_Usuario_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    UpdatedAt                DATETIME2(3)  NULL,
-    CONSTRAINT CK_Usuario_Iters CHECK (PasswordIterations >= 10000),
-    CONSTRAINT FK_Usuario_Rol FOREIGN KEY (RoleCode) REFERENCES dbo.Rol(RoleCode)
+    IteracionesPassword      INT           NOT NULL CONSTRAINT DF_Usuario_Iteraciones DEFAULT (20000),
+    Deshabilitado            BIT           NOT NULL CONSTRAINT DF_Usuario_Deshabilitado DEFAULT (0),
+    DebeCambiarPassword      BIT           NOT NULL CONSTRAINT DF_Usuario_DebeCambiar DEFAULT (0),
+    SolicitudReinicioPassword BIT          NOT NULL CONSTRAINT DF_Usuario_SolicitudReinicio DEFAULT (0),
+    SolicitadoEn             DATETIME2(3)  NULL,
+    IntentosFallidos         INT           NOT NULL CONSTRAINT DF_Usuario_IntentosFallidos DEFAULT (0),
+    BloqueadoHasta           DATETIME2(3)  NULL,
+    CreadoEn                 DATETIME2(3)  NOT NULL CONSTRAINT DF_Usuario_CreadoEn DEFAULT (SYSUTCDATETIME()),
+    ActualizadoEn            DATETIME2(3)  NULL,
+    CONSTRAINT CK_Usuario_Iteraciones CHECK (IteracionesPassword >= 10000),
+    CONSTRAINT FK_Usuario_Rol FOREIGN KEY (CodigoRol) REFERENCES dbo.Rol(CodigoRol)
 );
 GO
 
 CREATE TABLE dbo.UsuarioPermiso (
-    UserId         INT          NOT NULL,
-    PermissionCode NVARCHAR(50) NOT NULL,
-    CONSTRAINT PK_UsuarioPermiso PRIMARY KEY (UserId, PermissionCode),
-    CONSTRAINT FK_UP_Usuario FOREIGN KEY (UserId) REFERENCES dbo.Usuario(UserId) ON DELETE CASCADE,
-    CONSTRAINT FK_UP_Permiso FOREIGN KEY (PermissionCode) REFERENCES dbo.Permiso(PermissionCode)
+    UsuarioId          INT          NOT NULL,
+    CodigoPermiso      NVARCHAR(50) NOT NULL,
+    CONSTRAINT PK_UsuarioPermiso PRIMARY KEY (UsuarioId, CodigoPermiso),
+    CONSTRAINT FK_UP_Usuario FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuario(UsuarioId) ON DELETE CASCADE,
+    CONSTRAINT FK_UP_Permiso FOREIGN KEY (CodigoPermiso) REFERENCES dbo.Permiso(CodigoPermiso)
 );
 
 CREATE TABLE dbo.SolicitudReinicioPassword (
-    RequestId   BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SolicitudReinicioPassword PRIMARY KEY,
-    UserId      INT           NOT NULL,
-    Username    NVARCHAR(50)  NOT NULL,
-    DisplayName NVARCHAR(100) NOT NULL,
-    RoleCode    NVARCHAR(20)  NOT NULL,
-    Status      NVARCHAR(15)  NOT NULL CONSTRAINT DF_SRP_Status DEFAULT ('pending'),
-    RequestedAt DATETIME2(3)  NOT NULL CONSTRAINT DF_SRP_RequestedAt DEFAULT (SYSUTCDATETIME()),
-    Details     NVARCHAR(500) NULL,
-    CONSTRAINT CK_SRP_Status CHECK (Status IN ('pending', 'resolved', 'cancelled')),
-    CONSTRAINT FK_SRP_Usuario FOREIGN KEY (UserId) REFERENCES dbo.Usuario(UserId)
+    SolicitudId       BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SolicitudReinicioPassword PRIMARY KEY,
+    UsuarioId         INT           NOT NULL,
+    NombreUsuario     NVARCHAR(50)  NOT NULL,
+    NombreCompleto    NVARCHAR(100) NOT NULL,
+    CodigoRol         NVARCHAR(20)  NOT NULL,
+    Estado            NVARCHAR(15)  NOT NULL CONSTRAINT DF_SRP_Estado DEFAULT ('pending'),
+    SolicitadoEn      DATETIME2(3)  NOT NULL CONSTRAINT DF_SRP_SolicitadoEn DEFAULT (SYSUTCDATETIME()),
+    Detalles          NVARCHAR(500) NULL,
+    CONSTRAINT CK_SRP_Estado CHECK (Estado IN ('pending', 'resolved', 'cancelled')),
+    CONSTRAINT FK_SRP_Usuario FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuario(UsuarioId)
 );
 
 CREATE TABLE dbo.Area (
-    AreaId       NVARCHAR(15)  COLLATE Latin1_General_CI_AI NOT NULL CONSTRAINT PK_Area PRIMARY KEY,
-    Name         NVARCHAR(100) COLLATE Latin1_General_CI_AI NOT NULL,
-    CostCenter   NVARCHAR(50)  NOT NULL,
-    AssetCounter INT           NOT NULL CONSTRAINT DF_Area_AssetCounter DEFAULT (0),
-    CreatedAt    DATETIME2(3)  NOT NULL CONSTRAINT DF_Area_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    UpdatedAt    DATETIME2(3)  NULL
+    AreaId             NVARCHAR(15)  COLLATE Latin1_General_CI_AI NOT NULL CONSTRAINT PK_Area PRIMARY KEY,
+    Nombre             NVARCHAR(100) COLLATE Latin1_General_CI_AI NOT NULL,
+    CentroCosto        NVARCHAR(50)  NOT NULL,
+    ContadorActivos    INT           NOT NULL CONSTRAINT DF_Area_ContadorActivos DEFAULT (0),
+    CreadoEn           DATETIME2(3)  NOT NULL CONSTRAINT DF_Area_CreadoEn DEFAULT (SYSUTCDATETIME()),
+    ActualizadoEn      DATETIME2(3)  NULL
 );
 GO
 
 CREATE TABLE dbo.Activo (
-    AssetCode         NVARCHAR(60) COLLATE Latin1_General_CI_AI NOT NULL CONSTRAINT PK_Activo PRIMARY KEY,
-    Name              NVARCHAR(200) COLLATE Latin1_General_CI_AI NOT NULL,
-    Brand             NVARCHAR(100) COLLATE Latin1_General_CI_AI NULL,
-    Model             NVARCHAR(100) COLLATE Latin1_General_CI_AI NULL,
-    AreaId            NVARCHAR(15)  NOT NULL,
-    StationId         NVARCHAR(100) NOT NULL CONSTRAINT DF_Activo_StationId DEFAULT (''),
-    ParentAssetCode   NVARCHAR(60)  NULL,
-    Level             NVARCHAR(20)  NOT NULL,
-    AncestorsPath     NVARCHAR(400) NOT NULL CONSTRAINT DF_Activo_AncestorsPath DEFAULT (''),
-    Status            NVARCHAR(25)  NOT NULL CONSTRAINT DF_Activo_Status DEFAULT ('active'),
-    TransferredToId   NVARCHAR(60)  NULL,
-    Serial            NVARCHAR(100) NULL,
-    DynamicAttributes NVARCHAR(MAX) NULL,
-    ImageData         NVARCHAR(MAX) NULL,
-    ChildCounter      INT           NOT NULL CONSTRAINT DF_Activo_ChildCounter DEFAULT (0),
-    DeletedAt         DATETIME2(3)  NULL,
-    DeletedByUserId   INT           NULL,
-    DeletedByUserName NVARCHAR(100) NULL,
-    SearchText        AS (CONCAT(AssetCode,' ',Name,' ',Brand,' ',Model,' ',Serial)) PERSISTED,
-    CreatedAt         DATETIME2(3)  NOT NULL CONSTRAINT DF_Activo_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    UpdatedAt         DATETIME2(3)  NULL,
-    RowVersion        ROWVERSION,
-    CONSTRAINT CK_Activo_Level   CHECK (Level IN ('equipment','subEquipment','part','subPart')),
-    CONSTRAINT CK_Activo_Status  CHECK (Status IN ('active','transferredDeactivated','inactive','deleted')),
-    CONSTRAINT CK_Activo_Image   CHECK (ImageData IS NULL OR LEN(ImageData) < 1100000),
-    CONSTRAINT CK_Activo_Json    CHECK (DynamicAttributes IS NULL OR ISJSON(DynamicAttributes) = 1),
+    CodigoActivo               NVARCHAR(60) COLLATE Latin1_General_CI_AI NOT NULL CONSTRAINT PK_Activo PRIMARY KEY,
+    Nombre                     NVARCHAR(200) COLLATE Latin1_General_CI_AI NOT NULL,
+    Marca                      NVARCHAR(100) COLLATE Latin1_General_CI_AI NULL,
+    Modelo                     NVARCHAR(100) COLLATE Latin1_General_CI_AI NULL,
+    AreaId                     NVARCHAR(15)  NOT NULL,
+    EstacionId                 NVARCHAR(100) NOT NULL CONSTRAINT DF_Activo_EstacionId DEFAULT (''),
+    CodigoActivoPadre          NVARCHAR(60)  NULL,
+    Nivel                      NVARCHAR(20)  NOT NULL,
+    RutaAncestros              NVARCHAR(400) NOT NULL CONSTRAINT DF_Activo_RutaAncestros DEFAULT (''),
+    Estado                     NVARCHAR(25)  NOT NULL CONSTRAINT DF_Activo_Estado DEFAULT ('active'),
+    TraspasadoACodigo          NVARCHAR(60)  NULL,
+    Serie                      NVARCHAR(100) NULL,
+    AtributosDinamicos         NVARCHAR(MAX) NULL,
+    DatosImagen                NVARCHAR(MAX) NULL,
+    ContadorHijos              INT           NOT NULL CONSTRAINT DF_Activo_ContadorHijos DEFAULT (0),
+    EliminadoEn                DATETIME2(3)  NULL,
+    EliminadoPorUsuarioId      INT           NULL,
+    EliminadoPorNombreUsuario  NVARCHAR(100) NULL,
+    TextoBusqueda              AS (CONCAT(CodigoActivo,' ',Nombre,' ',Marca,' ',Modelo,' ',Serie)) PERSISTED,
+    CreadoEn                   DATETIME2(3)  NOT NULL CONSTRAINT DF_Activo_CreadoEn DEFAULT (SYSUTCDATETIME()),
+    ActualizadoEn              DATETIME2(3)  NULL,
+    VersionFila                ROWVERSION,
+    CONSTRAINT CK_Activo_Nivel   CHECK (Nivel IN ('equipment','subEquipment','part','subPart')),
+    CONSTRAINT CK_Activo_Estado  CHECK (Estado IN ('active','transferredDeactivated','inactive','deleted')),
+    CONSTRAINT CK_Activo_Imagen  CHECK (DatosImagen IS NULL OR LEN(DatosImagen) < 1100000),
+    CONSTRAINT CK_Activo_Json    CHECK (AtributosDinamicos IS NULL OR ISJSON(AtributosDinamicos) = 1),
     CONSTRAINT FK_Activo_Area    FOREIGN KEY (AreaId) REFERENCES dbo.Area(AreaId),
-    CONSTRAINT FK_Activo_Padre   FOREIGN KEY (ParentAssetCode) REFERENCES dbo.Activo(AssetCode),
-    CONSTRAINT FK_Activo_BajaPor FOREIGN KEY (DeletedByUserId) REFERENCES dbo.Usuario(UserId)
+    CONSTRAINT FK_Activo_Padre   FOREIGN KEY (CodigoActivoPadre) REFERENCES dbo.Activo(CodigoActivo),
+    CONSTRAINT FK_Activo_BajaPor FOREIGN KEY (EliminadoPorUsuarioId) REFERENCES dbo.Usuario(UsuarioId)
 );
 
 CREATE TABLE dbo.HistorialEstadoActivo (
-    HistoryId  BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HistorialEstadoActivo PRIMARY KEY,
-    AssetCode  NVARCHAR(60)  NOT NULL,
-    Status     NVARCHAR(25)  NOT NULL,
-    StartedAt  DATETIME2(3)  NOT NULL,
-    EndedAt    DATETIME2(3)  NULL,
-    AreaId     NVARCHAR(15)  NOT NULL,
-    Reason     NVARCHAR(500) NULL,
-    UserId     INT           NULL,
-    UserName   NVARCHAR(100) NULL,
-    CONSTRAINT CK_HEA_Status CHECK (Status IN ('active','transferredDeactivated','inactive','deleted')),
-    CONSTRAINT FK_HEA_Activo  FOREIGN KEY (AssetCode) REFERENCES dbo.Activo(AssetCode),
-    CONSTRAINT FK_HEA_Usuario FOREIGN KEY (UserId)    REFERENCES dbo.Usuario(UserId)
+    HistorialId        BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HistorialEstadoActivo PRIMARY KEY,
+    CodigoActivo       NVARCHAR(60)  NOT NULL,
+    Estado             NVARCHAR(25)  NOT NULL,
+    IniciadoEn         DATETIME2(3)  NOT NULL,
+    FinalizadoEn       DATETIME2(3)  NULL,
+    AreaId             NVARCHAR(15)  NOT NULL,
+    Motivo             NVARCHAR(500) NULL,
+    UsuarioId          INT           NULL,
+    NombreUsuario      NVARCHAR(100) NULL,
+    CONSTRAINT CK_HEA_Estado CHECK (Estado IN ('active','transferredDeactivated','inactive','deleted')),
+    CONSTRAINT FK_HEA_Activo  FOREIGN KEY (CodigoActivo) REFERENCES dbo.Activo(CodigoActivo),
+    CONSTRAINT FK_HEA_Usuario FOREIGN KEY (UsuarioId)    REFERENCES dbo.Usuario(UsuarioId)
 );
 
 CREATE TABLE dbo.CandadoBaja (
-    AssetCode   NVARCHAR(60) NOT NULL CONSTRAINT PK_CandadoBaja PRIMARY KEY,
-    LockStatus  NVARCHAR(10) NOT NULL,
-    UpdatedAt   DATETIME2(3) NOT NULL CONSTRAINT DF_CB_UpdatedAt DEFAULT (SYSUTCDATETIME()),
-    CONSTRAINT CK_CB_Status CHECK (LockStatus IN ('pending','approved','rejected')),
-    CONSTRAINT FK_CB_Activo FOREIGN KEY (AssetCode) REFERENCES dbo.Activo(AssetCode)
+    CodigoActivo       NVARCHAR(60) NOT NULL CONSTRAINT PK_CandadoBaja PRIMARY KEY,
+    EstadoCandado      NVARCHAR(10) NOT NULL,
+    ActualizadoEn      DATETIME2(3) NOT NULL CONSTRAINT DF_CB_ActualizadoEn DEFAULT (SYSUTCDATETIME()),
+    CONSTRAINT CK_CB_Estado CHECK (EstadoCandado IN ('pending','approved','rejected')),
+    CONSTRAINT FK_CB_Activo FOREIGN KEY (CodigoActivo) REFERENCES dbo.Activo(CodigoActivo)
 );
 
 CREATE TABLE dbo.SolicitudBaja (
-    RequestId            BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SolicitudBaja PRIMARY KEY,
-    AssetCode            NVARCHAR(60)  NOT NULL,
-    AssetName            NVARCHAR(200) NOT NULL,
-    AreaId               NVARCHAR(15)  NOT NULL,
-    Status               NVARCHAR(10)  NOT NULL CONSTRAINT DF_SB_Status DEFAULT ('pending'),
-    Reason               NVARCHAR(1000) NOT NULL,
-    RequestedByUserId    INT           NOT NULL,
-    RequestedByUserName  NVARCHAR(100) NOT NULL,
-    RequestedAt          DATETIME2(3)  NOT NULL CONSTRAINT DF_SB_RequestedAt DEFAULT (SYSUTCDATETIME()),
-    DecidedByUserId      INT           NULL,
-    DecidedByUserName    NVARCHAR(100) NULL,
-    DecidedAt            DATETIME2(3)  NULL,
-    DecisionReason       NVARCHAR(500) NULL,
-    RowVersion           ROWVERSION,
-    CONSTRAINT CK_SB_Status CHECK (Status IN ('pending','approved','rejected')),
-    CONSTRAINT FK_SB_Activo     FOREIGN KEY (AssetCode)         REFERENCES dbo.Activo(AssetCode),
-    CONSTRAINT FK_SB_Area       FOREIGN KEY (AreaId)            REFERENCES dbo.Area(AreaId),
-    CONSTRAINT FK_SB_Solicitante FOREIGN KEY (RequestedByUserId) REFERENCES dbo.Usuario(UserId),
-    CONSTRAINT FK_SB_Decisor    FOREIGN KEY (DecidedByUserId)   REFERENCES dbo.Usuario(UserId)
+    SolicitudId                  BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SolicitudBaja PRIMARY KEY,
+    CodigoActivo                 NVARCHAR(60)  NOT NULL,
+    NombreActivo                 NVARCHAR(200) NOT NULL,
+    AreaId                       NVARCHAR(15)  NOT NULL,
+    Estado                       NVARCHAR(10)  NOT NULL CONSTRAINT DF_SB_Estado DEFAULT ('pending'),
+    Motivo                       NVARCHAR(1000) NOT NULL,
+    SolicitadoPorUsuarioId       INT           NOT NULL,
+    SolicitadoPorNombreUsuario   NVARCHAR(100) NOT NULL,
+    SolicitadoEn                 DATETIME2(3)  NOT NULL CONSTRAINT DF_SB_SolicitadoEn DEFAULT (SYSUTCDATETIME()),
+    DecididoPorUsuarioId         INT           NULL,
+    DecididoPorNombreUsuario     NVARCHAR(100) NULL,
+    DecididoEn                   DATETIME2(3)  NULL,
+    MotivoDecision               NVARCHAR(500) NULL,
+    VersionFila                  ROWVERSION,
+    CONSTRAINT CK_SB_Estado CHECK (Estado IN ('pending','approved','rejected')),
+    CONSTRAINT FK_SB_Activo     FOREIGN KEY (CodigoActivo)           REFERENCES dbo.Activo(CodigoActivo),
+    CONSTRAINT FK_SB_Area       FOREIGN KEY (AreaId)                 REFERENCES dbo.Area(AreaId),
+    CONSTRAINT FK_SB_Solicitante FOREIGN KEY (SolicitadoPorUsuarioId) REFERENCES dbo.Usuario(UsuarioId),
+    CONSTRAINT FK_SB_Decisor    FOREIGN KEY (DecididoPorUsuarioId)   REFERENCES dbo.Usuario(UsuarioId)
 );
 
 CREATE TABLE dbo.ReporteAveria (
-    ReportId            BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ReporteAveria PRIMARY KEY,
-    AssetCode           NVARCHAR(60)  NOT NULL,
-    AssetName           NVARCHAR(200) NOT NULL,
-    AreaId              NVARCHAR(15)  NOT NULL,
-    Description         NVARCHAR(MAX) NOT NULL,
-    Severity            NVARCHAR(10)  NOT NULL,
-    ReportedByUserId    INT           NULL,
-    ReportedByUserName  NVARCHAR(100) NOT NULL,
-    ReportedAt          DATETIME2(3)  NOT NULL CONSTRAINT DF_RA_ReportedAt DEFAULT (SYSUTCDATETIME()),
-    Status              NVARCHAR(15)  NOT NULL CONSTRAINT DF_RA_Status DEFAULT ('reported'),
-    WorkOrderId         NVARCHAR(20)  NULL,
-    ResolvedByUserId    INT           NULL,
-    ResolvedByUserName  NVARCHAR(100) NULL,
-    ResolvedAt          DATETIME2(3)  NULL,
-    RejectionReason     NVARCHAR(500) NULL,
-    RejectedByUserId    INT           NULL,
-    RejectedByUserName  NVARCHAR(100) NULL,
-    RejectedAt          DATETIME2(3)  NULL,
-    RowVersion          ROWVERSION,
-    CONSTRAINT CK_RA_Severity CHECK (Severity IN ('low','medium','high','critical')),
-    CONSTRAINT CK_RA_Status   CHECK (Status IN ('reported','inWorkOrder','resolved','rejected','pending','inProgress')),
-    CONSTRAINT FK_RA_Activo    FOREIGN KEY (AssetCode)        REFERENCES dbo.Activo(AssetCode),
-    CONSTRAINT FK_RA_Reportador FOREIGN KEY (ReportedByUserId) REFERENCES dbo.Usuario(UserId),
-    CONSTRAINT FK_RA_Resolutor FOREIGN KEY (ResolvedByUserId) REFERENCES dbo.Usuario(UserId),
-    CONSTRAINT FK_RA_Rechazador FOREIGN KEY (RejectedByUserId) REFERENCES dbo.Usuario(UserId)
+    ReporteId                  BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_ReporteAveria PRIMARY KEY,
+    CodigoActivo               NVARCHAR(60)  NOT NULL,
+    NombreActivo               NVARCHAR(200) NOT NULL,
+    AreaId                     NVARCHAR(15)  NOT NULL,
+    Descripcion                NVARCHAR(MAX) NOT NULL,
+    Severidad                  NVARCHAR(10)  NOT NULL,
+    ReportadoPorUsuarioId      INT           NULL,
+    ReportadoPorNombreUsuario  NVARCHAR(100) NOT NULL,
+    ReportadoEn                DATETIME2(3)  NOT NULL CONSTRAINT DF_RA_ReportadoEn DEFAULT (SYSUTCDATETIME()),
+    Estado                     NVARCHAR(15)  NOT NULL CONSTRAINT DF_RA_Estado DEFAULT ('reported'),
+    OrdenTrabajoId             NVARCHAR(20)  NULL,
+    ResueltoPorUsuarioId       INT           NULL,
+    ResueltoPorNombreUsuario   NVARCHAR(100) NULL,
+    ResueltoEn                 DATETIME2(3)  NULL,
+    MotivoRechazo              NVARCHAR(500) NULL,
+    RechazadoPorUsuarioId      INT           NULL,
+    RechazadoPorNombreUsuario  NVARCHAR(100) NULL,
+    RechazadoEn                DATETIME2(3)  NULL,
+    VersionFila                ROWVERSION,
+    CONSTRAINT CK_RA_Severidad CHECK (Severidad IN ('low','medium','high','critical')),
+    CONSTRAINT CK_RA_Estado    CHECK (Estado IN ('reported','inWorkOrder','resolved','rejected','pending','inProgress')),
+    CONSTRAINT FK_RA_Activo     FOREIGN KEY (CodigoActivo)          REFERENCES dbo.Activo(CodigoActivo),
+    CONSTRAINT FK_RA_Reportador FOREIGN KEY (ReportadoPorUsuarioId) REFERENCES dbo.Usuario(UsuarioId),
+    CONSTRAINT FK_RA_Resolutor  FOREIGN KEY (ResueltoPorUsuarioId)  REFERENCES dbo.Usuario(UsuarioId),
+    CONSTRAINT FK_RA_Rechazador FOREIGN KEY (RechazadoPorUsuarioId) REFERENCES dbo.Usuario(UsuarioId)
 );
 
 CREATE TABLE dbo.OrdenTrabajo (
-    WorkOrderId                NVARCHAR(20)  NOT NULL CONSTRAINT PK_OrdenTrabajo PRIMARY KEY,
-    AssetCode                  NVARCHAR(60)  NULL,
-    AssetName                  NVARCHAR(200) NOT NULL,
-    AreaId                     NVARCHAR(15)  NULL,
-    AreaName                   NVARCHAR(200) NULL,
-    Description                NVARCHAR(MAX) NOT NULL,
-    Status                     NVARCHAR(15)  NOT NULL CONSTRAINT DF_OT_Status DEFAULT ('pending'),
-    Priority                   NVARCHAR(10)  NOT NULL CONSTRAINT DF_OT_Priority DEFAULT ('medium'),
-    AssignedTo                 NVARCHAR(200) NULL,
-    AssignedStaffCount         INT           NULL,
-    EstimatedHours             DECIMAL(6,2)  NULL,
-    ActualHours                DECIMAL(6,2)  NULL,
-    WorkDoneDescription        NVARCHAR(MAX) NULL,
-    IsCompleted                BIT           NULL,
-    UnfulfillmentReason        NVARCHAR(500) NULL,
-    ReprogramDate              DATETIME2(3)  NULL,
-    AccHaccpResponsible        NVARCHAR(200) NULL,
-    MaintenanceResponsible     NVARCHAR(200) NULL,
-    AreaHeadResponsible        NVARCHAR(200) NULL,
-    MaintenanceHeadResponsible NVARCHAR(200) NULL,
-    ScheduledDate              DATETIME2(3)  NULL,
-    ReportId                   BIGINT        NULL,
-    CreatedByUserId            INT           NULL,
-    CreatedByUserName          NVARCHAR(100) NULL,
-    CreatedAt                  DATETIME2(3)  NOT NULL CONSTRAINT DF_OT_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    RowVersion                 ROWVERSION,
-    CONSTRAINT CK_OT_Status      CHECK (Status IN ('pending','inProgress','completed','cancelled','unfulfilled')),
-    CONSTRAINT CK_OT_Priority    CHECK (Priority IN ('low','medium','high')),
-    CONSTRAINT CK_OT_Description CHECK (LTRIM(Description) <> ''),
-    CONSTRAINT FK_OT_Activo    FOREIGN KEY (AssetCode)        REFERENCES dbo.Activo(AssetCode),
-    CONSTRAINT FK_OT_Area      FOREIGN KEY (AreaId)           REFERENCES dbo.Area(AreaId),
-    CONSTRAINT FK_OT_Creador   FOREIGN KEY (CreatedByUserId)  REFERENCES dbo.Usuario(UserId),
-    CONSTRAINT FK_OT_Reporte   FOREIGN KEY (ReportId)         REFERENCES dbo.ReporteAveria(ReportId)
+    OrdenTrabajoId              NVARCHAR(20)  NOT NULL CONSTRAINT PK_OrdenTrabajo PRIMARY KEY,
+    CodigoActivo                NVARCHAR(60)  NULL,
+    NombreActivo                NVARCHAR(200) NOT NULL,
+    AreaId                      NVARCHAR(15)  NULL,
+    NombreArea                  NVARCHAR(200) NULL,
+    Descripcion                 NVARCHAR(MAX) NOT NULL,
+    Estado                      NVARCHAR(15)  NOT NULL CONSTRAINT DF_OT_Estado DEFAULT ('pending'),
+    Prioridad                   NVARCHAR(10)  NOT NULL CONSTRAINT DF_OT_Prioridad DEFAULT ('medium'),
+    AsignadoA                   NVARCHAR(200) NULL,
+    CantidadPersonalAsignado    INT           NULL,
+    HorasEstimadas              DECIMAL(6,2)  NULL,
+    HorasReales                 DECIMAL(6,2)  NULL,
+    DescripcionTrabajoRealizado NVARCHAR(MAX) NULL,
+    EstaCompletada              BIT           NULL,
+    MotivoIncumplimiento        NVARCHAR(500) NULL,
+    FechaReprogramacion         DATETIME2(3)  NULL,
+    ResponsableAccHaccp         NVARCHAR(200) NULL,
+    ResponsableMantenimiento    NVARCHAR(200) NULL,
+    ResponsableJefeArea         NVARCHAR(200) NULL,
+    ResponsableJefeMantenimiento NVARCHAR(200) NULL,
+    FechaProgramada             DATETIME2(3)  NULL,
+    ReporteId                   BIGINT        NULL,
+    CreadoPorUsuarioId          INT           NULL,
+    CreadoPorNombreUsuario      NVARCHAR(100) NULL,
+    CreadoEn                    DATETIME2(3)  NOT NULL CONSTRAINT DF_OT_CreadoEn DEFAULT (SYSUTCDATETIME()),
+    VersionFila                 ROWVERSION,
+    CONSTRAINT CK_OT_Estado      CHECK (Estado IN ('pending','inProgress','completed','cancelled','unfulfilled')),
+    CONSTRAINT CK_OT_Prioridad   CHECK (Prioridad IN ('low','medium','high')),
+    CONSTRAINT CK_OT_Descripcion CHECK (LTRIM(Descripcion) <> ''),
+    CONSTRAINT FK_OT_Activo    FOREIGN KEY (CodigoActivo)       REFERENCES dbo.Activo(CodigoActivo),
+    CONSTRAINT FK_OT_Area      FOREIGN KEY (AreaId)             REFERENCES dbo.Area(AreaId),
+    CONSTRAINT FK_OT_Creador   FOREIGN KEY (CreadoPorUsuarioId) REFERENCES dbo.Usuario(UsuarioId),
+    CONSTRAINT FK_OT_Reporte   FOREIGN KEY (ReporteId)          REFERENCES dbo.ReporteAveria(ReporteId)
 );
 
 ALTER TABLE dbo.ReporteAveria ADD CONSTRAINT FK_RA_OrdenTrabajo
-    FOREIGN KEY (WorkOrderId) REFERENCES dbo.OrdenTrabajo(WorkOrderId);
+    FOREIGN KEY (OrdenTrabajoId) REFERENCES dbo.OrdenTrabajo(OrdenTrabajoId);
 
 CREATE TABLE dbo.MaterialOrdenTrabajo (
-    WorkOrderId NVARCHAR(20)   NOT NULL,
-    LineNum      INT            NOT NULL,
-    Description NVARCHAR(200)  NOT NULL,
-    Quantity    DECIMAL(10,2)  NOT NULL CONSTRAINT DF_MOT_Quantity DEFAULT (1),
-    Unit        NVARCHAR(10)   NOT NULL CONSTRAINT DF_MOT_Unit DEFAULT ('pz'),
-    CONSTRAINT PK_MaterialOrdenTrabajo PRIMARY KEY (WorkOrderId, LineNum),
-    CONSTRAINT FK_MOT_Orden FOREIGN KEY (WorkOrderId) REFERENCES dbo.OrdenTrabajo(WorkOrderId)
+    OrdenTrabajoId NVARCHAR(20)   NOT NULL,
+    NumeroLinea    INT            NOT NULL,
+    Descripcion    NVARCHAR(200)  NOT NULL,
+    Cantidad       DECIMAL(10,2)  NOT NULL CONSTRAINT DF_MOT_Cantidad DEFAULT (1),
+    Unidad         NVARCHAR(10)   NOT NULL CONSTRAINT DF_MOT_Unidad DEFAULT ('pz'),
+    CONSTRAINT PK_MaterialOrdenTrabajo PRIMARY KEY (OrdenTrabajoId, NumeroLinea),
+    CONSTRAINT FK_MOT_Orden FOREIGN KEY (OrdenTrabajoId) REFERENCES dbo.OrdenTrabajo(OrdenTrabajoId)
 );
 
 CREATE TABLE dbo.TipoTrabajoOrdenTrabajo (
-    WorkOrderId NVARCHAR(20) NOT NULL,
-    WorkType    NVARCHAR(30) NOT NULL,
-    CONSTRAINT PK_TipoTrabajoOrdenTrabajo PRIMARY KEY (WorkOrderId, WorkType),
-    CONSTRAINT CK_TTOT_Tipo CHECK (WorkType IN
+    OrdenTrabajoId NVARCHAR(20) NOT NULL,
+    TipoTrabajo    NVARCHAR(30) NOT NULL,
+    CONSTRAINT PK_TipoTrabajoOrdenTrabajo PRIMARY KEY (OrdenTrabajoId, TipoTrabajo),
+    CONSTRAINT CK_TTOT_Tipo CHECK (TipoTrabajo IN
         ('electric','mechanical','urgency','refrigeration','plumbing','preventive','corrective','scheduled')),
-    CONSTRAINT FK_TTOT_Orden FOREIGN KEY (WorkOrderId) REFERENCES dbo.OrdenTrabajo(WorkOrderId)
+    CONSTRAINT FK_TTOT_Orden FOREIGN KEY (OrdenTrabajoId) REFERENCES dbo.OrdenTrabajo(OrdenTrabajoId)
 );
 GO
 
 CREATE TABLE dbo.PlanPreventivo (
-    ScheduleId         NVARCHAR(20)  NOT NULL CONSTRAINT PK_PlanPreventivo PRIMARY KEY,
-    Title              NVARCHAR(200) NOT NULL,
-    AssetCode          NVARCHAR(60)  NOT NULL,
-    AssetName          NVARCHAR(200) NOT NULL,
-    AreaId             NVARCHAR(15)  NOT NULL,
-    AreaName           NVARCHAR(200) NOT NULL,
-    MaintenanceType    NVARCHAR(100) NOT NULL,
-    Frequency          NVARCHAR(15)  NOT NULL,
-    Description        NVARCHAR(MAX) NULL,
-    EstimatedHours     DECIMAL(6,2)  NULL,
-    StartDate          DATETIME2(3)  NOT NULL,
-    NextDate           DATETIME2(3)  NOT NULL,
-    LastCompleted      DATETIME2(3)  NULL,
-    LastWorkOrderId    NVARCHAR(20)  NULL,
-    Status             NVARCHAR(10)  NOT NULL CONSTRAINT DF_PP_Status DEFAULT ('active'),
-    Notes              NVARCHAR(500) NULL,
-    CreatedByUserId    INT           NULL,
-    CreatedByUserName  NVARCHAR(100) NULL,
-    CreatedAt          DATETIME2(3)  NOT NULL CONSTRAINT DF_PP_CreatedAt DEFAULT (SYSUTCDATETIME()),
-    AmendmentDocNumber NVARCHAR(50)  NULL,
-    AmendedBy          NVARCHAR(250) NULL,
-    AmendedAt          DATETIME2(3)  NULL,
-    AmendmentReason    NVARCHAR(500) NULL,
-    RowVersion         ROWVERSION,
-    CONSTRAINT CK_PP_Frecuencia CHECK (Frequency IN
+    PlanId                      NVARCHAR(20)  NOT NULL CONSTRAINT PK_PlanPreventivo PRIMARY KEY,
+    Titulo                      NVARCHAR(200) NOT NULL,
+    CodigoActivo                NVARCHAR(60)  NOT NULL,
+    NombreActivo                NVARCHAR(200) NOT NULL,
+    AreaId                      NVARCHAR(15)  NOT NULL,
+    NombreArea                  NVARCHAR(200) NOT NULL,
+    TipoMantenimiento           NVARCHAR(100) NOT NULL,
+    Frecuencia                  NVARCHAR(15)  NOT NULL,
+    Descripcion                 NVARCHAR(MAX) NULL,
+    HorasEstimadas              DECIMAL(6,2)  NULL,
+    FechaInicio                 DATETIME2(3)  NOT NULL,
+    ProximaFecha                DATETIME2(3)  NOT NULL,
+    UltimaCompletada            DATETIME2(3)  NULL,
+    UltimaOrdenTrabajoId        NVARCHAR(20)  NULL,
+    Estado                      NVARCHAR(10)  NOT NULL CONSTRAINT DF_PP_Estado DEFAULT ('active'),
+    Notas                       NVARCHAR(500) NULL,
+    CreadoPorUsuarioId          INT           NULL,
+    CreadoPorNombreUsuario      NVARCHAR(100) NULL,
+    CreadoEn                    DATETIME2(3)  NOT NULL CONSTRAINT DF_PP_CreadoEn DEFAULT (SYSUTCDATETIME()),
+    NumeroDocumentoModificacion NVARCHAR(50)  NULL,
+    ModificadoPor               NVARCHAR(250) NULL,
+    ModificadoEn                DATETIME2(3)  NULL,
+    MotivoModificacion          NVARCHAR(500) NULL,
+    VersionFila                 ROWVERSION,
+    CONSTRAINT CK_PP_Frecuencia CHECK (Frecuencia IN
         ('daily','weekly','biweekly','monthly','bimonthly','quarterly','semiannual','annual',
          'Diaria','Semanal','Quincenal','Mensual','Bimestral','Trimestral','Semestral','Anual',
          'diaria','semanal','quincenal','mensual','bimestral','trimestral','semestral','anual')),
-    CONSTRAINT CK_PP_Status CHECK (Status IN ('active','paused','completed')),
-    CONSTRAINT FK_PP_Activo   FOREIGN KEY (AssetCode)       REFERENCES dbo.Activo(AssetCode),
-    CONSTRAINT FK_PP_Area     FOREIGN KEY (AreaId)          REFERENCES dbo.Area(AreaId),
-    CONSTRAINT FK_PP_Creador  FOREIGN KEY (CreatedByUserId) REFERENCES dbo.Usuario(UserId),
-    CONSTRAINT FK_PP_UltimaOT FOREIGN KEY (LastWorkOrderId) REFERENCES dbo.OrdenTrabajo(WorkOrderId)
+    CONSTRAINT CK_PP_Estado CHECK (Estado IN ('active','paused','completed')),
+    CONSTRAINT FK_PP_Activo   FOREIGN KEY (CodigoActivo)         REFERENCES dbo.Activo(CodigoActivo),
+    CONSTRAINT FK_PP_Area     FOREIGN KEY (AreaId)               REFERENCES dbo.Area(AreaId),
+    CONSTRAINT FK_PP_Creador  FOREIGN KEY (CreadoPorUsuarioId)   REFERENCES dbo.Usuario(UsuarioId),
+    CONSTRAINT FK_PP_UltimaOT FOREIGN KEY (UltimaOrdenTrabajoId) REFERENCES dbo.OrdenTrabajo(OrdenTrabajoId)
 );
 
 CREATE TABLE dbo.MaterialPreventivo (
-    ScheduleId NVARCHAR(20)  NOT NULL,
-    LineNum     INT           NOT NULL,
-    Name       NVARCHAR(200) NOT NULL,
-    Quantity   DECIMAL(10,2) NOT NULL CONSTRAINT DF_MP_Quantity DEFAULT (1),
-    Unit       NVARCHAR(10)  NOT NULL CONSTRAINT DF_MP_Unit DEFAULT ('pza'),
-    CONSTRAINT PK_MaterialPreventivo PRIMARY KEY (ScheduleId, LineNum),
-    CONSTRAINT FK_MP_Plan FOREIGN KEY (ScheduleId) REFERENCES dbo.PlanPreventivo(ScheduleId)
+    PlanId      NVARCHAR(20)  NOT NULL,
+    NumeroLinea INT           NOT NULL,
+    Nombre      NVARCHAR(200) NOT NULL,
+    Cantidad    DECIMAL(10,2) NOT NULL CONSTRAINT DF_MP_Cantidad DEFAULT (1),
+    Unidad      NVARCHAR(10)  NOT NULL CONSTRAINT DF_MP_Unidad DEFAULT ('pza'),
+    CONSTRAINT PK_MaterialPreventivo PRIMARY KEY (PlanId, NumeroLinea),
+    CONSTRAINT FK_MP_Plan FOREIGN KEY (PlanId) REFERENCES dbo.PlanPreventivo(PlanId)
 );
 
 CREATE TABLE dbo.BitacoraKardex (
-    LogId     BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_BitacoraKardex PRIMARY KEY,
-    LoggedAt  DATETIME2(3)  NOT NULL CONSTRAINT DF_BK_LoggedAt DEFAULT (SYSUTCDATETIME()),
-    UserId    INT           NULL,
-    UserName  NVARCHAR(100) NOT NULL,
-    Action    NVARCHAR(40)  NOT NULL,
-    Module    NVARCHAR(20)  NOT NULL,
-    EntityId  NVARCHAR(60)  NOT NULL,
-    Details   NVARCHAR(MAX) NOT NULL,
-    CONSTRAINT CK_BK_Modulo CHECK (Module IN ('ASSETS','WORK_ORDERS','BREAKDOWNS','PREVENTIVE')),
-    CONSTRAINT FK_BK_Usuario FOREIGN KEY (UserId) REFERENCES dbo.Usuario(UserId)
+    BitacoraId   BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_BitacoraKardex PRIMARY KEY,
+    RegistradoEn DATETIME2(3)  NOT NULL CONSTRAINT DF_BK_RegistradoEn DEFAULT (SYSUTCDATETIME()),
+    UsuarioId    INT           NULL,
+    NombreUsuario NVARCHAR(100) NOT NULL,
+    Accion       NVARCHAR(40)  NOT NULL,
+    Modulo       NVARCHAR(20)  NOT NULL,
+    EntidadId    NVARCHAR(60)  NOT NULL,
+    Detalles     NVARCHAR(MAX) NOT NULL,
+    CONSTRAINT CK_BK_Modulo CHECK (Modulo IN ('ASSETS','WORK_ORDERS','BREAKDOWNS','PREVENTIVE')),
+    CONSTRAINT FK_BK_Usuario FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuario(UsuarioId)
 );
 GO
 
@@ -428,23 +402,23 @@ GO
    2. TIPOS DE TABLA (TVPs)
    ========================================================================== */
 CREATE TYPE dbo.TipoListaTexto AS TABLE (
-    Value NVARCHAR(30) NOT NULL
+    Valor NVARCHAR(30) NOT NULL
 );
 GO
 
 CREATE TYPE dbo.TipoMaterialOrdenTrabajo AS TABLE (
-    LineNum     INT            NOT NULL,
-    Description NVARCHAR(200)  NOT NULL,
-    Quantity    DECIMAL(10,2)  NOT NULL,
-    Unit        NVARCHAR(10)   NULL
+    NumeroLinea INT            NOT NULL,
+    Descripcion NVARCHAR(200)  NOT NULL,
+    Cantidad    DECIMAL(10,2)  NOT NULL,
+    Unidad      NVARCHAR(10)   NULL
 );
 GO
 
 CREATE TYPE dbo.TipoMaterialPreventivo AS TABLE (
-    LineNum  INT            NOT NULL,
-    Name     NVARCHAR(200)  NOT NULL,
-    Quantity DECIMAL(10,2)  NOT NULL,
-    Unit     NVARCHAR(10)   NULL
+    NumeroLinea INT            NOT NULL,
+    Nombre      NVARCHAR(200)  NOT NULL,
+    Cantidad    DECIMAL(10,2)  NOT NULL,
+    Unidad      NVARCHAR(10)   NULL
 );
 GO
 
@@ -514,23 +488,23 @@ GO
 /* ==========================================================================
    4. ÍNDICES
    ========================================================================== */
-CREATE NONCLUSTERED INDEX IX_Activo_Area_Nombre     ON dbo.Activo(AreaId, Name);
-CREATE NONCLUSTERED INDEX IX_Activo_Area_Estado     ON dbo.Activo(AreaId, Status, Name);
-CREATE NONCLUSTERED INDEX IX_Activo_Serie          ON dbo.Activo(Serial) WHERE Serial IS NOT NULL;
-CREATE UNIQUE NONCLUSTERED INDEX UX_HEA_PeriodoAbierto ON dbo.HistorialEstadoActivo(AssetCode) WHERE EndedAt IS NULL;
-CREATE NONCLUSTERED INDEX IX_OT_Estado_Fecha       ON dbo.OrdenTrabajo(Status, CreatedAt DESC);
-CREATE NONCLUSTERED INDEX IX_OT_Activo_Fecha       ON dbo.OrdenTrabajo(AssetCode, CreatedAt DESC);
-CREATE NONCLUSTERED INDEX IX_OT_Area_Fecha         ON dbo.OrdenTrabajo(AreaId, CreatedAt DESC);
-CREATE NONCLUSTERED INDEX IX_BK_Entidad_Fecha      ON dbo.BitacoraKardex(EntityId, LoggedAt DESC);
-CREATE NONCLUSTERED INDEX IX_BK_Modulo_Fecha       ON dbo.BitacoraKardex(Module, LoggedAt DESC);
-CREATE NONCLUSTERED INDEX IX_BK_Usuario_Fecha      ON dbo.BitacoraKardex(UserId, LoggedAt DESC);
-CREATE NONCLUSTERED INDEX IX_PP_Area_Estado_Prox   ON dbo.PlanPreventivo(AreaId, Status, NextDate);
-CREATE NONCLUSTERED INDEX IX_PP_Estado_Prox        ON dbo.PlanPreventivo(Status, NextDate);
-CREATE NONCLUSTERED INDEX IX_SB_Estado_Fecha       ON dbo.SolicitudBaja(Status, RequestedAt DESC);
-CREATE NONCLUSTERED INDEX IX_SB_Activo_Estado      ON dbo.SolicitudBaja(AssetCode, Status);
-CREATE NONCLUSTERED INDEX IX_RA_Reportador_Fecha   ON dbo.ReporteAveria(ReportedByUserId, ReportedAt DESC);
-CREATE NONCLUSTERED INDEX IX_RA_Estado_Fecha       ON dbo.ReporteAveria(Status, ReportedAt DESC);
-CREATE NONCLUSTERED INDEX IX_RA_Area_Estado_Fecha  ON dbo.ReporteAveria(AreaId, Status, ReportedAt DESC);
+CREATE NONCLUSTERED INDEX IX_Activo_Area_Nombre     ON dbo.Activo(AreaId, Nombre);
+CREATE NONCLUSTERED INDEX IX_Activo_Area_Estado     ON dbo.Activo(AreaId, Estado, Nombre);
+CREATE NONCLUSTERED INDEX IX_Activo_Serie          ON dbo.Activo(Serie) WHERE Serie IS NOT NULL;
+CREATE UNIQUE NONCLUSTERED INDEX UX_HEA_PeriodoAbierto ON dbo.HistorialEstadoActivo(CodigoActivo) WHERE FinalizadoEn IS NULL;
+CREATE NONCLUSTERED INDEX IX_OT_Estado_Fecha       ON dbo.OrdenTrabajo(Estado, CreadoEn DESC);
+CREATE NONCLUSTERED INDEX IX_OT_Activo_Fecha       ON dbo.OrdenTrabajo(CodigoActivo, CreadoEn DESC);
+CREATE NONCLUSTERED INDEX IX_OT_Area_Fecha         ON dbo.OrdenTrabajo(AreaId, CreadoEn DESC);
+CREATE NONCLUSTERED INDEX IX_BK_Entidad_Fecha      ON dbo.BitacoraKardex(EntidadId, RegistradoEn DESC);
+CREATE NONCLUSTERED INDEX IX_BK_Modulo_Fecha       ON dbo.BitacoraKardex(Modulo, RegistradoEn DESC);
+CREATE NONCLUSTERED INDEX IX_BK_Usuario_Fecha      ON dbo.BitacoraKardex(UsuarioId, RegistradoEn DESC);
+CREATE NONCLUSTERED INDEX IX_PP_Area_Estado_Prox   ON dbo.PlanPreventivo(AreaId, Estado, ProximaFecha);
+CREATE NONCLUSTERED INDEX IX_PP_Estado_Prox        ON dbo.PlanPreventivo(Estado, ProximaFecha);
+CREATE NONCLUSTERED INDEX IX_SB_Estado_Fecha       ON dbo.SolicitudBaja(Estado, SolicitadoEn DESC);
+CREATE NONCLUSTERED INDEX IX_SB_Activo_Estado      ON dbo.SolicitudBaja(CodigoActivo, Estado);
+CREATE NONCLUSTERED INDEX IX_RA_Reportador_Fecha   ON dbo.ReporteAveria(ReportadoPorUsuarioId, ReportadoEn DESC);
+CREATE NONCLUSTERED INDEX IX_RA_Estado_Fecha       ON dbo.ReporteAveria(Estado, ReportadoEn DESC);
+CREATE NONCLUSTERED INDEX IX_RA_Area_Estado_Fecha  ON dbo.ReporteAveria(AreaId, Estado, ReportadoEn DESC);
 GO
 
 /* ==========================================================================
@@ -557,38 +531,38 @@ BEGIN
     IF EXISTS (
         SELECT 1
           FROM inserted i
-          JOIN deleted d ON i.AssetCode = d.AssetCode
-         WHERE i.AreaId          <> d.AreaId
-            OR i.Level           <> d.Level
-            OR i.AncestorsPath   <> d.AncestorsPath
-            OR (i.ParentAssetCode <> d.ParentAssetCode
-                OR (i.ParentAssetCode IS NULL AND d.ParentAssetCode IS NOT NULL)
-                OR (i.ParentAssetCode IS NOT NULL AND d.ParentAssetCode IS NULL))
-            OR (d.Serial IS NOT NULL AND i.Serial <> d.Serial)
+          JOIN deleted d ON i.CodigoActivo = d.CodigoActivo
+         WHERE i.AreaId            <> d.AreaId
+            OR i.Nivel             <> d.Nivel
+            OR i.RutaAncestros     <> d.RutaAncestros
+            OR (i.CodigoActivoPadre <> d.CodigoActivoPadre
+                OR (i.CodigoActivoPadre IS NULL AND d.CodigoActivoPadre IS NOT NULL)
+                OR (i.CodigoActivoPadre IS NOT NULL AND d.CodigoActivoPadre IS NULL))
+            OR (d.Serie IS NOT NULL AND i.Serie <> d.Serie)
     )
     BEGIN
-        RAISERROR(N'Violación de inmutabilidad: no se pueden modificar AreaId, Level, AncestorsPath, ParentAssetCode ni Serial tras la creación.', 16, 1);
+        RAISERROR(N'Violación de inmutabilidad: no se pueden modificar AreaId, Nivel, RutaAncestros, CodigoActivoPadre ni Serie tras la creación.', 16, 1);
         ROLLBACK TRANSACTION;
         RETURN;
     END;
 
     UPDATE a
-       SET Name              = i.Name,
-           Brand             = i.Brand,
-           Model             = i.Model,
-           StationId         = i.StationId,
-           Status            = i.Status,
-           TransferredToId   = i.TransferredToId,
-           Serial            = i.Serial,
-           DynamicAttributes = i.DynamicAttributes,
-           ImageData         = i.ImageData,
-           ChildCounter      = i.ChildCounter,
-           DeletedAt         = i.DeletedAt,
-           DeletedByUserId   = i.DeletedByUserId,
-           DeletedByUserName = i.DeletedByUserName,
-           UpdatedAt         = SYSUTCDATETIME()
+       SET Nombre                    = i.Nombre,
+           Marca                     = i.Marca,
+           Modelo                    = i.Modelo,
+           EstacionId                = i.EstacionId,
+           Estado                    = i.Estado,
+           TraspasadoACodigo         = i.TraspasadoACodigo,
+           Serie                     = i.Serie,
+           AtributosDinamicos        = i.AtributosDinamicos,
+           DatosImagen               = i.DatosImagen,
+           ContadorHijos             = i.ContadorHijos,
+           EliminadoEn               = i.EliminadoEn,
+           EliminadoPorUsuarioId     = i.EliminadoPorUsuarioId,
+           EliminadoPorNombreUsuario = i.EliminadoPorNombreUsuario,
+           ActualizadoEn             = SYSUTCDATETIME()
       FROM dbo.Activo a
-      JOIN inserted i ON a.AssetCode = i.AssetCode;
+      JOIN inserted i ON a.CodigoActivo = i.CodigoActivo;
 END;
 GO
 
@@ -598,11 +572,11 @@ AFTER UPDATE
 AS
 BEGIN
     SET NOCOUNT ON;
-    IF UPDATE(Username)
+    IF UPDATE(NombreUsuario)
     BEGIN
-        IF EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON i.UserId = d.UserId WHERE i.Username <> d.Username)
+        IF EXISTS (SELECT 1 FROM inserted i JOIN deleted d ON i.UsuarioId = d.UsuarioId WHERE i.NombreUsuario <> d.NombreUsuario)
         BEGIN
-            RAISERROR(N'El nombre de usuario (Username) es inmutable y no se puede modificar.', 16, 1);
+            RAISERROR(N'El nombre de usuario (NombreUsuario) es inmutable y no se puede modificar.', 16, 1);
             ROLLBACK TRANSACTION;
             RETURN;
         END;
@@ -611,7 +585,7 @@ END;
 GO
 
 /* ==========================================================================
-   6. PROCEDIMIENTOS ALMACENADOS EN ESPAÑOL
+   6. PROCEDIMIENTOS ALMACENADOS
    ========================================================================== */
 
 -- --- AUTH Y USUARIOS ---
@@ -619,11 +593,14 @@ CREATE PROCEDURE dbo.uspUsuarioObtenerParaLogin @Username NVARCHAR(50)
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT UserId, Username, DisplayName, RoleCode, PasswordSalt, PasswordHash,
-           PasswordIterations, Disabled, MustChangePassword, PasswordResetRequested,
-           FailedLoginAttempts, LockedUntil
-      FROM dbo.Usuario
-     WHERE Username = @Username;
+    SELECT u.UsuarioId AS UserId, u.NombreUsuario AS Username, u.NombreCompleto AS DisplayName,
+           u.CodigoRol AS RoleCode, u.PasswordSalt, u.PasswordHash,
+           u.IteracionesPassword AS PasswordIterations, u.Deshabilitado AS Disabled,
+           u.DebeCambiarPassword AS MustChangePassword, u.SolicitudReinicioPassword AS PasswordResetRequested,
+           u.IntentosFallidos AS FailedLoginAttempts, u.BloqueadoHasta AS LockedUntil,
+           (SELECT STRING_AGG(CodigoPermiso, ',') FROM dbo.UsuarioPermiso WHERE UsuarioId = u.UsuarioId) AS PermissionsCsv
+      FROM dbo.Usuario u
+     WHERE u.NombreUsuario = @Username;
 END;
 GO
 
@@ -632,11 +609,11 @@ AS
 BEGIN
     SET NOCOUNT ON;
     UPDATE dbo.Usuario
-       SET FailedLoginAttempts = FailedLoginAttempts + 1,
-           LockedUntil = CASE WHEN FailedLoginAttempts + 1 >= 5
-                              THEN DATEADD(MINUTE, 5, SYSUTCDATETIME())
-                              ELSE LockedUntil END
-     WHERE UserId = @UserId;
+       SET IntentosFallidos = IntentosFallidos + 1,
+           BloqueadoHasta = CASE WHEN IntentosFallidos + 1 >= 5
+                                 THEN DATEADD(MINUTE, 5, SYSUTCDATETIME())
+                                 ELSE BloqueadoHasta END
+     WHERE UsuarioId = @UserId;
 END;
 GO
 
@@ -645,8 +622,8 @@ AS
 BEGIN
     SET NOCOUNT ON;
     UPDATE dbo.Usuario
-       SET FailedLoginAttempts = 0, LockedUntil = NULL
-     WHERE UserId = @UserId;
+       SET IntentosFallidos = 0, BloqueadoHasta = NULL
+     WHERE UsuarioId = @UserId;
 END;
 GO
 
@@ -657,40 +634,49 @@ BEGIN
     SET NOCOUNT ON;
     UPDATE dbo.Usuario
        SET PasswordSalt = @PasswordSalt, PasswordHash = @PasswordHash,
-           PasswordIterations = @PasswordIterations, UpdatedAt = SYSUTCDATETIME()
-     WHERE UserId = @UserId;
+           IteracionesPassword = @PasswordIterations, ActualizadoEn = SYSUTCDATETIME()
+     WHERE UsuarioId = @UserId;
 END;
 GO
 
 CREATE PROCEDURE dbo.uspUsuarioCrear
     @Username NVARCHAR(50), @DisplayName NVARCHAR(100), @RoleCode NVARCHAR(20),
     @PasswordSalt NVARCHAR(64), @PasswordHash NVARCHAR(128), @PasswordIterations INT = 20000,
-    @MustChangePassword BIT = 0
+    @MustChangePassword BIT = 0,
+    @Permissions dbo.TipoListaTexto READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
     BEGIN TRY
         BEGIN TRANSACTION;
-        IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE Username = @Username)
+        IF EXISTS (SELECT 1 FROM dbo.Usuario WHERE NombreUsuario = @Username)
         BEGIN
             RAISERROR(N'El nombre de usuario ya está en uso.', 16, 1);
         END;
 
         INSERT INTO dbo.Usuario
-            (Username, DisplayName, RoleCode, PasswordSalt, PasswordHash,
-             PasswordIterations, MustChangePassword)
+            (NombreUsuario, NombreCompleto, CodigoRol, PasswordSalt, PasswordHash,
+             IteracionesPassword, DebeCambiarPassword)
         VALUES
             (@Username, @DisplayName, @RoleCode, @PasswordSalt, @PasswordHash,
              @PasswordIterations, @MustChangePassword);
 
         DECLARE @uid INT = SCOPE_IDENTITY();
 
-        INSERT INTO dbo.UsuarioPermiso (UserId, PermissionCode)
-        SELECT @uid, PermissionCode FROM dbo.RolPermiso WHERE RoleCode = @RoleCode;
+        IF EXISTS (SELECT 1 FROM @Permissions)
+        BEGIN
+            INSERT INTO dbo.UsuarioPermiso (UsuarioId, CodigoPermiso)
+            SELECT DISTINCT @uid, Valor FROM @Permissions;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO dbo.UsuarioPermiso (UsuarioId, CodigoPermiso)
+            SELECT @uid, CodigoPermiso FROM dbo.RolPermiso WHERE CodigoRol = @RoleCode;
+        END;
 
         COMMIT TRANSACTION;
-        SELECT @uid AS NewUserId;
+        SELECT @uid AS NewUserId, @uid AS UsuarioId;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -701,32 +687,40 @@ GO
 
 CREATE PROCEDURE dbo.uspUsuarioActualizar
     @UserId INT, @DisplayName NVARCHAR(100) = NULL, @NewRoleCode NVARCHAR(20) = NULL,
-    @NewSalt NVARCHAR(64) = NULL, @NewHash NVARCHAR(128) = NULL, @NewIterations INT = NULL
+    @NewSalt NVARCHAR(64) = NULL, @NewHash NVARCHAR(128) = NULL, @NewIterations INT = NULL,
+    @HasCustomPermissions BIT = 0,
+    @Permissions dbo.TipoListaTexto READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
     BEGIN TRY
         BEGIN TRANSACTION;
-        IF NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE UserId = @UserId)
+        IF NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE UsuarioId = @UserId)
         BEGIN
             RAISERROR(N'El usuario especificado no existe.', 16, 1);
         END;
 
         UPDATE dbo.Usuario
-           SET DisplayName        = COALESCE(@DisplayName, DisplayName),
-               RoleCode           = COALESCE(@NewRoleCode, RoleCode),
-               PasswordSalt       = COALESCE(@NewSalt, PasswordSalt),
-               PasswordHash       = COALESCE(@NewHash, PasswordHash),
-               PasswordIterations = COALESCE(@NewIterations, PasswordIterations),
-               UpdatedAt          = SYSUTCDATETIME()
-         WHERE UserId = @UserId;
+           SET NombreCompleto      = COALESCE(@DisplayName, NombreCompleto),
+               CodigoRol           = COALESCE(@NewRoleCode, CodigoRol),
+               PasswordSalt        = COALESCE(@NewSalt, PasswordSalt),
+               PasswordHash        = COALESCE(@NewHash, PasswordHash),
+               IteracionesPassword = COALESCE(@NewIterations, IteracionesPassword),
+               ActualizadoEn       = SYSUTCDATETIME()
+         WHERE UsuarioId = @UserId;
 
-        IF @NewRoleCode IS NOT NULL
+        IF @HasCustomPermissions = 1
         BEGIN
-            DELETE FROM dbo.UsuarioPermiso WHERE UserId = @UserId;
-            INSERT INTO dbo.UsuarioPermiso (UserId, PermissionCode)
-            SELECT @UserId, PermissionCode FROM dbo.RolPermiso WHERE RoleCode = @NewRoleCode;
+            DELETE FROM dbo.UsuarioPermiso WHERE UsuarioId = @UserId;
+            INSERT INTO dbo.UsuarioPermiso (UsuarioId, CodigoPermiso)
+            SELECT DISTINCT @UserId, Valor FROM @Permissions;
+        END
+        ELSE IF @NewRoleCode IS NOT NULL
+        BEGIN
+            DELETE FROM dbo.UsuarioPermiso WHERE UsuarioId = @UserId;
+            INSERT INTO dbo.UsuarioPermiso (UsuarioId, CodigoPermiso)
+            SELECT @UserId, CodigoPermiso FROM dbo.RolPermiso WHERE CodigoRol = @NewRoleCode;
         END;
 
         COMMIT TRANSACTION;
@@ -742,7 +736,7 @@ CREATE PROCEDURE dbo.uspUsuarioAlternarDeshabilitado @UserId INT, @Disabled BIT
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE dbo.Usuario SET Disabled = @Disabled, UpdatedAt = SYSUTCDATETIME() WHERE UserId = @UserId;
+    UPDATE dbo.Usuario SET Deshabilitado = @Disabled, ActualizadoEn = SYSUTCDATETIME() WHERE UsuarioId = @UserId;
     IF @@ROWCOUNT = 0
     BEGIN
         RAISERROR(N'El usuario especificado no existe.', 16, 1);
@@ -758,10 +752,10 @@ BEGIN
     SET NOCOUNT ON;
     UPDATE dbo.Usuario
        SET PasswordSalt = @PasswordSalt, PasswordHash = @PasswordHash,
-           PasswordIterations = @PasswordIterations, MustChangePassword = 0,
-           PasswordResetRequested = 0, PasswordResetRequestedAt = NULL,
-           FailedLoginAttempts = 0, LockedUntil = NULL, UpdatedAt = SYSUTCDATETIME()
-     WHERE UserId = @UserId;
+           IteracionesPassword = @PasswordIterations, DebeCambiarPassword = 0,
+           SolicitudReinicioPassword = 0, SolicitadoEn = NULL,
+           IntentosFallidos = 0, BloqueadoHasta = NULL, ActualizadoEn = SYSUTCDATETIME()
+     WHERE UsuarioId = @UserId;
     IF @@ROWCOUNT = 0
     BEGIN
         RAISERROR(N'El usuario especificado no existe.', 16, 1);
@@ -777,10 +771,10 @@ BEGIN
     SET NOCOUNT ON;
     UPDATE dbo.Usuario
        SET PasswordSalt = @PasswordSalt, PasswordHash = @PasswordHash,
-           PasswordIterations = @PasswordIterations, MustChangePassword = 1,
-           PasswordResetRequested = 0, PasswordResetRequestedAt = NULL,
-           FailedLoginAttempts = 0, LockedUntil = NULL, UpdatedAt = SYSUTCDATETIME()
-     WHERE UserId = @UserId;
+           IteracionesPassword = @PasswordIterations, DebeCambiarPassword = 1,
+           SolicitudReinicioPassword = 0, SolicitadoEn = NULL,
+           IntentosFallidos = 0, BloqueadoHasta = NULL, ActualizadoEn = SYSUTCDATETIME()
+     WHERE UsuarioId = @UserId;
     IF @@ROWCOUNT = 0
     BEGIN
         RAISERROR(N'El usuario especificado no existe.', 16, 1);
@@ -794,9 +788,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @UserId INT, @DisplayName NVARCHAR(100), @RoleCode NVARCHAR(20), @AlreadyRequested BIT;
-    SELECT @UserId = UserId, @DisplayName = DisplayName, @RoleCode = RoleCode,
-           @AlreadyRequested = PasswordResetRequested
-      FROM dbo.Usuario WHERE Username = @Username;
+    SELECT @UserId = UsuarioId, @DisplayName = NombreCompleto, @RoleCode = CodigoRol,
+           @AlreadyRequested = SolicitudReinicioPassword
+      FROM dbo.Usuario WHERE NombreUsuario = @Username;
 
     IF @UserId IS NULL
     BEGIN
@@ -807,10 +801,10 @@ BEGIN
     IF @AlreadyRequested = 0
     BEGIN
         UPDATE dbo.Usuario
-           SET PasswordResetRequested = 1, PasswordResetRequestedAt = SYSUTCDATETIME()
-         WHERE UserId = @UserId;
+           SET SolicitudReinicioPassword = 1, SolicitadoEn = SYSUTCDATETIME()
+         WHERE UsuarioId = @UserId;
 
-        INSERT INTO dbo.SolicitudReinicioPassword (UserId, Username, DisplayName, RoleCode, Status, Details)
+        INSERT INTO dbo.SolicitudReinicioPassword (UsuarioId, NombreUsuario, NombreCompleto, CodigoRol, Estado, Detalles)
         VALUES (@UserId, @Username, @DisplayName, @RoleCode, 'pending', N'Solicitud enviada desde pantalla de login.');
     END;
 END;
@@ -820,10 +814,11 @@ CREATE PROCEDURE dbo.uspSolicitudReinicioPasswordListarPendientes
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT RequestId, UserId, Username, DisplayName, RoleCode, RequestedAt, Details
+    SELECT SolicitudId AS RequestId, UsuarioId AS UserId, NombreUsuario AS Username,
+           NombreCompleto AS DisplayName, CodigoRol AS RoleCode, SolicitadoEn AS RequestedAt, Detalles AS Details
       FROM dbo.SolicitudReinicioPassword
-     WHERE Status = 'pending'
-     ORDER BY RequestedAt DESC;
+     WHERE Estado = 'pending'
+     ORDER BY SolicitadoEn DESC;
 END;
 GO
 
@@ -831,8 +826,8 @@ CREATE PROCEDURE dbo.uspSolicitudReinicioPasswordMarcarResuelta @RequestId BIGIN
 AS
 BEGIN
     SET NOCOUNT ON;
-    UPDATE dbo.SolicitudReinicioPassword SET Status = 'resolved'
-     WHERE RequestId = @RequestId AND Status = 'pending';
+    UPDATE dbo.SolicitudReinicioPassword SET Estado = 'resolved'
+     WHERE SolicitudId = @RequestId AND Estado = 'pending';
     IF @@ROWCOUNT = 0
     BEGIN
         RAISERROR(N'La solicitud ya fue procesada.', 16, 1);
@@ -845,10 +840,13 @@ CREATE PROCEDURE dbo.uspUsuarioObtenerTodos
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT UserId, Username, DisplayName, RoleCode, Disabled, MustChangePassword,
-           PasswordResetRequested, PasswordResetRequestedAt, CreatedAt
-      FROM dbo.Usuario
-     ORDER BY Username;
+    SELECT u.UsuarioId AS UserId, u.NombreUsuario AS Username, u.NombreCompleto AS DisplayName,
+           u.CodigoRol AS RoleCode, u.Deshabilitado AS Disabled, u.DebeCambiarPassword AS MustChangePassword,
+           u.SolicitudReinicioPassword AS PasswordResetRequested, u.SolicitadoEn AS PasswordResetRequestedAt,
+           u.CreadoEn AS CreatedAt,
+           (SELECT STRING_AGG(CodigoPermiso, ',') FROM dbo.UsuarioPermiso WHERE UsuarioId = u.UsuarioId) AS PermissionsCsv
+      FROM dbo.Usuario u
+     ORDER BY u.NombreUsuario;
 END;
 GO
 
@@ -856,12 +854,15 @@ CREATE PROCEDURE dbo.uspUsuarioObtenerPorId @UserId INT
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT u.UserId, u.Username, u.DisplayName, u.RoleCode, u.PasswordSalt, u.PasswordHash,
-           u.PasswordIterations, u.Disabled, u.MustChangePassword, u.PasswordResetRequested,
-           u.PasswordResetRequestedAt, u.FailedLoginAttempts, u.LockedUntil, u.CreatedAt,
-           (SELECT STRING_AGG(PermissionCode, ',') FROM dbo.UsuarioPermiso WHERE UserId = u.UserId) AS PermissionsCsv
+    SELECT u.UsuarioId AS UserId, u.NombreUsuario AS Username, u.NombreCompleto AS DisplayName,
+           u.CodigoRol AS RoleCode, u.PasswordSalt, u.PasswordHash,
+           u.IteracionesPassword AS PasswordIterations, u.Deshabilitado AS Disabled,
+           u.DebeCambiarPassword AS MustChangePassword, u.SolicitudReinicioPassword AS PasswordResetRequested,
+           u.SolicitadoEn AS PasswordResetRequestedAt, u.IntentosFallidos AS FailedLoginAttempts,
+           u.BloqueadoHasta AS LockedUntil, u.CreadoEn AS CreatedAt,
+           (SELECT STRING_AGG(CodigoPermiso, ',') FROM dbo.UsuarioPermiso WHERE UsuarioId = u.UsuarioId) AS PermissionsCsv
       FROM dbo.Usuario u
-     WHERE u.UserId = @UserId;
+     WHERE u.UsuarioId = @UserId;
 END;
 GO
 
@@ -870,7 +871,8 @@ CREATE PROCEDURE dbo.uspAreaObtenerTodas
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT AreaId, Name, CostCenter, AssetCounter, CreatedAt, UpdatedAt
+    SELECT AreaId, Nombre AS Name, CentroCosto AS CostCenter, ContadorActivos AS AssetCounter,
+           CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt
       FROM dbo.Area
      ORDER BY AreaId ASC;
 END;
@@ -892,9 +894,9 @@ BEGIN
         BEGIN
             DECLARE @cnt TABLE (val INT NOT NULL);
             UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
-               SET NextNumber += 1
-             OUTPUT inserted.NextNumber INTO @cnt(val)
-              WHERE Name = 'areas';
+               SET SiguienteNumero += 1
+             OUTPUT inserted.SiguienteNumero INTO @cnt(val)
+              WHERE Nombre = 'areas';
 
             DECLARE @nextVal INT; SELECT @nextVal = val FROM @cnt;
             SET @FinalId = CONCAT('A', @nextVal);
@@ -905,7 +907,7 @@ BEGIN
             RAISERROR(N'Ya existe un área con ese identificador.', 16, 1);
         END;
 
-        INSERT INTO dbo.Area (AreaId, Name, CostCenter, AssetCounter, CreatedAt)
+        INSERT INTO dbo.Area (AreaId, Nombre, CentroCosto, ContadorActivos, CreadoEn)
         VALUES (@FinalId, @Name, @NormCC, 0, SYSUTCDATETIME());
 
         COMMIT TRANSACTION;
@@ -929,9 +931,9 @@ BEGIN
              ELSE CONCAT('CC-', @CostCenter) END;
 
     UPDATE dbo.Area
-       SET Name       = @Name,
-           CostCenter = COALESCE(@NormCC, CostCenter),
-           UpdatedAt  = SYSUTCDATETIME()
+       SET Nombre        = @Name,
+           CentroCosto   = COALESCE(@NormCC, CentroCosto),
+           ActualizadoEn = SYSUTCDATETIME()
      WHERE AreaId = @AreaId;
 
     IF @@ROWCOUNT = 0
@@ -947,9 +949,15 @@ CREATE PROCEDURE dbo.uspActivoObtenerRaicesPorArea @AreaId NVARCHAR(15)
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT * FROM dbo.Activo
-     WHERE AreaId = @AreaId AND ParentAssetCode IS NULL AND Status <> 'deleted'
-     ORDER BY Name ASC;
+    SELECT CodigoActivo AS AssetCode, Nombre AS Name, Marca AS Brand, Modelo AS Model,
+           AreaId, EstacionId AS StationId, CodigoActivoPadre AS ParentAssetCode,
+           Nivel AS Level, RutaAncestros AS AncestorsPath, Estado AS Status,
+           TraspasadoACodigo AS TransferredToId, Serie AS Serial,
+           AtributosDinamicos AS DynamicAttributes, DatosImagen AS ImageData,
+           ContadorHijos AS ChildCounter, CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt
+      FROM dbo.Activo
+     WHERE AreaId = @AreaId AND CodigoActivoPadre IS NULL AND Estado <> 'deleted'
+     ORDER BY Nombre ASC;
 END;
 GO
 
@@ -958,11 +966,17 @@ CREATE PROCEDURE dbo.uspActivoObtenerHijos
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT * FROM dbo.Activo
+    SELECT CodigoActivo AS AssetCode, Nombre AS Name, Marca AS Brand, Modelo AS Model,
+           AreaId, EstacionId AS StationId, CodigoActivoPadre AS ParentAssetCode,
+           Nivel AS Level, RutaAncestros AS AncestorsPath, Estado AS Status,
+           TraspasadoACodigo AS TransferredToId, Serie AS Serial,
+           AtributosDinamicos AS DynamicAttributes, DatosImagen AS ImageData,
+           ContadorHijos AS ChildCounter, CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt
+      FROM dbo.Activo
      WHERE (@AreaId IS NULL OR AreaId = @AreaId)
-       AND ((@ParentAssetCode IS NULL AND ParentAssetCode IS NULL) OR ParentAssetCode = @ParentAssetCode)
-       AND Status <> 'deleted'
-     ORDER BY Name ASC;
+       AND ((@ParentAssetCode IS NULL AND CodigoActivoPadre IS NULL) OR CodigoActivoPadre = @ParentAssetCode)
+       AND Estado <> 'deleted'
+     ORDER BY Nombre ASC;
 END;
 GO
 
@@ -971,16 +985,21 @@ CREATE PROCEDURE dbo.uspActivoBuscar
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT a.*
+    SELECT a.CodigoActivo AS AssetCode, a.Nombre AS Name, a.Marca AS Brand, a.Modelo AS Model,
+           a.AreaId, a.EstacionId AS StationId, a.CodigoActivoPadre AS ParentAssetCode,
+           a.Nivel AS Level, a.RutaAncestros AS AncestorsPath, a.Estado AS Status,
+           a.TraspasadoACodigo AS TransferredToId, a.Serie AS Serial,
+           a.AtributosDinamicos AS DynamicAttributes, a.DatosImagen AS ImageData,
+           a.ContadorHijos AS ChildCounter, a.CreadoEn AS CreatedAt, a.ActualizadoEn AS UpdatedAt
       FROM dbo.Activo a
      CROSS APPLY (SELECT COUNT(*) AS TokenCount FROM STRING_SPLIT(@Query, ' ') WHERE LTRIM(RTRIM(value)) <> '') cnt
      WHERE (@AreaId IS NULL OR a.AreaId = @AreaId)
-       AND a.Status <> 'deleted'
-       AND (@Status IS NULL OR a.Status = @Status)
+       AND a.Estado <> 'deleted'
+       AND (@Status IS NULL OR a.Estado = @Status)
        AND (cnt.TokenCount = 0 OR
             (SELECT COUNT(*) FROM STRING_SPLIT(@Query, ' ') t
-              WHERE t.value <> '' AND a.SearchText LIKE '%' + t.value + '%') = cnt.TokenCount)
-     ORDER BY a.Name ASC;
+              WHERE t.value <> '' AND a.TextoBusqueda LIKE '%' + t.value + '%') = cnt.TokenCount)
+     ORDER BY a.Nombre ASC;
 END;
 GO
 
@@ -988,9 +1007,15 @@ CREATE PROCEDURE dbo.uspActivoBuscarPorSerie @Serial NVARCHAR(100)
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT TOP (1) * FROM dbo.Activo
-     WHERE Serial = @Serial AND Status <> 'deleted'
-     ORDER BY CASE WHEN Status = 'active' THEN 0 ELSE 1 END, CreatedAt DESC;
+    SELECT TOP (1) CodigoActivo AS AssetCode, Nombre AS Name, Marca AS Brand, Modelo AS Model,
+           AreaId, EstacionId AS StationId, CodigoActivoPadre AS ParentAssetCode,
+           Nivel AS Level, RutaAncestros AS AncestorsPath, Estado AS Status,
+           TraspasadoACodigo AS TransferredToId, Serie AS Serial,
+           AtributosDinamicos AS DynamicAttributes, DatosImagen AS ImageData,
+           ContadorHijos AS ChildCounter, CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt
+      FROM dbo.Activo
+     WHERE Serie = @Serial AND Estado <> 'deleted'
+     ORDER BY CASE WHEN Estado = 'active' THEN 0 ELSE 1 END, CreadoEn DESC;
 END;
 GO
 
@@ -1010,7 +1035,7 @@ BEGIN
 
         IF @Serial IS NOT NULL AND LTRIM(RTRIM(@Serial)) <> ''
         BEGIN
-            IF EXISTS (SELECT 1 FROM dbo.Activo WHERE Serial = @Serial AND Status <> 'deleted')
+            IF EXISTS (SELECT 1 FROM dbo.Activo WHERE Serie = @Serial AND Estado <> 'deleted')
             BEGIN
                 RAISERROR(N'El número de serie ya está en uso por otro activo activo.', 16, 1);
             END;
@@ -1023,8 +1048,8 @@ BEGIN
         BEGIN
             DECLARE @acTable TABLE (val INT NOT NULL);
             UPDATE dbo.Area WITH (UPDLOCK, HOLDLOCK)
-               SET AssetCounter += 1
-             OUTPUT inserted.AssetCounter INTO @acTable(val)
+               SET ContadorActivos += 1
+             OUTPUT inserted.ContadorActivos INTO @acTable(val)
               WHERE AreaId = @AreaId;
 
             DECLARE @ac INT; SELECT @ac = val FROM @acTable;
@@ -1037,7 +1062,7 @@ BEGIN
         END
         ELSE
         BEGIN
-            IF EXISTS (SELECT 1 FROM dbo.CandadoBaja WHERE AssetCode = @ParentAssetCode AND LockStatus = 'pending')
+            IF EXISTS (SELECT 1 FROM dbo.CandadoBaja WHERE CodigoActivo = @ParentAssetCode AND EstadoCandado = 'pending')
             BEGIN
                 RAISERROR(N'El activo padre tiene una solicitud de baja pendiente.', 16, 1);
             END;
@@ -1046,12 +1071,12 @@ BEGIN
             DECLARE @ccTable TABLE (val INT NOT NULL);
 
             UPDATE dbo.Activo WITH (UPDLOCK, HOLDLOCK)
-               SET ChildCounter += 1
-             OUTPUT inserted.ChildCounter INTO @ccTable(val)
-              WHERE AssetCode = @ParentAssetCode;
+               SET ContadorHijos += 1
+             OUTPUT inserted.ContadorHijos INTO @ccTable(val)
+              WHERE CodigoActivo = @ParentAssetCode;
 
-            SELECT @parentStatus = Status, @parentPath = AncestorsPath
-              FROM dbo.Activo WHERE AssetCode = @ParentAssetCode;
+            SELECT @parentStatus = Estado, @parentPath = RutaAncestros
+              FROM dbo.Activo WHERE CodigoActivo = @ParentAssetCode;
 
             IF @parentStatus IS NULL OR @parentStatus = 'deleted'
             BEGIN
@@ -1064,23 +1089,23 @@ BEGIN
         END;
 
         INSERT INTO dbo.Activo
-            (AssetCode, Name, Brand, Model, AreaId, StationId, ParentAssetCode,
-             Level, AncestorsPath, Status, Serial, DynamicAttributes, ImageData,
-             ChildCounter, CreatedAt)
+            (CodigoActivo, Nombre, Marca, Modelo, AreaId, EstacionId, CodigoActivoPadre,
+             Nivel, RutaAncestros, Estado, Serie, AtributosDinamicos, DatosImagen,
+             ContadorHijos, CreadoEn)
         VALUES
             (@NewAssetCode, @Name, @Brand, @Model, @AreaId, ISNULL(@StationId, ''),
              @ParentAssetCode, @Level, @AncestorsPath, @Status, @Serial,
              @DynamicAttributes, @ImageData, 0, SYSUTCDATETIME());
 
-        INSERT INTO dbo.HistorialEstadoActivo (AssetCode, Status, StartedAt, AreaId, Reason, UserId, UserName)
+        INSERT INTO dbo.HistorialEstadoActivo (CodigoActivo, Estado, IniciadoEn, AreaId, Motivo, UsuarioId, NombreUsuario)
         VALUES (@NewAssetCode, @Status, SYSUTCDATETIME(), @AreaId, N'Alta inicial del activo', @UserId, @UserName);
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'ASSET_CREATED', 'ASSETS', @NewAssetCode,
                 CONCAT(N'Activo ', @NewAssetCode, N' (', @Name, N') creado en área ', @AreaId, N'.'));
 
         COMMIT TRANSACTION;
-        SELECT @NewAssetCode AS NewAssetCode;
+        SELECT @NewAssetCode AS NewAssetCode, @NewAssetCode AS CodigoActivo;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -1100,23 +1125,23 @@ BEGIN
     SET XACT_ABORT ON;
     BEGIN TRY
         BEGIN TRANSACTION;
-        IF EXISTS (SELECT 1 FROM dbo.CandadoBaja WHERE AssetCode = @AssetCode AND LockStatus = 'pending')
+        IF EXISTS (SELECT 1 FROM dbo.CandadoBaja WHERE CodigoActivo = @AssetCode AND EstadoCandado = 'pending')
         BEGIN
             RAISERROR(N'El activo tiene una solicitud de baja pendiente.', 16, 1);
         END;
 
         UPDATE dbo.Activo
-           SET Name = @Name, Brand = @Brand, Model = @Model, StationId = ISNULL(@StationId, ''),
-               Status = @Status, DynamicAttributes = @DynamicAttributes, ImageData = @ImageData,
-               UpdatedAt = SYSUTCDATETIME()
-         WHERE AssetCode = @AssetCode AND Status <> 'deleted';
+           SET Nombre = @Name, Marca = @Brand, Modelo = @Model, EstacionId = ISNULL(@StationId, ''),
+               Estado = @Status, AtributosDinamicos = @DynamicAttributes, DatosImagen = @ImageData,
+               ActualizadoEn = SYSUTCDATETIME()
+         WHERE CodigoActivo = @AssetCode AND Estado <> 'deleted';
 
         IF @@ROWCOUNT = 0
         BEGIN
             RAISERROR(N'El activo no existe o está eliminado.', 16, 1);
         END;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'ASSET_UPDATED', 'ASSETS', @AssetCode,
                 CONCAT(N'Activo ', @AssetCode, N' (', @Name, N') actualizado.'));
 
@@ -1139,9 +1164,9 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         DECLARE @srcArea NVARCHAR(15), @srcName NVARCHAR(200), @srcStatus NVARCHAR(25);
-        SELECT @srcArea = AreaId, @srcName = Name, @srcStatus = Status
+        SELECT @srcArea = AreaId, @srcName = Nombre, @srcStatus = Estado
           FROM dbo.Activo WITH (UPDLOCK, HOLDLOCK)
-         WHERE AssetCode = @SourceAssetCode;
+         WHERE CodigoActivo = @SourceAssetCode;
 
         IF @srcArea IS NULL OR @srcStatus = 'deleted'
         BEGIN
@@ -1154,8 +1179,8 @@ BEGIN
 
         DECLARE @targetCounter TABLE (val INT NOT NULL);
         UPDATE dbo.Area WITH (UPDLOCK, HOLDLOCK)
-           SET AssetCounter += 1
-         OUTPUT inserted.AssetCounter INTO @targetCounter(val)
+           SET ContadorActivos += 1
+         OUTPUT inserted.ContadorActivos INTO @targetCounter(val)
           WHERE AreaId = @TargetAreaId;
 
         DECLARE @nextRoot INT; SELECT @nextRoot = val FROM @targetCounter;
@@ -1167,22 +1192,22 @@ BEGIN
         DECLARE @newRootCode NVARCHAR(60) = CONCAT(@TargetAreaId, '-', FORMAT(@nextRoot, '000'));
 
         INSERT INTO dbo.Activo
-            (AssetCode, Name, Brand, Model, AreaId, StationId, ParentAssetCode,
-             Level, AncestorsPath, Status, Serial, DynamicAttributes, ImageData, ChildCounter, CreatedAt)
-        SELECT @newRootCode, Name, Brand, Model, @TargetAreaId, StationId, NULL,
-               Level, '', 'active', Serial, DynamicAttributes, ImageData, ChildCounter, SYSUTCDATETIME()
-          FROM dbo.Activo WHERE AssetCode = @SourceAssetCode;
+            (CodigoActivo, Nombre, Marca, Modelo, AreaId, EstacionId, CodigoActivoPadre,
+             Nivel, RutaAncestros, Estado, Serie, AtributosDinamicos, DatosImagen, ContadorHijos, CreadoEn)
+        SELECT @newRootCode, Nombre, Marca, Modelo, @TargetAreaId, EstacionId, NULL,
+               Nivel, '', 'active', Serie, AtributosDinamicos, DatosImagen, ContadorHijos, SYSUTCDATETIME()
+          FROM dbo.Activo WHERE CodigoActivo = @SourceAssetCode;
 
         UPDATE dbo.Activo
-           SET Status = 'transferredDeactivated', TransferredToId = @newRootCode, UpdatedAt = SYSUTCDATETIME()
-         WHERE AssetCode = @SourceAssetCode;
+           SET Estado = 'transferredDeactivated', TraspasadoACodigo = @newRootCode, ActualizadoEn = SYSUTCDATETIME()
+         WHERE CodigoActivo = @SourceAssetCode;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'ASSET_TRANSFER', 'ASSETS', @SourceAssetCode,
                 CONCAT(N'Activo ', @SourceAssetCode, N' traspasado a ', @TargetAreaId, N' como ', @newRootCode, N'.'));
 
         COMMIT TRANSACTION;
-        SELECT @newRootCode AS NewAssetCode;
+        SELECT @newRootCode AS NewAssetCode, @newRootCode AS CodigoActivo;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -1200,15 +1225,15 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         UPDATE dbo.Activo
-           SET Status = 'active', TransferredToId = NULL, UpdatedAt = SYSUTCDATETIME()
-         WHERE AssetCode = @AssetCode AND Status = 'transferredDeactivated';
+           SET Estado = 'active', TraspasadoACodigo = NULL, ActualizadoEn = SYSUTCDATETIME()
+         WHERE CodigoActivo = @AssetCode AND Estado = 'transferredDeactivated';
 
         IF @@ROWCOUNT = 0
         BEGIN
             RAISERROR(N'Solo se pueden reactivar activos en estado desactivado por traspaso.', 16, 1);
         END;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'ASSET_REACTIVATE', 'ASSETS', @AssetCode,
                 CONCAT(N'Activo ', @AssetCode, N' reactivado en su área original.'));
 
@@ -1231,22 +1256,22 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         DECLARE @AreaId NVARCHAR(15);
-        SELECT @AreaId = AreaId FROM dbo.Activo WHERE AssetCode = @AssetCode;
+        SELECT @AreaId = AreaId FROM dbo.Activo WHERE CodigoActivo = @AssetCode;
         IF @AreaId IS NULL
         BEGIN
             RAISERROR(N'El activo no existe.', 16, 1);
         END;
 
-        UPDATE dbo.HistorialEstadoActivo SET EndedAt = SYSUTCDATETIME()
-         WHERE AssetCode = @AssetCode AND EndedAt IS NULL;
+        UPDATE dbo.HistorialEstadoActivo SET FinalizadoEn = SYSUTCDATETIME()
+         WHERE CodigoActivo = @AssetCode AND FinalizadoEn IS NULL;
 
-        UPDATE dbo.Activo SET Status = @NewStatus, UpdatedAt = SYSUTCDATETIME()
-         WHERE AssetCode = @AssetCode;
+        UPDATE dbo.Activo SET Estado = @NewStatus, ActualizadoEn = SYSUTCDATETIME()
+         WHERE CodigoActivo = @AssetCode;
 
-        INSERT INTO dbo.HistorialEstadoActivo (AssetCode, Status, StartedAt, AreaId, Reason, UserId, UserName)
+        INSERT INTO dbo.HistorialEstadoActivo (CodigoActivo, Estado, IniciadoEn, AreaId, Motivo, UsuarioId, NombreUsuario)
         VALUES (@AssetCode, @NewStatus, SYSUTCDATETIME(), @AreaId, @Reason, @UserId, @UserName);
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'ASSET_STATUS_CHANGED', 'ASSETS', @AssetCode,
                 CONCAT(N'Estado de ', @AssetCode, N' cambiado a ', @NewStatus, N'. Motivo: ', ISNULL(@Reason, N'N/A')));
 
@@ -1270,34 +1295,34 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         DECLARE @AssetName NVARCHAR(200), @AreaId NVARCHAR(15), @Status NVARCHAR(25);
-        SELECT @AssetName = Name, @AreaId = AreaId, @Status = Status
-          FROM dbo.Activo WHERE AssetCode = @AssetCode;
+        SELECT @AssetName = Nombre, @AreaId = AreaId, @Status = Estado
+          FROM dbo.Activo WHERE CodigoActivo = @AssetCode;
 
         IF @AssetName IS NULL OR @Status = 'deleted'
         BEGIN
             RAISERROR(N'El activo no existe o ya está eliminado.', 16, 1);
         END;
 
-        IF EXISTS (SELECT 1 FROM dbo.CandadoBaja WHERE AssetCode = @AssetCode AND LockStatus = 'pending')
+        IF EXISTS (SELECT 1 FROM dbo.CandadoBaja WHERE CodigoActivo = @AssetCode AND EstadoCandado = 'pending')
         BEGIN
             RAISERROR(N'El activo ya tiene una solicitud de baja pendiente.', 16, 1);
         END;
 
-        INSERT INTO dbo.SolicitudBaja (AssetCode, AssetName, AreaId, Status, Reason, RequestedByUserId, RequestedByUserName)
+        INSERT INTO dbo.SolicitudBaja (CodigoActivo, NombreActivo, AreaId, Estado, Motivo, SolicitadoPorUsuarioId, SolicitadoPorNombreUsuario)
         VALUES (@AssetCode, @AssetName, @AreaId, 'pending', @Reason, @UserId, @UserName);
         DECLARE @rid BIGINT = SCOPE_IDENTITY();
 
-        IF EXISTS (SELECT 1 FROM dbo.CandadoBaja WHERE AssetCode = @AssetCode)
-            UPDATE dbo.CandadoBaja SET LockStatus = 'pending', UpdatedAt = SYSUTCDATETIME() WHERE AssetCode = @AssetCode;
+        IF EXISTS (SELECT 1 FROM dbo.CandadoBaja WHERE CodigoActivo = @AssetCode)
+            UPDATE dbo.CandadoBaja SET EstadoCandado = 'pending', ActualizadoEn = SYSUTCDATETIME() WHERE CodigoActivo = @AssetCode;
         ELSE
-            INSERT INTO dbo.CandadoBaja (AssetCode, LockStatus) VALUES (@AssetCode, 'pending');
+            INSERT INTO dbo.CandadoBaja (CodigoActivo, EstadoCandado) VALUES (@AssetCode, 'pending');
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'ASSET_DELETE_REQUESTED', 'ASSETS', @AssetCode,
                 CONCAT(N'Solicitud de baja ', @rid, N' creada para ', @AssetCode, N'. Motivo: "', @Reason, N'".'));
 
         COMMIT TRANSACTION;
-        SELECT @rid AS NewRequestId;
+        SELECT @rid AS NewRequestId, @rid AS SolicitudId;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -1311,11 +1336,16 @@ CREATE PROCEDURE dbo.uspSolicitudBajaObtenerPendientes
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT * FROM dbo.SolicitudBaja
-     WHERE Status = 'pending'
-       AND (@StartDate IS NULL OR RequestedAt >= @StartDate)
-       AND (@EndDate   IS NULL OR RequestedAt <= @EndDate)
-     ORDER BY RequestedAt DESC;
+    SELECT SolicitudId AS RequestId, CodigoActivo AS AssetCode, NombreActivo AS AssetName, AreaId,
+           Estado AS Status, Motivo AS Reason, SolicitadoPorUsuarioId AS RequestedByUserId,
+           SolicitadoPorNombreUsuario AS RequestedByUserName, SolicitadoEn AS RequestedAt,
+           DecididoPorUsuarioId AS DecidedByUserId, DecididoPorNombreUsuario AS DecidedByUserName,
+           DecididoEn AS DecidedAt, MotivoDecision AS DecisionReason
+      FROM dbo.SolicitudBaja
+     WHERE Estado = 'pending'
+       AND (@StartDate IS NULL OR SolicitadoEn >= @StartDate)
+       AND (@EndDate   IS NULL OR SolicitadoEn <= @EndDate)
+     ORDER BY SolicitadoEn DESC;
 END;
 GO
 
@@ -1324,10 +1354,15 @@ CREATE PROCEDURE dbo.uspSolicitudBajaObtenerTodas
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT * FROM dbo.SolicitudBaja
-     WHERE (@StartDate IS NULL OR RequestedAt >= @StartDate)
-       AND (@EndDate   IS NULL OR RequestedAt <= @EndDate)
-     ORDER BY RequestedAt DESC;
+    SELECT SolicitudId AS RequestId, CodigoActivo AS AssetCode, NombreActivo AS AssetName, AreaId,
+           Estado AS Status, Motivo AS Reason, SolicitadoPorUsuarioId AS RequestedByUserId,
+           SolicitadoPorNombreUsuario AS RequestedByUserName, SolicitadoEn AS RequestedAt,
+           DecididoPorUsuarioId AS DecidedByUserId, DecididoPorNombreUsuario AS DecidedByUserName,
+           DecididoEn AS DecidedAt, MotivoDecision AS DecisionReason
+      FROM dbo.SolicitudBaja
+     WHERE (@StartDate IS NULL OR SolicitadoEn >= @StartDate)
+       AND (@EndDate   IS NULL OR SolicitadoEn <= @EndDate)
+     ORDER BY SolicitadoEn DESC;
 END;
 GO
 
@@ -1335,9 +1370,14 @@ CREATE PROCEDURE dbo.uspSolicitudBajaObtenerPendientePorActivo @AssetCode NVARCH
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT TOP (1) * FROM dbo.SolicitudBaja
-     WHERE AssetCode = @AssetCode AND Status = 'pending'
-     ORDER BY RequestedAt DESC;
+    SELECT TOP (1) SolicitudId AS RequestId, CodigoActivo AS AssetCode, NombreActivo AS AssetName, AreaId,
+           Estado AS Status, Motivo AS Reason, SolicitadoPorUsuarioId AS RequestedByUserId,
+           SolicitadoPorNombreUsuario AS RequestedByUserName, SolicitadoEn AS RequestedAt,
+           DecididoPorUsuarioId AS DecidedByUserId, DecididoPorNombreUsuario AS DecidedByUserName,
+           DecididoEn AS DecidedAt, MotivoDecision AS DecisionReason
+      FROM dbo.SolicitudBaja
+     WHERE CodigoActivo = @AssetCode AND Estado = 'pending'
+     ORDER BY SolicitadoEn DESC;
 END;
 GO
 
@@ -1351,8 +1391,8 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         DECLARE @c NVARCHAR(60), @nm NVARCHAR(200), @ar NVARCHAR(15), @st NVARCHAR(10);
-        SELECT @c = AssetCode, @nm = AssetName, @ar = AreaId, @st = Status
-          FROM dbo.SolicitudBaja WITH (UPDLOCK, HOLDLOCK) WHERE RequestId = @RequestId;
+        SELECT @c = CodigoActivo, @nm = NombreActivo, @ar = AreaId, @st = Estado
+          FROM dbo.SolicitudBaja WITH (UPDLOCK, HOLDLOCK) WHERE SolicitudId = @RequestId;
 
         IF @c IS NULL OR @st <> 'pending'
         BEGIN
@@ -1360,22 +1400,22 @@ BEGIN
         END;
 
         UPDATE a
-           SET Status = 'deleted', DeletedAt = SYSUTCDATETIME(),
-               DeletedByUserId = @ApproverUserId, DeletedByUserName = @ApproverUserName,
-               UpdatedAt = SYSUTCDATETIME()
+           SET Estado = 'deleted', EliminadoEn = SYSUTCDATETIME(),
+               EliminadoPorUsuarioId = @ApproverUserId, EliminadoPorNombreUsuario = @ApproverUserName,
+               ActualizadoEn = SYSUTCDATETIME()
           FROM dbo.Activo a
-         WHERE a.AreaId = @ar AND a.Status <> 'deleted'
-           AND (a.AssetCode = @c OR CHARINDEX(CONCAT(N',', @c, N','), CONCAT(N',', a.AncestorsPath, N',')) > 0);
+         WHERE a.AreaId = @ar AND a.Estado <> 'deleted'
+           AND (a.CodigoActivo = @c OR CHARINDEX(CONCAT(N',', @c, N','), CONCAT(N',', a.RutaAncestros, N',')) > 0);
 
         UPDATE dbo.SolicitudBaja
-           SET Status = 'approved', DecidedByUserId = @ApproverUserId,
-               DecidedByUserName = @ApproverUserName, DecidedAt = SYSUTCDATETIME(),
-               DecisionReason = COALESCE(@ApproveReason, N'')
-         WHERE RequestId = @RequestId;
+           SET Estado = 'approved', DecididoPorUsuarioId = @ApproverUserId,
+               DecididoPorNombreUsuario = @ApproverUserName, DecididoEn = SYSUTCDATETIME(),
+               MotivoDecision = COALESCE(@ApproveReason, N'')
+         WHERE SolicitudId = @RequestId;
 
-        UPDATE dbo.CandadoBaja SET LockStatus = 'approved', UpdatedAt = SYSUTCDATETIME() WHERE AssetCode = @c;
+        UPDATE dbo.CandadoBaja SET EstadoCandado = 'approved', ActualizadoEn = SYSUTCDATETIME() WHERE CodigoActivo = @c;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@ApproverUserId, @ApproverUserName, 'ASSET_DELETED', 'ASSETS', @c,
                 CONCAT(N'Aprobada la solicitud de baja ', @RequestId, N' para ', @c, N' (', @nm, N').'));
 
@@ -1398,8 +1438,8 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         DECLARE @c NVARCHAR(60), @nm NVARCHAR(200), @st NVARCHAR(10);
-        SELECT @c = AssetCode, @nm = AssetName, @st = Status
-          FROM dbo.SolicitudBaja WITH (UPDLOCK, HOLDLOCK) WHERE RequestId = @RequestId;
+        SELECT @c = CodigoActivo, @nm = NombreActivo, @st = Estado
+          FROM dbo.SolicitudBaja WITH (UPDLOCK, HOLDLOCK) WHERE SolicitudId = @RequestId;
 
         IF @c IS NULL OR @st <> 'pending'
         BEGIN
@@ -1407,14 +1447,14 @@ BEGIN
         END;
 
         UPDATE dbo.SolicitudBaja
-           SET Status = 'rejected', DecidedByUserId = @RejectedByUserId,
-               DecidedByUserName = @RejectedByUserName, DecidedAt = SYSUTCDATETIME(),
-               DecisionReason = @RejectReason
-         WHERE RequestId = @RequestId;
+           SET Estado = 'rejected', DecididoPorUsuarioId = @RejectedByUserId,
+               DecididoPorNombreUsuario = @RejectedByUserName, DecididoEn = SYSUTCDATETIME(),
+               MotivoDecision = @RejectReason
+         WHERE SolicitudId = @RequestId;
 
-        UPDATE dbo.CandadoBaja SET LockStatus = 'rejected', UpdatedAt = SYSUTCDATETIME() WHERE AssetCode = @c;
+        UPDATE dbo.CandadoBaja SET EstadoCandado = 'rejected', ActualizadoEn = SYSUTCDATETIME() WHERE CodigoActivo = @c;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@RejectedByUserId, @RejectedByUserName, 'ASSET_DELETE_REJECTED', 'ASSETS', @c,
                 CONCAT(N'Rechazada la solicitud ', @RequestId, N' para ', @c, N': "', @RejectReason, N'".'));
 
@@ -1433,21 +1473,31 @@ CREATE PROCEDURE dbo.uspOrdenTrabajoObtenerTodas
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT w.*,
+    SELECT w.OrdenTrabajoId AS WorkOrderId, w.CodigoActivo AS AssetCode, w.NombreActivo AS AssetName,
+           w.AreaId, w.NombreArea AS AreaName, w.Descripcion AS Description,
+           w.Estado AS Status, w.Prioridad AS Priority, w.AsignadoA AS AssignedTo,
+           w.CantidadPersonalAsignado AS AssignedStaffCount, w.HorasEstimadas AS EstimatedHours,
+           w.HorasReales AS ActualHours, w.DescripcionTrabajoRealizado AS WorkDoneDescription,
+           w.EstaCompletada AS IsCompleted, w.MotivoIncumplimiento AS UnfulfillmentReason,
+           w.FechaReprogramacion AS ReprogramDate, w.ResponsableAccHaccp AS AccHaccpResponsible,
+           w.ResponsableMantenimiento AS MaintenanceResponsible, w.ResponsableJefeArea AS AreaHeadResponsible,
+           w.ResponsableJefeMantenimiento AS MaintenanceHeadResponsible, w.FechaProgramada AS ScheduledDate,
+           w.ReporteId AS ReportId, w.CreadoPorUsuarioId AS CreatedByUserId,
+           w.CreadoPorNombreUsuario AS CreatedByUserName, w.CreadoEn AS CreatedAt,
            m.MaterialsJson,
            t.WorkTypesCsv
       FROM dbo.OrdenTrabajo w
-     OUTER APPLY (SELECT (SELECT LineNum, Description, Quantity, Unit
+     OUTER APPLY (SELECT (SELECT NumeroLinea AS LineNum, Descripcion AS Description, Cantidad AS Quantity, Unidad AS Unit
                             FROM dbo.MaterialOrdenTrabajo
-                           WHERE WorkOrderId = w.WorkOrderId
-                           ORDER BY LineNum
+                           WHERE OrdenTrabajoId = w.OrdenTrabajoId
+                           ORDER BY NumeroLinea
                              FOR JSON PATH) AS MaterialsJson) m
-     OUTER APPLY (SELECT STRING_AGG(WorkType, ',') AS WorkTypesCsv
+     OUTER APPLY (SELECT STRING_AGG(TipoTrabajo, ',') AS WorkTypesCsv
                     FROM dbo.TipoTrabajoOrdenTrabajo
-                   WHERE WorkOrderId = w.WorkOrderId) t
-     WHERE (@StatusFilter IS NULL OR w.Status = @StatusFilter)
+                   WHERE OrdenTrabajoId = w.OrdenTrabajoId) t
+     WHERE (@StatusFilter IS NULL OR w.Estado = @StatusFilter)
        AND (@AreaFilter   IS NULL OR w.AreaId = @AreaFilter)
-     ORDER BY w.CreatedAt DESC;
+     ORDER BY w.CreadoEn DESC;
 END;
 GO
 
@@ -1455,9 +1505,14 @@ CREATE PROCEDURE dbo.uspOrdenTrabajoObtenerAbiertas
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT * FROM dbo.OrdenTrabajo
-     WHERE Status IN ('pending', 'inProgress')
-     ORDER BY CreatedAt DESC;
+    SELECT OrdenTrabajoId AS WorkOrderId, CodigoActivo AS AssetCode, NombreActivo AS AssetName,
+           AreaId, NombreArea AS AreaName, Descripcion AS Description,
+           Estado AS Status, Prioridad AS Priority, AsignadoA AS AssignedTo,
+           CantidadPersonalAsignado AS AssignedStaffCount, HorasEstimadas AS EstimatedHours,
+           FechaProgramada AS ScheduledDate, ReporteId, CreadoEn AS CreatedAt
+      FROM dbo.OrdenTrabajo
+     WHERE Estado IN ('pending', 'inProgress')
+     ORDER BY CreadoEn DESC;
 END;
 GO
 
@@ -1479,40 +1534,40 @@ BEGIN
         BEGIN TRANSACTION;
         DECLARE @cCount TABLE (v INT NOT NULL);
         UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
-           SET NextNumber += 1
-         OUTPUT deleted.NextNumber INTO @cCount(v)
-          WHERE Name = 'work_orders';
+           SET SiguienteNumero += 1
+         OUTPUT deleted.SiguienteNumero INTO @cCount(v)
+          WHERE Nombre = 'work_orders';
 
         DECLARE @seq INT; SELECT @seq = v FROM @cCount;
         DECLARE @woId NVARCHAR(20) = CONCAT('OT-', YEAR(SYSUTCDATETIME()), '-', FORMAT(@seq, '0000'));
 
         INSERT INTO dbo.OrdenTrabajo
-            (WorkOrderId, AssetCode, AssetName, AreaId, AreaName, Description,
-             Status, Priority, AssignedTo, AssignedStaffCount, EstimatedHours,
-             ScheduledDate, ReportId, CreatedByUserId, CreatedByUserName, CreatedAt)
+            (OrdenTrabajoId, CodigoActivo, NombreActivo, AreaId, NombreArea, Descripcion,
+             Estado, Prioridad, AsignadoA, CantidadPersonalAsignado, HorasEstimadas,
+             FechaProgramada, ReporteId, CreadoPorUsuarioId, CreadoPorNombreUsuario, CreadoEn)
         VALUES
             (@woId, NULLIF(@AssetCode, ''), @AssetName, @AreaId, @AreaName, @Description,
              'pending', @Priority, @AssignedTo, @AssignedStaffCount, @EstimatedHours,
              @ScheduledDate, @ReportId, @CreatedByUserId, @CreatedByUserName, SYSUTCDATETIME());
 
-        INSERT INTO dbo.MaterialOrdenTrabajo (WorkOrderId, LineNum, Description, Quantity, Unit)
-        SELECT @woId, ROW_NUMBER() OVER (ORDER BY LineNum), Description, Quantity, ISNULL(Unit, 'pz')
+        INSERT INTO dbo.MaterialOrdenTrabajo (OrdenTrabajoId, NumeroLinea, Descripcion, Cantidad, Unidad)
+        SELECT @woId, ROW_NUMBER() OVER (ORDER BY NumeroLinea), Descripcion, Cantidad, ISNULL(Unidad, 'pz')
           FROM @Materials;
 
-        INSERT INTO dbo.TipoTrabajoOrdenTrabajo (WorkOrderId, WorkType)
-        SELECT DISTINCT @woId, LTRIM(RTRIM(Value)) FROM @WorkTypes WHERE LTRIM(RTRIM(Value)) <> '';
+        INSERT INTO dbo.TipoTrabajoOrdenTrabajo (OrdenTrabajoId, TipoTrabajo)
+        SELECT DISTINCT @woId, LTRIM(RTRIM(Valor)) FROM @WorkTypes WHERE LTRIM(RTRIM(Valor)) <> '';
 
         IF @ReportId IS NOT NULL
         BEGIN
-            UPDATE dbo.ReporteAveria SET Status = 'inWorkOrder', WorkOrderId = @woId WHERE ReportId = @ReportId;
+            UPDATE dbo.ReporteAveria SET Estado = 'inWorkOrder', OrdenTrabajoId = @woId WHERE ReporteId = @ReportId;
         END;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@CreatedByUserId, @CreatedByUserName, 'WORK_ORDER_CREATED', 'WORK_ORDERS', @woId,
                 CONCAT(N'Orden de trabajo ', @woId, N' creada para ', @AssetName, N'.'));
 
         COMMIT TRANSACTION;
-        SELECT @woId AS WorkOrderNumber, @woId AS NewWorkOrderId;
+        SELECT @woId AS WorkOrderNumber, @woId AS NewWorkOrderId, @woId AS OrdenTrabajoId;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -1531,22 +1586,22 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         DECLARE @cur NVARCHAR(15), @rid BIGINT;
-        SELECT @cur = Status, @rid = ReportId FROM dbo.OrdenTrabajo WITH (UPDLOCK, HOLDLOCK)
-         WHERE WorkOrderId = @WorkOrderId;
+        SELECT @cur = Estado, @rid = ReporteId FROM dbo.OrdenTrabajo WITH (UPDLOCK, HOLDLOCK)
+         WHERE OrdenTrabajoId = @WorkOrderId;
 
         IF @cur IS NULL
         BEGIN
             RAISERROR(N'La orden de trabajo ya no existe.', 16, 1);
         END;
 
-        UPDATE dbo.OrdenTrabajo SET Status = @NewStatus WHERE WorkOrderId = @WorkOrderId;
+        UPDATE dbo.OrdenTrabajo SET Estado = @NewStatus WHERE OrdenTrabajoId = @WorkOrderId;
 
         IF @NewStatus = 'completed' AND @rid IS NOT NULL
-            UPDATE dbo.ReporteAveria SET Status = 'resolved', ResolvedByUserId = @UserId, ResolvedByUserName = @UserName, ResolvedAt = SYSUTCDATETIME() WHERE ReportId = @rid;
+            UPDATE dbo.ReporteAveria SET Estado = 'resolved', ResueltoPorUsuarioId = @UserId, ResueltoPorNombreUsuario = @UserName, ResueltoEn = SYSUTCDATETIME() WHERE ReporteId = @rid;
         ELSE IF @NewStatus = 'cancelled' AND @rid IS NOT NULL
-            UPDATE dbo.ReporteAveria SET Status = 'reported', WorkOrderId = NULL WHERE ReportId = @rid;
+            UPDATE dbo.ReporteAveria SET Estado = 'reported', OrdenTrabajoId = NULL WHERE ReporteId = @rid;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'WORK_ORDER_STATUS_CHANGED', 'WORK_ORDERS', @WorkOrderId,
                 CONCAT(N'OT ', @WorkOrderId, N': estado "', @cur, N'" -> "', @NewStatus, N'".'));
 
@@ -1577,26 +1632,26 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         UPDATE dbo.OrdenTrabajo
-           SET Description = @Description, Priority = @Priority,
-               AssignedTo = @AssignedTo, AssignedStaffCount = @AssignedStaffCount,
-               EstimatedHours = @EstimatedHours, ActualHours = @ActualHours,
-               WorkDoneDescription = @WorkDoneDescription, IsCompleted = @IsCompleted,
-               UnfulfillmentReason = @UnfulfillmentReason, ReprogramDate = @ReprogramDate,
-               AccHaccpResponsible = @AccHaccpResponsible, MaintenanceResponsible = @MaintenanceResponsible,
-               ScheduledDate = @ScheduledDate
-         WHERE WorkOrderId = @WorkOrderId;
+           SET Descripcion = @Description, Prioridad = @Priority,
+               AsignadoA = @AssignedTo, CantidadPersonalAsignado = @AssignedStaffCount,
+               HorasEstimadas = @EstimatedHours, HorasReales = @ActualHours,
+               DescripcionTrabajoRealizado = @WorkDoneDescription, EstaCompletada = @IsCompleted,
+               MotivoIncumplimiento = @UnfulfillmentReason, FechaReprogramacion = @ReprogramDate,
+               ResponsableAccHaccp = @AccHaccpResponsible, ResponsableMantenimiento = @MaintenanceResponsible,
+               FechaProgramada = @ScheduledDate
+         WHERE OrdenTrabajoId = @WorkOrderId;
 
-        DELETE FROM dbo.MaterialOrdenTrabajo WHERE WorkOrderId = @WorkOrderId;
-        DELETE FROM dbo.TipoTrabajoOrdenTrabajo WHERE WorkOrderId = @WorkOrderId;
+        DELETE FROM dbo.MaterialOrdenTrabajo WHERE OrdenTrabajoId = @WorkOrderId;
+        DELETE FROM dbo.TipoTrabajoOrdenTrabajo WHERE OrdenTrabajoId = @WorkOrderId;
 
-        INSERT INTO dbo.MaterialOrdenTrabajo (WorkOrderId, LineNum, Description, Quantity, Unit)
-        SELECT @WorkOrderId, ROW_NUMBER() OVER (ORDER BY LineNum), Description, Quantity, ISNULL(Unit, 'pz')
+        INSERT INTO dbo.MaterialOrdenTrabajo (OrdenTrabajoId, NumeroLinea, Descripcion, Cantidad, Unidad)
+        SELECT @WorkOrderId, ROW_NUMBER() OVER (ORDER BY NumeroLinea), Descripcion, Cantidad, ISNULL(Unidad, 'pz')
           FROM @Materials;
 
-        INSERT INTO dbo.TipoTrabajoOrdenTrabajo (WorkOrderId, WorkType)
-        SELECT DISTINCT @WorkOrderId, LTRIM(RTRIM(Value)) FROM @WorkTypes WHERE LTRIM(RTRIM(Value)) <> '';
+        INSERT INTO dbo.TipoTrabajoOrdenTrabajo (OrdenTrabajoId, TipoTrabajo)
+        SELECT DISTINCT @WorkOrderId, LTRIM(RTRIM(Valor)) FROM @WorkTypes WHERE LTRIM(RTRIM(Valor)) <> '';
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'WORK_ORDER_UPDATED', 'WORK_ORDERS', @WorkOrderId,
                 CONCAT(N'Detalles de OT ', @WorkOrderId, N' actualizados.'));
 
@@ -1620,21 +1675,21 @@ BEGIN
     SET XACT_ABORT ON;
     BEGIN TRY
         BEGIN TRANSACTION;
-        IF NOT EXISTS (SELECT 1 FROM dbo.Activo WHERE AssetCode = @AssetCode)
+        IF NOT EXISTS (SELECT 1 FROM dbo.Activo WHERE CodigoActivo = @AssetCode)
         BEGIN
             RAISERROR(N'El activo no existe.', 16, 1);
         END;
 
-        INSERT INTO dbo.ReporteAveria (AssetCode, AssetName, AreaId, Description, Severity, ReportedByUserId, ReportedByUserName)
+        INSERT INTO dbo.ReporteAveria (CodigoActivo, NombreActivo, AreaId, Descripcion, Severidad, ReportadoPorUsuarioId, ReportadoPorNombreUsuario)
         VALUES (@AssetCode, @AssetName, @AreaId, @Description, @Severity, @ReporterUserId, @ReporterUserName);
         DECLARE @rid BIGINT = SCOPE_IDENTITY();
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@ReporterUserId, @ReporterUserName, 'BREAKDOWN_REPORTED', 'BREAKDOWNS', @AssetCode,
                 CONCAT(N'Reporte ', @rid, N': avería en ', @AssetCode, N' (', @AssetName, N'). Severidad: ', @Severity, N'.'));
 
         COMMIT TRANSACTION;
-        SELECT @rid AS NewReportId;
+        SELECT @rid AS NewReportId, @rid AS ReporteId;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -1649,11 +1704,19 @@ CREATE PROCEDURE dbo.uspReporteAveriaObtenerTodos
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT * FROM dbo.ReporteAveria
-     WHERE (@StatusFilter IS NULL OR Status = @StatusFilter)
-       AND (@StartDate IS NULL OR ReportedAt >= @StartDate)
-       AND (@EndDate   IS NULL OR ReportedAt <= @EndDate)
-     ORDER BY ReportedAt DESC;
+    SELECT ReporteId, CodigoActivo AS AssetCode, NombreActivo AS AssetName, AreaId,
+           Descripcion AS Description, Severidad AS Severity,
+           ReportadoPorUsuarioId AS ReportedByUserId, ReportadoPorNombreUsuario AS ReportedByUserName,
+           ReportadoEn AS ReportedAt, Estado AS Status, OrdenTrabajoId AS WorkOrderId,
+           ResueltoPorUsuarioId AS ResolvedByUserId, ResueltoPorNombreUsuario AS ResolvedByUserName,
+           ResueltoEn AS ResolvedAt, MotivoRechazo AS RejectionReason,
+           RechazadoPorUsuarioId AS RejectedByUserId, RechazadoPorNombreUsuario AS RejectedByUserName,
+           RechazadoEn AS RejectedAt
+      FROM dbo.ReporteAveria
+     WHERE (@StatusFilter IS NULL OR Estado = @StatusFilter)
+       AND (@StartDate IS NULL OR ReportadoEn >= @StartDate)
+       AND (@EndDate   IS NULL OR ReportadoEn <= @EndDate)
+     ORDER BY ReportadoEn DESC;
 END;
 GO
 
@@ -1661,7 +1724,17 @@ CREATE PROCEDURE dbo.uspReporteAveriaObtenerPorUsuario @ReporterUserId INT
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT * FROM dbo.ReporteAveria WHERE ReportedByUserId = @ReporterUserId ORDER BY ReportedAt DESC;
+    SELECT ReporteId, CodigoActivo AS AssetCode, NombreActivo AS AssetName, AreaId,
+           Descripcion AS Description, Severidad AS Severity,
+           ReportadoPorUsuarioId AS ReportedByUserId, ReportadoPorNombreUsuario AS ReportedByUserName,
+           ReportadoEn AS ReportedAt, Estado AS Status, OrdenTrabajoId AS WorkOrderId,
+           ResueltoPorUsuarioId AS ResolvedByUserId, ResueltoPorNombreUsuario AS ResolvedByUserName,
+           ResueltoEn AS ResolvedAt, MotivoRechazo AS RejectionReason,
+           RechazadoPorUsuarioId AS RejectedByUserId, RechazadoPorNombreUsuario AS RejectedByUserName,
+           RechazadoEn AS RejectedAt
+      FROM dbo.ReporteAveria
+     WHERE ReportadoPorUsuarioId = @ReporterUserId
+     ORDER BY ReportadoEn DESC;
 END;
 GO
 
@@ -1669,7 +1742,13 @@ CREATE PROCEDURE dbo.uspReporteAveriaObtenerAbiertos
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT * FROM dbo.ReporteAveria WHERE Status IN ('reported', 'inWorkOrder') ORDER BY ReportedAt DESC;
+    SELECT ReporteId, CodigoActivo AS AssetCode, NombreActivo AS AssetName, AreaId,
+           Descripcion AS Description, Severidad AS Severity,
+           ReportadoPorUsuarioId AS ReportedByUserId, ReportadoPorNombreUsuario AS ReportedByUserName,
+           ReportadoEn AS ReportedAt, Estado AS Status, OrdenTrabajoId AS WorkOrderId
+      FROM dbo.ReporteAveria
+     WHERE Estado IN ('reported', 'inWorkOrder')
+     ORDER BY ReportadoEn DESC;
 END;
 GO
 
@@ -1681,13 +1760,13 @@ BEGIN
     SET XACT_ABORT ON;
     BEGIN TRY
         BEGIN TRANSACTION;
-        UPDATE dbo.ReporteAveria SET Status = 'inWorkOrder', WorkOrderId = @WorkOrderId WHERE ReportId = @ReportId;
+        UPDATE dbo.ReporteAveria SET Estado = 'inWorkOrder', OrdenTrabajoId = @WorkOrderId WHERE ReporteId = @ReportId;
         IF @@ROWCOUNT = 0
         BEGIN
             RAISERROR(N'El reporte ya no existe.', 16, 1);
         END;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'BREAKDOWN_LINKED_WORK_ORDER', 'BREAKDOWNS', @ReportId,
                 CONCAT(N'Reporte ', @ReportId, N' vinculado a la OT ', @WorkOrderId, N'.'));
 
@@ -1706,16 +1785,16 @@ AS
 BEGIN
     SET NOCOUNT ON;
     UPDATE dbo.ReporteAveria
-       SET Status = 'resolved', ResolvedByUserId = @ResolvedByUserId,
-           ResolvedByUserName = @ResolvedByUserName, ResolvedAt = SYSUTCDATETIME()
-     WHERE ReportId = @ReportId;
+       SET Estado = 'resolved', ResueltoPorUsuarioId = @ResolvedByUserId,
+           ResueltoPorNombreUsuario = @ResolvedByUserName, ResueltoEn = SYSUTCDATETIME()
+     WHERE ReporteId = @ReportId;
     IF @@ROWCOUNT = 0
     BEGIN
         RAISERROR(N'El reporte ya no existe.', 16, 1);
         RETURN;
     END;
 
-    INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+    INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
     VALUES (@ResolvedByUserId, @ResolvedByUserName, 'BREAKDOWN_RESOLVED', 'BREAKDOWNS', @ReportId,
             CONCAT(N'Reporte ', @ReportId, N' resuelto.'));
 END;
@@ -1727,17 +1806,17 @@ AS
 BEGIN
     SET NOCOUNT ON;
     UPDATE dbo.ReporteAveria
-       SET Status = 'rejected', RejectionReason = @Reason,
-           RejectedByUserId = @RejectedByUserId, RejectedByUserName = @RejectedByUserName,
-           RejectedAt = SYSUTCDATETIME()
-     WHERE ReportId = @ReportId;
+       SET Estado = 'rejected', MotivoRechazo = @Reason,
+           RechazadoPorUsuarioId = @RejectedByUserId, RechazadoPorNombreUsuario = @RejectedByUserName,
+           RechazadoEn = SYSUTCDATETIME()
+     WHERE ReporteId = @ReportId;
     IF @@ROWCOUNT = 0
     BEGIN
         RAISERROR(N'El reporte ya no existe.', 16, 1);
         RETURN;
     END;
 
-    INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+    INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
     VALUES (@RejectedByUserId, @RejectedByUserName, 'BREAKDOWN_REJECTED', 'BREAKDOWNS', @ReportId,
             CONCAT(N'Reporte ', @ReportId, N' rechazado: "', @Reason, N'".'));
 END;
@@ -1749,16 +1828,26 @@ CREATE PROCEDURE dbo.uspPlanPreventivoObtenerTodos
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT p.*, m.MaterialsJson
+    SELECT p.PlanId AS ScheduleId, p.Titulo AS Title, p.CodigoActivo AS AssetCode,
+           p.NombreActivo AS AssetName, p.AreaId, p.NombreArea AS AreaName,
+           p.TipoMantenimiento AS MaintenanceType, p.Frecuencia AS Frequency,
+           p.Descripcion AS Description, p.HorasEstimadas AS EstimatedHours,
+           p.FechaInicio AS StartDate, p.ProximaFecha AS NextDate,
+           p.UltimaCompletada AS LastCompleted, p.UltimaOrdenTrabajoId AS LastWorkOrderId,
+           p.Estado AS Status, p.Notas AS Notes, p.CreadoPorUsuarioId AS CreatedByUserId,
+           p.CreadoPorNombreUsuario AS CreatedByUserName, p.CreadoEn AS CreatedAt,
+           p.NumeroDocumentoModificacion AS AmendmentDocNumber, p.ModificadoPor AS AmendedBy,
+           p.ModificadoEn AS AmendedAt, p.MotivoModificacion AS AmendmentReason,
+           m.MaterialsJson
       FROM dbo.PlanPreventivo p
-     OUTER APPLY (SELECT (SELECT Name, Quantity, Unit
+     OUTER APPLY (SELECT (SELECT Nombre AS Name, Cantidad AS Quantity, Unidad AS Unit
                             FROM dbo.MaterialPreventivo
-                           WHERE ScheduleId = p.ScheduleId
-                           ORDER BY LineNum
+                           WHERE PlanId = p.PlanId
+                           ORDER BY NumeroLinea
                              FOR JSON PATH) AS MaterialsJson) m
      WHERE (@AreaFilter   IS NULL OR p.AreaId = @AreaFilter)
-       AND (@StatusFilter IS NULL OR p.Status = @StatusFilter)
-     ORDER BY p.NextDate ASC;
+       AND (@StatusFilter IS NULL OR p.Estado = @StatusFilter)
+     ORDER BY p.ProximaFecha ASC;
 END;
 GO
 
@@ -1780,9 +1869,9 @@ BEGIN
         BEGIN TRANSACTION;
         DECLARE @cTable TABLE (v INT NOT NULL);
         UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
-           SET NextNumber += 1
-         OUTPUT deleted.NextNumber INTO @cTable(v)
-          WHERE Name = 'preventive_schedules';
+           SET SiguienteNumero += 1
+         OUTPUT deleted.SiguienteNumero INTO @cTable(v)
+          WHERE Nombre = 'preventive_schedules';
 
         DECLARE @n INT; SELECT @n = v FROM @cTable;
         DECLARE @id NVARCHAR(20) = CONCAT('PM-', YEAR(SYSUTCDATETIME()), '-', FORMAT(@n, '0000'));
@@ -1790,24 +1879,24 @@ BEGIN
             CASE WHEN LTRIM(ISNULL(@Title, N'')) = N'' THEN CONCAT(N'Plan Preventivo ', @id) ELSE @Title END;
 
         INSERT INTO dbo.PlanPreventivo
-            (ScheduleId, Title, AssetCode, AssetName, AreaId, AreaName, MaintenanceType, Frequency,
-             Description, EstimatedHours, StartDate, NextDate, LastCompleted, LastWorkOrderId,
-             Status, Notes, CreatedByUserId, CreatedByUserName, CreatedAt)
+            (PlanId, Titulo, CodigoActivo, NombreActivo, AreaId, NombreArea, TipoMantenimiento, Frecuencia,
+             Descripcion, HorasEstimadas, FechaInicio, ProximaFecha, UltimaCompletada, UltimaOrdenTrabajoId,
+             Estado, Notas, CreadoPorUsuarioId, CreadoPorNombreUsuario, CreadoEn)
         VALUES
             (@id, @FinalTitle, @AssetCode, @AssetName, @AreaId, @AreaName, @MaintenanceType, @Frequency,
              @Description, @EstimatedHours, @StartDate, @NextDate, @LastCompleted, @LastWorkOrderId,
              @Status, @Notes, @CreatedByUserId, @CreatedByUserName, SYSUTCDATETIME());
 
-        INSERT INTO dbo.MaterialPreventivo (ScheduleId, LineNum, Name, Quantity, Unit)
-        SELECT @id, ROW_NUMBER() OVER (ORDER BY LineNum), Name, Quantity, ISNULL(Unit, 'pza')
+        INSERT INTO dbo.MaterialPreventivo (PlanId, NumeroLinea, Nombre, Cantidad, Unidad)
+        SELECT @id, ROW_NUMBER() OVER (ORDER BY NumeroLinea), Nombre, Cantidad, ISNULL(Unidad, 'pza')
           FROM @Materials;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@CreatedByUserId, @CreatedByUserName, 'PREVENTIVE_SCHEDULE_CREATED', 'PREVENTIVE', @id,
                 CONCAT(N'Plan preventivo ', @id, N' creado para ', @AssetCode, N' - Frecuencia: ', dbo.fnFrecuenciaEtiqueta(@Frequency), N'.'));
 
         COMMIT TRANSACTION;
-        SELECT @id AS NewScheduleId;
+        SELECT @id AS NewScheduleId, @id AS PlanId;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -1830,21 +1919,21 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
         UPDATE dbo.PlanPreventivo
-           SET Title = @Title, MaintenanceType = @MaintenanceType, Frequency = @Frequency,
-               Description = @Description, EstimatedHours = @EstimatedHours,
-               StartDate = @StartDate, NextDate = @NextDate, Notes = @Notes,
-               AmendmentDocNumber = @AmendmentDocNumber,
-               AmendedBy = @UserName,
-               AmendedAt = SYSUTCDATETIME(),
-               AmendmentReason = @AmendmentReason
-         WHERE ScheduleId = @ScheduleId;
+           SET Titulo = @Title, TipoMantenimiento = @MaintenanceType, Frecuencia = @Frequency,
+               Descripcion = @Description, HorasEstimadas = @EstimatedHours,
+               FechaInicio = @StartDate, ProximaFecha = @NextDate, Notas = @Notes,
+               NumeroDocumentoModificacion = @AmendmentDocNumber,
+               ModificadoPor = @UserName,
+               ModificadoEn = SYSUTCDATETIME(),
+               MotivoModificacion = @AmendmentReason
+         WHERE PlanId = @ScheduleId;
 
-        DELETE FROM dbo.MaterialPreventivo WHERE ScheduleId = @ScheduleId;
-        INSERT INTO dbo.MaterialPreventivo (ScheduleId, LineNum, Name, Quantity, Unit)
-        SELECT @ScheduleId, ROW_NUMBER() OVER (ORDER BY LineNum), Name, Quantity, ISNULL(Unit, 'pza')
+        DELETE FROM dbo.MaterialPreventivo WHERE PlanId = @ScheduleId;
+        INSERT INTO dbo.MaterialPreventivo (PlanId, NumeroLinea, Nombre, Cantidad, Unidad)
+        SELECT @ScheduleId, ROW_NUMBER() OVER (ORDER BY NumeroLinea), Nombre, Cantidad, ISNULL(Unidad, 'pza')
           FROM @Materials;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'PREVENTIVE_SCHEDULE_UPDATED', 'PREVENTIVE', @ScheduleId,
                 CONCAT(N'Plan preventivo ', @ScheduleId, N' modificado.'));
 
@@ -1864,15 +1953,15 @@ AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @freq NVARCHAR(15);
-    SELECT @freq = Frequency FROM dbo.PlanPreventivo WHERE ScheduleId = @ScheduleId;
+    SELECT @freq = Frecuencia FROM dbo.PlanPreventivo WHERE PlanId = @ScheduleId;
     IF @freq IS NOT NULL
     BEGIN
         DECLARE @next DATETIME2(3) = DATEADD(DAY, dbo.fnFrecuenciaDias(@freq), SYSUTCDATETIME());
         UPDATE dbo.PlanPreventivo
-           SET LastCompleted = SYSUTCDATETIME(), LastWorkOrderId = @WorkOrderId, NextDate = @next
-         WHERE ScheduleId = @ScheduleId;
+           SET UltimaCompletada = SYSUTCDATETIME(), UltimaOrdenTrabajoId = @WorkOrderId, ProximaFecha = @next
+         WHERE PlanId = @ScheduleId;
 
-        INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
         VALUES (@UserId, @UserName, 'PREVENTIVE_SCHEDULE_UPDATED', 'PREVENTIVE', @ScheduleId,
                 CONCAT(N'Plan preventivo ', @ScheduleId, N' ejecutado mediante OT ', @WorkOrderId, N'.'));
     END;
@@ -1887,14 +1976,14 @@ AS
 BEGIN
     SET NOCOUNT ON;
     UPDATE dbo.PlanPreventivo
-       SET Status = @NewStatus,
-           AmendmentDocNumber = @AmendmentDocNumber,
-           AmendedBy = @UserName,
-           AmendedAt = SYSUTCDATETIME(),
-           AmendmentReason = @Reason
-     WHERE ScheduleId = @ScheduleId;
+       SET Estado = @NewStatus,
+           NumeroDocumentoModificacion = @AmendmentDocNumber,
+           ModificadoPor = @UserName,
+           ModificadoEn = SYSUTCDATETIME(),
+           MotivoModificacion = @Reason
+     WHERE PlanId = @ScheduleId;
 
-    INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+    INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
     VALUES (@UserId, @UserName, 'PREVENTIVE_SCHEDULE_STATUS_CHANGED', 'PREVENTIVE', @ScheduleId,
             CONCAT(N'Estado de plan preventivo ', @ScheduleId, N' cambiado a "', @NewStatus, N'".'));
 END;
@@ -1907,7 +1996,7 @@ CREATE PROCEDURE dbo.uspKardexAgregar
 AS
 BEGIN
     SET NOCOUNT ON;
-    INSERT INTO dbo.BitacoraKardex (UserId, UserName, Action, Module, EntityId, Details)
+    INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
     VALUES (@UserId, @UserName, @Action, @Module, @EntityId, @Details);
 END;
 GO
@@ -1919,14 +2008,16 @@ CREATE PROCEDURE dbo.uspKardexObtenerTodos
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT TOP (@Limit) *
+    SELECT TOP (@Limit) BitacoraId AS LogId, RegistradoEn AS LoggedAt, UsuarioId AS UserId,
+           NombreUsuario AS UserName, Accion AS Action, Modulo AS Module, EntidadId AS EntityId,
+           Detalles AS Details
       FROM dbo.BitacoraKardex
-     WHERE (@ModuleFilter IS NULL OR Module = @ModuleFilter)
-       AND (@ActionFilter IS NULL OR Action = @ActionFilter)
-       AND (@UserFilter   IS NULL OR UserId = @UserFilter)
-       AND (@StartDate    IS NULL OR LoggedAt >= @StartDate)
-       AND (@EndDate      IS NULL OR LoggedAt <= @EndDate)
-     ORDER BY LoggedAt DESC;
+     WHERE (@ModuleFilter IS NULL OR Modulo = @ModuleFilter)
+       AND (@ActionFilter IS NULL OR Accion = @ActionFilter)
+       AND (@UserFilter   IS NULL OR UsuarioId = @UserFilter)
+       AND (@StartDate    IS NULL OR RegistradoEn >= @StartDate)
+       AND (@EndDate      IS NULL OR RegistradoEn <= @EndDate)
+     ORDER BY RegistradoEn DESC;
 END;
 GO
 
@@ -1934,7 +2025,12 @@ CREATE PROCEDURE dbo.uspKardexObtenerPorEntidad @EntityId NVARCHAR(60)
 AS
 BEGIN
     SET NOCOUNT ON;
-    SELECT * FROM dbo.BitacoraKardex WHERE EntityId = @EntityId ORDER BY LoggedAt DESC;
+    SELECT BitacoraId AS LogId, RegistradoEn AS LoggedAt, UsuarioId AS UserId,
+           NombreUsuario AS UserName, Accion AS Action, Modulo AS Module, EntidadId AS EntityId,
+           Detalles AS Details
+      FROM dbo.BitacoraKardex
+     WHERE EntidadId = @EntityId
+     ORDER BY RegistradoEn DESC;
 END;
 GO
 
@@ -1943,11 +2039,11 @@ AS
 BEGIN
     SET NOCOUNT ON;
     SELECT
-        (SELECT COUNT(*) FROM dbo.Activo         WHERE Status <> 'deleted')                    AS TotalAssets,
-        (SELECT COUNT(*) FROM dbo.OrdenTrabajo   WHERE Status = 'pending')                     AS PendingWorkOrders,
-        (SELECT COUNT(*) FROM dbo.OrdenTrabajo   WHERE Status = 'inProgress')                  AS InProgressWorkOrders,
-        (SELECT COUNT(*) FROM dbo.OrdenTrabajo   WHERE Status = 'completed')                   AS CompletedWorkOrders,
-        (SELECT COUNT(*) FROM dbo.PlanPreventivo WHERE Status = 'active')                      AS ActivePreventiveSchedules,
+        (SELECT COUNT(*) FROM dbo.Activo         WHERE Estado <> 'deleted')                    AS TotalAssets,
+        (SELECT COUNT(*) FROM dbo.OrdenTrabajo   WHERE Estado = 'pending')                     AS PendingWorkOrders,
+        (SELECT COUNT(*) FROM dbo.OrdenTrabajo   WHERE Estado = 'inProgress')                  AS InProgressWorkOrders,
+        (SELECT COUNT(*) FROM dbo.OrdenTrabajo   WHERE Estado = 'completed')                   AS CompletedWorkOrders,
+        (SELECT COUNT(*) FROM dbo.PlanPreventivo WHERE Estado = 'active')                      AS ActivePreventiveSchedules,
         (SELECT COUNT(*) FROM dbo.BitacoraKardex)                                              AS TotalKardexLogs;
 END;
 GO
@@ -1970,13 +2066,13 @@ GO
 BEGIN TRY
     BEGIN TRANSACTION;
 
-    INSERT INTO dbo.Rol (RoleCode, Label) VALUES
+    INSERT INTO dbo.Rol (CodigoRol, Nombre) VALUES
         ('admin',      N'Administrador'),
         ('jefe',       N'Jefe de Mantenimiento'),
         ('reportador', N'Reportador'),
         ('lector',     N'Lector');
 
-    INSERT INTO dbo.Permiso (PermissionCode) VALUES
+    INSERT INTO dbo.Permiso (CodigoPermiso) VALUES
         ('dashboard.view'), ('asset.view'), ('asset.create'), ('asset.edit'),
         ('asset.transfer'), ('asset.delete.request'), ('asset.delete.approve'),
         ('work_order.view'), ('work_order.create'), ('work_order.print'),
@@ -1984,31 +2080,31 @@ BEGIN TRY
         ('breakdown.report'), ('breakdown.view'), ('breakdown.manage'),
         ('user.manage');
 
-    INSERT INTO dbo.RolPermiso (RoleCode, PermissionCode)
-    SELECT 'admin', PermissionCode FROM dbo.Permiso;
+    INSERT INTO dbo.RolPermiso (CodigoRol, CodigoPermiso)
+    SELECT 'admin', CodigoPermiso FROM dbo.Permiso;
 
-    INSERT INTO dbo.RolPermiso (RoleCode, PermissionCode) VALUES
+    INSERT INTO dbo.RolPermiso (CodigoRol, CodigoPermiso) VALUES
         ('jefe', 'dashboard.view'), ('jefe', 'asset.view'),
         ('jefe', 'work_order.view'), ('jefe', 'work_order.create'), ('jefe', 'work_order.print'),
         ('jefe', 'preventive.view'), ('jefe', 'kardex.view'),
         ('jefe', 'breakdown.view'), ('jefe', 'breakdown.manage');
 
-    INSERT INTO dbo.RolPermiso (RoleCode, PermissionCode) VALUES
+    INSERT INTO dbo.RolPermiso (CodigoRol, CodigoPermiso) VALUES
         ('reportador', 'breakdown.report'), ('reportador', 'breakdown.view');
 
-    INSERT INTO dbo.RolPermiso (RoleCode, PermissionCode) VALUES
+    INSERT INTO dbo.RolPermiso (CodigoRol, CodigoPermiso) VALUES
         ('lector', 'dashboard.view'), ('lector', 'asset.view'),
         ('lector', 'work_order.view'), ('lector', 'preventive.view'),
         ('lector', 'kardex.view'), ('lector', 'breakdown.view');
 
-    INSERT INTO dbo.Contador (Name, NextNumber) VALUES
+    INSERT INTO dbo.Contador (Nombre, SiguienteNumero) VALUES
         ('areas', 4),
         ('work_orders', 2),
         ('preventive_schedules', 1);
 
     INSERT INTO dbo.Usuario
-        (Username, DisplayName, RoleCode, PasswordSalt, PasswordHash,
-         PasswordIterations, Disabled, MustChangePassword)
+        (NombreUsuario, NombreCompleto, CodigoRol, PasswordSalt, PasswordHash,
+         IteracionesPassword, Deshabilitado, DebeCambiarPassword)
     VALUES
         ('admin',      N'Administrador General',            'admin',      'Rx1dwPY0zyqg1mfPfwMcSg==',
          'o9h4+o4D7+n7VmRYx0ZU+JtDShclDmIHid7jFfOm+sM=', 20000, 0, 0),
@@ -2021,8 +2117,8 @@ BEGIN TRY
         ('gerente',    N'Gerente de Operaciones (legado)',  'lector',     'Rx1dwPY0zyqg1mfPfwMcSg==',
          'o9h4+o4D7+n7VmRYx0ZU+JtDShclDmIHid7jFfOm+sM=', 20000, 1, 0);
 
-    INSERT INTO dbo.UsuarioPermiso (UserId, PermissionCode)
-    SELECT u.UserId, p.PermissionCode
+    INSERT INTO dbo.UsuarioPermiso (UsuarioId, CodigoPermiso)
+    SELECT u.UsuarioId, p.CodigoPermiso
       FROM dbo.Usuario u
       JOIN (VALUES
         ('admin', 'dashboard.view'), ('admin', 'asset.view'),
@@ -2037,18 +2133,18 @@ BEGIN TRY
         ('lector', 'work_order.view'), ('lector', 'preventive.view'),
         ('lector', 'kardex.view'), ('lector', 'breakdown.view'),
         ('reportador', 'asset.view'), ('reportador', 'breakdown.report')
-      ) AS p(Username, PermissionCode)
-        ON p.Username = u.Username;
+      ) AS p(NombreUsuario, CodigoPermiso)
+        ON p.NombreUsuario = u.NombreUsuario;
 
-    INSERT INTO dbo.Area (AreaId, Name, CostCenter, AssetCounter)
+    INSERT INTO dbo.Area (AreaId, Nombre, CentroCosto, ContadorActivos)
     VALUES
         ('A1', N'Planta de Procesamiento', 'CC-01', 2),
         ('A2', N'Empacadora',              'CC-02', 0),
         ('A3', N'Cámaras de Frío',         'CC-03', 0);
 
     INSERT INTO dbo.Activo
-        (AssetCode, Name, Brand, Model, AreaId, StationId, ParentAssetCode, Level,
-         AncestorsPath, Status, Serial, ChildCounter, DynamicAttributes, CreatedAt)
+        (CodigoActivo, Nombre, Marca, Modelo, AreaId, EstacionId, CodigoActivoPadre, Nivel,
+         RutaAncestros, Estado, Serie, ContadorHijos, AtributosDinamicos, CreadoEn)
     VALUES
         ('A1-001',          N'Bomba centrífuga',       N'KSB',        N'Etanorm 80',   'A1', 'S1', NULL,            'equipment',    '',                              'active', NULL, 2,
          N'{"potencia":"7.5 kW","caudal":"60 m3/h"}', SYSUTCDATETIME()),
@@ -2063,25 +2159,25 @@ BEGIN TRY
         ('A1-001-01-01-01', N'Rótula del rodamiento',  N'SKF',        N'BALL-6205',    'A1', 'S1', 'A1-001-01-01',  'subPart',      'A1-001,A1-001-01,A1-001-01-01', 'active', NULL, 0,
          N'{"material":"Acero cromado"}', SYSUTCDATETIME());
 
-    INSERT INTO dbo.HistorialEstadoActivo (AssetCode, Status, StartedAt, AreaId, Reason, UserName)
-    SELECT a.AssetCode, a.Status, SYSUTCDATETIME(), a.AreaId, N'Alta inicial del activo', N'admin'
+    INSERT INTO dbo.HistorialEstadoActivo (CodigoActivo, Estado, IniciadoEn, AreaId, Motivo, NombreUsuario)
+    SELECT a.CodigoActivo, a.Estado, SYSUTCDATETIME(), a.AreaId, N'Alta inicial del activo', N'admin'
       FROM dbo.Activo a;
 
     DECLARE @uidAdmin INT, @uidReportador INT;
-    SELECT @uidAdmin = UserId FROM dbo.Usuario WHERE Username = 'admin';
-    SELECT @uidReportador = UserId FROM dbo.Usuario WHERE Username = 'reportador';
+    SELECT @uidAdmin = UsuarioId FROM dbo.Usuario WHERE NombreUsuario = 'admin';
+    SELECT @uidReportador = UsuarioId FROM dbo.Usuario WHERE NombreUsuario = 'reportador';
 
     INSERT INTO dbo.OrdenTrabajo
-        (WorkOrderId, AssetCode, AssetName, Description, Status, Priority,
-         CreatedByUserId, CreatedByUserName, CreatedAt)
+        (OrdenTrabajoId, CodigoActivo, NombreActivo, Descripcion, Estado, Prioridad,
+         CreadoPorUsuarioId, CreadoPorNombreUsuario, CreadoEn)
     VALUES
         ('OT-0001', 'A1-001', N'Bomba centrífuga', N'Fuga de aceite en el sello mecánico.',
          'pending', 'high', @uidAdmin, N'Administrador General', DATEADD(DAY, -2, SYSUTCDATETIME()));
 
     INSERT INTO dbo.ReporteAveria
-        (AssetCode, AssetName, AreaId, Description, Severity,
-         ReportedByUserId, ReportedByUserName, ReportedAt, Status, WorkOrderId,
-         RejectionReason, RejectedByUserId, RejectedByUserName, RejectedAt)
+        (CodigoActivo, NombreActivo, AreaId, Descripcion, Severidad,
+         ReportadoPorUsuarioId, ReportadoPorNombreUsuario, ReportadoEn, Estado, OrdenTrabajoId,
+         MotivoRechazo, RechazadoPorUsuarioId, RechazadoPorNombreUsuario, RechazadoEn)
     VALUES
         ('A1-001',     N'Bomba centrífuga',  'A1', N'Fuga de aceite en el sello mecánico.',        'high',   @uidReportador, N'reportador', DATEADD(DAY, -3, SYSUTCDATETIME()), 'inWorkOrder', 'OT-0001',
          NULL, NULL, NULL, NULL),
@@ -2090,7 +2186,7 @@ BEGIN TRY
         ('A1-001-01',  N'Motor eléctrico',   'A1', N'Ligera vibración detectada en el motor.',     'low',    @uidReportador, N'reportador', DATEADD(HOUR, -20, SYSUTCDATETIME()), 'rejected',   NULL,
          N'Vibración dentro de rango aceptable; sin avería.', @uidAdmin, N'Administrador General', DATEADD(HOUR, -18, SYSUTCDATETIME()));
 
-    UPDATE dbo.OrdenTrabajo SET ReportId = 1 WHERE WorkOrderId = 'OT-0001';
+    UPDATE dbo.OrdenTrabajo SET ReporteId = 1 WHERE OrdenTrabajoId = 'OT-0001';
 
     COMMIT TRANSACTION;
     PRINT N'Seed completado en español: roles, permisos, contadores, usuarios (1234), areas A1-A3, jerarquia de activos (4 niveles), averias y OT-0001.';
@@ -2102,5 +2198,5 @@ BEGIN CATCH
 END CATCH
 GO
 
-PRINT N'MacsaCMMS inicializada correctamente en Español.';
+PRINT N'MacsaCMMS inicializada correctamente con campos en Español.';
 GO

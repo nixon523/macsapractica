@@ -69,6 +69,7 @@ class UserListViewModel extends ChangeNotifier {
     required String displayName,
     required String password,
     required UserRole role,
+    Set<String> permissions = const {},
   }) async {
     _isSaving = true;
     _errorMessage = '';
@@ -81,6 +82,7 @@ class UserListViewModel extends ChangeNotifier {
         displayName: displayName,
         password: password,
         role: role,
+        permissions: permissions,
       ));
       _successMessage = 'Usuario "$username" creado con contraseña temporal.';
       _isSaving = false;
@@ -100,6 +102,7 @@ class UserListViewModel extends ChangeNotifier {
     String? displayName,
     UserRole? role,
     String? newPassword,
+    Set<String>? permissions,
   }) async {
     _isSaving = true;
     _errorMessage = '';
@@ -112,6 +115,7 @@ class UserListViewModel extends ChangeNotifier {
         displayName: displayName,
         role: role,
         newPassword: newPassword,
+        permissions: permissions,
       ));
       _successMessage = 'Usuario actualizado correctamente.';
       _isSaving = false;

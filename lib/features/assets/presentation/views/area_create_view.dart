@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:macsapractica/app/di/get_it.dart';
+import '../../../../app/widgets/app_form_shell.dart';
 import '../../domain/entities/cost_center_catalog.dart';
 import '../viewmodels/area_create_edit_viewmodel.dart';
 
@@ -71,8 +72,8 @@ class _AreaFormState extends State<_AreaForm> {
     return Scaffold(
       appBar: AppBar(title: const Text('Nueva Área / Centro de Costo')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
+        child: AppFormShell(
+          child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -130,6 +131,7 @@ class _AreaFormState extends State<_AreaForm> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

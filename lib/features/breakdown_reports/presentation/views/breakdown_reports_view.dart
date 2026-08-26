@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../app/widgets/app_dialog.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../work_orders/presentation/views/work_order_create_view.dart';
 import '../../domain/entities/breakdown_report.dart';
@@ -595,7 +596,7 @@ class _RejectReportDialogState extends State<_RejectReportDialog> {
     return AlertDialog(
       title: const Text('Rechazar Reporte de Avería'),
       content: SizedBox(
-        width: 400,
+        width: responsiveDialogWidth(context, 400),
         child: Form(
           key: _formKey,
           child: Column(

@@ -31,6 +31,13 @@ class AssetCardWidget extends StatelessWidget {
     final colors = theme.colorScheme;
     final imageData = asset.imageData;
     final depth = _depth;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final isMobile = screenWidth < 600;
+
+    // Indentación adaptativa: en móvil usamos menos espacio por nivel para
+    // dejar más ancho al contenido de la tarjeta.
+    final indentUnit = isMobile ? 14.0 : 28.0;
+    final currentIndent = isMobile ? 18.0 : 32.0;
 
     // Color distintivo por nivel jerárquico para acentuar el árbol en la UI
     final levelBorderColor = switch (asset.level) {
@@ -41,7 +48,10 @@ class AssetCardWidget extends StatelessWidget {
     };
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 12,
+        vertical: 3,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -52,7 +62,7 @@ class AssetCardWidget extends StatelessWidget {
               children: [
                 for (int i = 0; i < depth - 1; i++)
                   Container(
-                    width: 28,
+                    width: indentUnit,
                     height: 56,
                     alignment: Alignment.center,
                     child: Container(
@@ -62,7 +72,7 @@ class AssetCardWidget extends StatelessWidget {
                     ),
                   ),
                 Container(
-                  width: 32,
+                  width: currentIndent,
                   height: 56,
                   alignment: Alignment.center,
                   child: Row(
@@ -74,7 +84,7 @@ class AssetCardWidget extends StatelessWidget {
                       ),
                       Icon(
                         Icons.subdirectory_arrow_right_rounded,
-                        size: 20,
+                        size: isMobile ? 16 : 20,
                         color: levelBorderColor,
                       ),
                     ],
@@ -189,8 +199,12 @@ class AssetCardWidget extends StatelessWidget {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _LevelChip(level: asset.level),
-                      const SizedBox(width: 4),
+                      // En móvil escondemos el chip de nivel (redundante con el
+                      // color del borde) para ganar espacio para el título.
+                      if (!isMobile) ...[
+                        _LevelChip(level: asset.level),
+                        const SizedBox(width: 4),
+                      ],
                       if (!asset.isActive) ...[
                         _StatusChip(status: asset.status),
                         const SizedBox(width: 4),
@@ -200,6 +214,9 @@ class AssetCardWidget extends StatelessWidget {
                           icon: const Icon(Icons.edit_outlined, size: 18),
                           tooltip: 'Editar',
                           onPressed: onEdit,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                              minWidth: 32, minHeight: 32),
                         ),
                       const Icon(Icons.arrow_forward_ios, size: 14),
                     ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
+import '../../../../app/widgets/app_dialog.dart';
 import '../../../assets/domain/entities/area.dart';
 import '../../../assets/domain/entities/asset.dart';
 import '../../../assets/domain/repositories/area_repository.dart';
@@ -908,7 +909,7 @@ class _CreatePreventivePlanDialogState
     return AlertDialog(
       title: const Text('Definir Nuevo Plan Preventivo'),
       content: SizedBox(
-        width: 580,
+        width: responsiveDialogWidth(context, 580),
         child: _loadingDependencies
             ? const SizedBox(
                 height: 200,
@@ -1308,7 +1309,7 @@ class _AmendPreventivePlanDialogState
         ],
       ),
       content: SizedBox(
-        width: 500,
+        width: responsiveDialogWidth(context, 500),
         child: Form(
           key: _formKey,
           child: LayoutBuilder(

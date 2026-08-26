@@ -16,6 +16,8 @@ class MacsaApp extends StatelessWidget {
       child: MaterialApp(
         title: AppConstants.appName,
         theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: ThemeMode.light,
         onGenerateRoute: AppRouter.generateRoute,
         initialRoute: AppRouter.login,
       ),

@@ -14,6 +14,7 @@ abstract class AuthRepository {
     required String displayName,
     required String password,
     required UserRole role,
+    Set<String> permissions = const {},
     bool mustChangePassword = true,
   });
 
@@ -23,6 +24,7 @@ abstract class AuthRepository {
     String? displayName,
     UserRole? role,
     String? newPassword,
+    Set<String>? permissions,
   });
 
   /// Habilita o deshabilita un usuario.

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/app_dialog.dart';
 import '../../features/auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 
 class SidebarItem {
@@ -445,7 +446,7 @@ class SidebarWidget extends StatelessWidget {
               ],
             ),
             content: SizedBox(
-              width: 380,
+              width: responsiveDialogWidth(context, 380),
               child: Form(
                 key: formKey,
                 child: Column(

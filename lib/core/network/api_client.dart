@@ -23,7 +23,7 @@ class ApiClient {
 
   static String get defaultBaseUrl {
     if (kIsWeb) return 'http://localhost:3000/api';
-    return 'http://localhost:3000/api';
+    return 'http://192.168.1.33:3000/api';
   }
 
   String get baseUrl => _baseUrl;

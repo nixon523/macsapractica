@@ -3,16 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../app/widgets/app_dialog.dart';
+import '../../../../core/utils/upper_case_formatter.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/user_role.dart';
 import '../viewmodels/auth_viewmodel.dart';
 import '../viewmodels/user_list_viewmodel.dart';
 
 enum _UserStatusFilter {
-  all('Todos'),
-  pendingReset('Solicitudes'),
   active('Activos'),
-  disabled('Deshabilitados');
+  disabled('Deshabilitados'),
+  pendingReset('Solicitudes');
 
   const _UserStatusFilter(this.label);
   final String label;
@@ -28,7 +29,7 @@ class UserListView extends StatefulWidget {
 class _UserListViewState extends State<UserListView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  _UserStatusFilter _statusFilter = _UserStatusFilter.all;
+  _UserStatusFilter _statusFilter = _UserStatusFilter.active;
   UserRole? _roleFilter;
 
   @override
@@ -173,16 +174,14 @@ class _UserListViewState extends State<UserListView> {
       }
 
       switch (_statusFilter) {
-        case _UserStatusFilter.all:
-          break;
-        case _UserStatusFilter.pendingReset:
-          if (!user.passwordResetRequested) return false;
-          break;
         case _UserStatusFilter.active:
           if (user.disabled) return false;
           break;
         case _UserStatusFilter.disabled:
           if (!user.disabled) return false;
+          break;
+        case _UserStatusFilter.pendingReset:
+          if (!user.passwordResetRequested) return false;
           break;
       }
 
@@ -266,26 +265,24 @@ class _UserListViewState extends State<UserListView> {
                 final segmented = SegmentedButton<_UserStatusFilter>(
                   segments: [
                     const ButtonSegment(
-                      value: _UserStatusFilter.all,
-                      label: Text('Todos'),
-                    ),
-                    ButtonSegment(
-                      value: _UserStatusFilter.pendingReset,
-                      label: Text(
-                        'Solicitudes ($pendingResetCount)',
-                        style: TextStyle(
-                          color: pendingResetCount > 0 ? Colors.red : null,
-                          fontWeight: pendingResetCount > 0 ? FontWeight.bold : null,
-                        ),
-                      ),
-                    ),
-                    const ButtonSegment(
                       value: _UserStatusFilter.active,
                       label: Text('Activos'),
                     ),
                     const ButtonSegment(
                       value: _UserStatusFilter.disabled,
                       label: Text('Deshabilitados'),
+                    ),
+                    ButtonSegment(
+                      value: _UserStatusFilter.pendingReset,
+                      label: Text(
+                        pendingResetCount > 0
+                            ? 'Solicitudes ($pendingResetCount)'
+                            : 'Solicitudes',
+                        style: TextStyle(
+                          color: pendingResetCount > 0 ? Colors.red : null,
+                          fontWeight: pendingResetCount > 0 ? FontWeight.bold : null,
+                        ),
+                      ),
                     ),
                   ],
                   selected: {_statusFilter},
@@ -624,7 +621,7 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
     final code = chars[rand.nextInt(chars.length)] +
         chars[rand.nextInt(chars.length)];
     setState(() {
-      _passwordController.text = 'Macsa#$num-$code';
+      _passwordController.text = 'MACSA#$num-$code';
     });
   }
 
@@ -707,7 +704,7 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
     return AlertDialog(
       title: Text('Restablecer Clave: @${widget.user.username}'),
       content: SizedBox(
-        width: 400,
+        width: responsiveDialogWidth(context, 400),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -720,7 +717,8 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
             TextFormField(
               controller: _passwordController,
               obscureText: _obscure,
-              textCapitalization: TextCapitalization.none,
+              textCapitalization: TextCapitalization.characters,
+              inputFormatters: [UpperCaseTextFormatter()],
               enableSuggestions: false,
               autocorrect: false,
               decoration: InputDecoration(
@@ -764,6 +762,40 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
   }
 }
 
+/// Mapa de permisos agrupados por módulo para mostrar en checkboxes.
+const _permissionGroups = <String, List<({String code, String label})>>{
+  'Dashboard': [
+    (code: 'dashboard.view', label: 'Ver Dashboard'),
+  ],
+  'Activos': [
+    (code: 'asset.view', label: 'Ver Activos'),
+    (code: 'asset.create', label: 'Crear Activos'),
+    (code: 'asset.edit', label: 'Editar Activos'),
+    (code: 'asset.transfer', label: 'Traspasar Activos'),
+    (code: 'asset.delete.request', label: 'Solicitar Baja'),
+    (code: 'asset.delete.approve', label: 'Aprobar/Rechazar Baja'),
+  ],
+  'Órdenes de Trabajo': [
+    (code: 'work_order.view', label: 'Ver OTs'),
+    (code: 'work_order.create', label: 'Crear OTs'),
+    (code: 'work_order.print', label: 'Imprimir OTs'),
+  ],
+  'Planes Preventivos': [
+    (code: 'preventive.view', label: 'Ver Preventivos'),
+  ],
+  'Kardex': [
+    (code: 'kardex.view', label: 'Ver Kardex'),
+  ],
+  'Averías': [
+    (code: 'breakdown.report', label: 'Reportar Averías'),
+    (code: 'breakdown.view', label: 'Ver Averías'),
+    (code: 'breakdown.manage', label: 'Gestionar Averías'),
+  ],
+  'Usuarios': [
+    (code: 'user.manage', label: 'Gestionar Usuarios'),
+  ],
+};
+
 class _UserFormDialog extends StatefulWidget {
   const _UserFormDialog({this.editUser, this.currentUserId});
 
@@ -781,8 +813,10 @@ class _UserFormDialogState extends State<_UserFormDialog> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   late UserRole _selectedRole;
+  late Set<String> _selectedPermissions;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool _permissionsExpanded = false;
 
   bool get isEditing => widget.editUser != null;
 
@@ -797,11 +831,18 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     );
     _selectedRole = widget.editUser?.role ?? UserRole.lector;
 
+    // Inicializar permisos: los del usuario (edición) o los por defecto del rol (creación)
+    if (isEditing && widget.editUser!.permissions.isNotEmpty) {
+      _selectedPermissions = Set<String>.from(widget.editUser!.permissions);
+    } else {
+      _selectedPermissions = Set<String>.from(_selectedRole.defaultPermissions);
+    }
+
     if (!isEditing) {
       final rand = Random();
       final num = 1000 + rand.nextInt(9000);
-      _passwordController.text = 'Macsa#$num';
-      _confirmPasswordController.text = 'Macsa#$num';
+      _passwordController.text = 'MACSA#$num';
+      _confirmPasswordController.text = 'MACSA#$num';
     }
   }
 
@@ -812,6 +853,15 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  void _onRoleChanged(UserRole? newRole) {
+    if (newRole == null || newRole == _selectedRole) return;
+    setState(() {
+      _selectedRole = newRole;
+      // Resetear permisos a los del nuevo rol
+      _selectedPermissions = Set<String>.from(newRole.defaultPermissions);
+    });
   }
 
   Future<void> _submit() async {
@@ -829,6 +879,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
         displayName: _displayNameController.text.trim(),
         role: _selectedRole,
         newPassword: newPassword,
+        permissions: _selectedPermissions,
       );
     } else {
       success = await vm.createUser(
@@ -836,6 +887,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
         displayName: _displayNameController.text.trim(),
         password: _passwordController.text,
         role: _selectedRole,
+        permissions: _selectedPermissions,
       );
     }
 
@@ -847,24 +899,28 @@ class _UserFormDialogState extends State<_UserFormDialog> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<UserListViewModel>();
+    final isAdmin = _selectedRole == UserRole.admin;
 
     return AlertDialog(
       title: Text(isEditing ? 'Editar Usuario' : 'Crear Nuevo Usuario'),
       content: SizedBox(
-        width: 400,
+        width: responsiveDialogWidth(context, 500),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 TextFormField(
                   controller: _usernameController,
                   decoration: const InputDecoration(
                     labelText: 'Nombre de Usuario *',
-                    hintText: 'Ej: admin',
+                    hintText: 'Ej: KMEJIA',
                     border: OutlineInputBorder(),
                   ),
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [UpperCaseTextFormatter()],
                   enabled: !isEditing,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -885,7 +941,8 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-                  textCapitalization: TextCapitalization.none,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [UpperCaseTextFormatter()],
                   enableSuggestions: false,
                   autocorrect: false,
                   decoration: InputDecoration(
@@ -910,7 +967,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   value: _selectedRole,
                   isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Rol / Permiso *',
+                    labelText: 'Rol *',
                     border: OutlineInputBorder(),
                   ),
                   items: UserRole.values.map((role) {
@@ -923,10 +980,116 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                       ),
                     );
                   }).toList(),
-                  onChanged: (value) {
-                    if (value != null) setState(() => _selectedRole = value);
-                  },
+                  onChanged: _onRoleChanged,
                 ),
+                const SizedBox(height: 14),
+
+                // --- Sección de Permisos con Checkboxes ---
+                Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    children: [
+                      InkWell(
+                        onTap: () => setState(() => _permissionsExpanded = !_permissionsExpanded),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _permissionsExpanded ? Icons.expand_less : Icons.expand_more,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Permisos del Usuario',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                ),
+                              ),
+                              Text(
+                                '${_selectedPermissions.length} activo(s)',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (isAdmin && _permissionsExpanded)
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'El Administrador tiene acceso total a todos los módulos.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green.shade700,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      if (_permissionsExpanded && !isAdmin)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: _permissionGroups.entries.map((group) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                                    child: Text(
+                                      group.key,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  ...group.value.map((perm) {
+                                    final isChecked = _selectedPermissions.contains(perm.code);
+                                    return CheckboxListTile(
+                                      title: Text(perm.label, style: const TextStyle(fontSize: 13)),
+                                      subtitle: Text(perm.code, style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontFamily: 'monospace')),
+                                      value: isChecked,
+                                      dense: true,
+                                      visualDensity: VisualDensity.compact,
+                                      controlAffinity: ListTileControlAffinity.leading,
+                                      onChanged: (val) {
+                                        setState(() {
+                                          if (val == true) {
+                                            _selectedPermissions.add(perm.code);
+                                          } else {
+                                            _selectedPermissions.remove(perm.code);
+                                          }
+                                        });
+                                      },
+                                    );
+                                  }),
+                                  if (group.key != _permissionGroups.keys.last)
+                                    const Divider(height: 1, indent: 12, endIndent: 12),
+                                ],
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                if (vm.errorMessage.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    vm.errorMessage,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                  ),
+                ],
               ],
             ),
           ),
