@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import '../../../../app/widgets/app_dialog.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../work_orders/presentation/views/work_order_create_view.dart';
 import '../../domain/entities/breakdown_report.dart';
 import '../viewmodels/breakdown_reports_viewmodel.dart';
 
-enum _ReportTab { open, resolved, rejected }
+enum _ReportTab { open, resolved, rejected, all }
 
+/// Vista ejecutiva y profesional de Reportes de Averías basada en el estándar del Kardex.
 class BreakdownReportsView extends StatefulWidget {
   const BreakdownReportsView({super.key});
 
@@ -20,17 +19,23 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
   _ReportTab _tab = _ReportTab.open;
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  DateTime? _startDate;
-  DateTime? _endDate;
+  late DateTime? _startDate;
+  late DateTime? _endDate;
+  String _selectedPreset = 'hoy';
 
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _startDate = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
     _searchCtrl.addListener(() {
       setState(() {
         _searchQuery = _searchCtrl.text.trim().toLowerCase();
       });
     });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadData();
@@ -50,41 +55,62 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
         );
   }
 
+  void _applyPreset(String preset) {
+    final now = DateTime.now();
+    setState(() {
+      _selectedPreset = preset;
+      switch (preset) {
+        case 'hoy':
+          _startDate = DateTime(now.year, now.month, now.day, 0, 0, 0);
+          _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+          break;
+        case 'ayer':
+          final yesterday = now.subtract(const Duration(days: 1));
+          _startDate = DateTime(yesterday.year, yesterday.month, yesterday.day, 0, 0, 0);
+          _endDate = DateTime(yesterday.year, yesterday.month, yesterday.day, 23, 59, 59);
+          break;
+        case '7dias':
+          final sevenDaysAgo = now.subtract(const Duration(days: 6));
+          _startDate = DateTime(sevenDaysAgo.year, sevenDaysAgo.month, sevenDaysAgo.day, 0, 0, 0);
+          _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+          break;
+        case 'mes':
+          _startDate = DateTime(now.year, now.month, 1, 0, 0, 0);
+          _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+          break;
+        case 'todo':
+          _startDate = null;
+          _endDate = null;
+          break;
+      }
+    });
+    _loadData();
+  }
+
   Future<void> _selectDateRange() async {
     final now = DateTime.now();
     final picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
-      lastDate: DateTime(now.year + 5),
+      lastDate: DateTime(now.year + 2),
       initialDateRange: _startDate != null && _endDate != null
           ? DateTimeRange(start: _startDate!, end: _endDate!)
-          : null,
-      helpText: 'Seleccionar Rango de Fechas',
+          : DateTimeRange(
+              start: DateTime(now.year, now.month, now.day),
+              end: DateTime(now.year, now.month, now.day),
+            ),
+      helpText: 'Seleccionar Rango de Fechas (Desde - Hasta)',
       cancelText: 'Cancelar',
-      confirmText: 'Aplicar',
+      confirmText: 'Aplicar Filtro',
     );
     if (picked != null) {
       setState(() {
-        _startDate = picked.start;
-        _endDate = DateTime(
-          picked.end.year,
-          picked.end.month,
-          picked.end.day,
-          23,
-          59,
-          59,
-        );
+        _selectedPreset = 'personalizado';
+        _startDate = DateTime(picked.start.year, picked.start.month, picked.start.day, 0, 0, 0);
+        _endDate = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
       });
       _loadData();
     }
-  }
-
-  void _clearDateRange() {
-    setState(() {
-      _startDate = null;
-      _endDate = null;
-    });
-    _loadData();
   }
 
   Future<void> _generateWorkOrder(BreakdownReport report) async {
@@ -109,10 +135,9 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('¿Marcar avería como resuelta?'),
+        title: const Text('Resolver reporte de avería'),
         content: Text(
-          'Se marcará como resuelta la avería del equipo '
-          '"${report.assetId} — ${report.assetName}".',
+          '¿Confirmas que la avería en ${report.assetId} (${report.assetName}) ha sido resuelta?',
         ),
         actions: [
           TextButton(
@@ -120,12 +145,14 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
             child: const Text('Cancelar'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF15803D)),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Resolver'),
+            child: const Text('Confirmar'),
           ),
         ],
       ),
     );
+
     if (confirmed != true || !mounted) return;
 
     final viewModel = context.read<BreakdownReportsViewModel>();
@@ -174,155 +201,54 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
   }
 
   List<BreakdownReport> _filterReports(List<BreakdownReport> list) {
-    if (_searchQuery.isEmpty) return list;
+    var filtered = switch (_tab) {
+      _ReportTab.open => list.where((r) => r.status == BreakdownReportStatus.reported).toList(),
+      _ReportTab.resolved => list.where((r) => r.status == BreakdownReportStatus.resolved || r.status == BreakdownReportStatus.inWorkOrder).toList(),
+      _ReportTab.rejected => list.where((r) => r.status == BreakdownReportStatus.rejected).toList(),
+      _ReportTab.all => list,
+    };
 
-    return list.where((r) {
-      final assetId = r.assetId.toLowerCase();
-      final assetName = r.assetName.toLowerCase();
-      final areaId = r.areaId.toLowerCase();
-      final desc = r.description.toLowerCase();
-      final reporter = r.reportedByUserName.toLowerCase();
-      final ot = (r.workOrderId ?? '').toLowerCase();
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((r) {
+        final assetId = r.assetId.toLowerCase();
+        final assetName = r.assetName.toLowerCase();
+        final areaId = r.areaId.toLowerCase();
+        final desc = r.description.toLowerCase();
+        final reporter = r.reportedByUserName.toLowerCase();
+        final ot = (r.workOrderId ?? '').toLowerCase();
 
-      return assetId.contains(_searchQuery) ||
-          assetName.contains(_searchQuery) ||
-          areaId.contains(_searchQuery) ||
-          desc.contains(_searchQuery) ||
-          reporter.contains(_searchQuery) ||
-          ot.contains(_searchQuery);
-    }).toList();
+        return assetId.contains(_searchQuery) ||
+            assetName.contains(_searchQuery) ||
+            areaId.contains(_searchQuery) ||
+            desc.contains(_searchQuery) ||
+            reporter.contains(_searchQuery) ||
+            ot.contains(_searchQuery);
+      }).toList();
+    }
+
+    return filtered;
   }
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<BreakdownReportsViewModel>();
     final authVm = context.watch<AuthViewModel>();
-    final canCreateOt = authVm.hasPermission('breakdown.manage');
-    final canResolve = authVm.hasPermission('breakdown.manage');
-    final canReject = authVm.hasPermission('breakdown.manage');
+    final canManage = authVm.hasPermission('breakdown.manage');
 
-    final dateLabel = _startDate == null
-        ? 'Filtrar fecha'
-        : '${_startDate!.day}/${_startDate!.month}/${_startDate!.year} - ${_endDate!.day}/${_endDate!.month}/${_endDate!.year}';
-
-    final currentTabReports = switch (_tab) {
-      _ReportTab.open => vm.openReports,
-      _ReportTab.resolved => vm.resolvedReports,
-      _ReportTab.rejected => vm.rejectedReports,
-    };
-
-    final filteredReports = _filterReports(currentTabReports);
+    final allReports = [...vm.openReports, ...vm.resolvedReports, ...vm.rejectedReports];
+    final filteredReports = _filterReports(allReports);
 
     return Scaffold(
       body: Column(
         children: [
-          // Barra de Control Responsiva (Mobile & Desktop)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 650;
-
-                final segmented = SegmentedButton<_ReportTab>(
-                  segments: [
-                    ButtonSegment(
-                      value: _ReportTab.open,
-                      label: Text('Abiertas (${vm.openReports.length})'),
-                    ),
-                    ButtonSegment(
-                      value: _ReportTab.resolved,
-                      label: Text('Resueltas (${vm.resolvedReports.length})'),
-                    ),
-                    ButtonSegment(
-                      value: _ReportTab.rejected,
-                      label: Text('Rechazadas (${vm.rejectedReports.length})'),
-                    ),
-                  ],
-                  selected: {_tab},
-                  onSelectionChanged: (set) => setState(() => _tab = set.first),
-                );
-
-                final searchField = TextField(
-                  controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Buscar por equipo, código o descripción...',
-                    prefixIcon: const Icon(Icons.search, size: 18),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 16),
-                            onPressed: () => _searchCtrl.clear(),
-                          )
-                        : null,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 9,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                );
-
-                final dateChip = Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ActionChip(
-                      avatar: Icon(
-                        Icons.date_range,
-                        size: 16,
-                        color: _startDate != null ? Theme.of(context).colorScheme.primary : null,
-                      ),
-                      label: Text(dateLabel, style: const TextStyle(fontSize: 12)),
-                      onPressed: _selectDateRange,
-                    ),
-                    if (_startDate != null) ...[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        tooltip: 'Limpiar fecha',
-                        onPressed: _clearDateRange,
-                      ),
-                    ],
-                  ],
-                );
-
-                if (isNarrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: segmented,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(child: searchField),
-                          const SizedBox(width: 8),
-                          dateChip,
-                        ],
-                      ),
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    segmented,
-                    const SizedBox(width: 12),
-                    Expanded(child: searchField),
-                    const SizedBox(width: 8),
-                    dateChip,
-                  ],
-                );
-              },
-            ),
+          _buildFilterSection(
+            isNarrow: MediaQuery.of(context).size.width < 750,
+            openCount: vm.openReports.length,
+            resolvedCount: vm.resolvedReports.length,
+            rejectedCount: vm.rejectedReports.length,
           ),
-
           const Divider(height: 1),
-
-          // Listado de Reportes
+          _buildSummaryBar(filteredReports.length, vm.openReports.length),
           Expanded(
             child: switch (vm.viewState) {
               BreakdownReportsViewState.initial ||
@@ -333,13 +259,38 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
                 ),
               BreakdownReportsViewState.success => filteredReports.isEmpty
                   ? Center(
-                      child: Text(
-                        switch (_tab) {
-                          _ReportTab.open => 'No hay averías abiertas.',
-                          _ReportTab.resolved => 'No hay averías resueltas.',
-                          _ReportTab.rejected => 'No hay reportes rechazados.',
-                        },
-                        style: TextStyle(color: Colors.grey.shade600),
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.bug_report_outlined, size: 56, color: Theme.of(context).colorScheme.outline),
+                            const SizedBox(height: 16),
+                            Text(
+                              _searchQuery.isNotEmpty
+                                  ? 'Sin resultados para "$_searchQuery"'
+                                  : 'No hay averías registradas en este periodo.',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _searchQuery.isNotEmpty
+                                  ? 'Intenta con otro término o limpia la barra de búsqueda.'
+                                  : 'Prueba cambiando el rango de fechas o el filtro de estado.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            ),
+                            if (_selectedPreset != 'todo') ...[
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: () => _applyPreset('todo'),
+                                icon: const Icon(Icons.history, size: 18),
+                                label: const Text('Ver todas las averías'),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     )
                   : RefreshIndicator(
@@ -349,12 +300,12 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
                         itemCount: filteredReports.length,
                         itemBuilder: (context, index) {
                           final report = filteredReports[index];
-                          return _SimpleReportCard(
+                          return _ModernReportCard(
                             report: report,
                             isProcessing: vm.isProcessing,
-                            canGenerateOt: canCreateOt,
-                            canResolve: canResolve,
-                            canReject: canReject,
+                            canGenerateOt: canManage,
+                            canResolve: canManage,
+                            canReject: canManage,
                             onGenerateOt: () => _generateWorkOrder(report),
                             onResolve: () => _confirmResolve(report),
                             onReject: () => _confirmReject(report),
@@ -368,10 +319,287 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
       ),
     );
   }
+
+  Widget _buildFilterSection({
+    required bool isNarrow,
+    required int openCount,
+    required int resolvedCount,
+    required int rejectedCount,
+  }) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      color: colors.surface,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Fila 1: Selector de Fechas (Desde - Hasta) y Presets
+          if (!isNarrow)
+            Row(
+              children: [
+                _buildDateRangeButton(),
+                const SizedBox(width: 12),
+                Expanded(child: _buildPresetsRow()),
+              ],
+            )
+          else ...[
+            _buildDateRangeButton(),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: _buildPresetsRow(),
+            ),
+          ],
+          const SizedBox(height: 10),
+
+          // Fila 2: Búsqueda y Chips de Estado
+          if (!isNarrow)
+            Row(
+              children: [
+                Expanded(flex: 3, child: _buildSearchBar()),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 5,
+                  child: _buildStatusChips(
+                    openCount: openCount,
+                    resolvedCount: resolvedCount,
+                    rejectedCount: rejectedCount,
+                    scrollable: false,
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            _buildSearchBar(),
+            const SizedBox(height: 8),
+            _buildStatusChips(
+              openCount: openCount,
+              resolvedCount: resolvedCount,
+              rejectedCount: rejectedCount,
+              scrollable: true,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateRangeButton() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    String label;
+    if (_startDate == null && _endDate == null) {
+      label = 'Todo el historial';
+    } else if (_startDate != null && _endDate != null) {
+      final s = _startDate!;
+      final e = _endDate!;
+      if (s.year == e.year && s.month == e.month && s.day == e.day) {
+        label = 'Hoy: ${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year}';
+      } else {
+        label = '${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year} '
+            '➔ ${e.day.toString().padLeft(2, '0')}/${e.month.toString().padLeft(2, '0')}/${e.year}';
+      }
+    } else {
+      label = 'Filtrar rango';
+    }
+
+    return OutlinedButton.icon(
+      onPressed: _selectDateRange,
+      icon: Icon(Icons.calendar_today_outlined, size: 18, color: colors.primary),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+          color: colors.onSurface,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        side: BorderSide(color: colors.outlineVariant),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        backgroundColor: colors.surfaceContainerLowest,
+      ),
+    );
+  }
+
+  Widget _buildPresetsRow() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildPresetChip('hoy', 'Hoy'),
+        const SizedBox(width: 6),
+        _buildPresetChip('ayer', 'Ayer'),
+        const SizedBox(width: 6),
+        _buildPresetChip('7dias', '7 días'),
+        const SizedBox(width: 6),
+        _buildPresetChip('mes', 'Este mes'),
+        const SizedBox(width: 6),
+        _buildPresetChip('todo', 'Todo'),
+      ],
+    );
+  }
+
+  Widget _buildPresetChip(String key, String label) {
+    final isSelected = _selectedPreset == key;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => _applyPreset(key),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
+      ),
+      selectedColor: colors.primary,
+      backgroundColor: colors.surfaceContainerLow,
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return TextField(
+      controller: _searchCtrl,
+      decoration: InputDecoration(
+        hintText: 'Buscar por equipo, código, motivo o reportero…',
+        hintStyle: const TextStyle(fontSize: 12),
+        prefixIcon: const Icon(Icons.search, size: 20),
+        suffixIcon: _searchCtrl.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 18),
+                onPressed: () => _searchCtrl.clear(),
+              )
+            : null,
+        isDense: true,
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusChips({
+    required int openCount,
+    required int resolvedCount,
+    required int rejectedCount,
+    required bool scrollable,
+  }) {
+    final categories = <(_ReportTab, String, IconData, Color)>[
+      (_ReportTab.open, 'Abiertas ($openCount)', Icons.report_problem_outlined, const Color(0xFFC2410C)),
+      (_ReportTab.resolved, 'Resueltas ($resolvedCount)', Icons.check_circle_outline, const Color(0xFF15803D)),
+      (_ReportTab.rejected, 'Rechazadas ($rejectedCount)', Icons.cancel_outlined, const Color(0xFFDC2626)),
+      (_ReportTab.all, 'Todas', Icons.all_inbox_outlined, const Color(0xFF1E293B)),
+    ];
+
+    final chips = categories.map((item) {
+      final isSelected = _tab == item.$1;
+      final theme = Theme.of(context);
+      final colors = theme.colorScheme;
+
+      return FilterChip(
+        avatar: Icon(
+          item.$3,
+          size: 16,
+          color: isSelected ? Colors.white : item.$4,
+        ),
+        label: Text(item.$2),
+        selected: isSelected,
+        onSelected: (_) => setState(() => _tab = item.$1),
+        selectedColor: item.$4,
+        backgroundColor: colors.surfaceContainerLow,
+        labelStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? Colors.white : colors.onSurface,
+        ),
+        showCheckmark: false,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      );
+    }).toList();
+
+    if (scrollable) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: chips.map((c) => Padding(padding: const EdgeInsets.only(right: 6), child: c)).toList(),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: chips,
+    );
+  }
+
+  Widget _buildSummaryBar(int count, int openCount) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
+      child: Row(
+        children: [
+          Icon(Icons.bug_report_outlined, size: 16, color: colors.primary),
+          const SizedBox(width: 8),
+          Text(
+            '$count reporte(s) de avería',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: colors.onSurface,
+            ),
+          ),
+          const SizedBox(width: 10),
+          if (openCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEDD5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$openCount pendiente(s)',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFC2410C)),
+              ),
+            ),
+          const Spacer(),
+          Text(
+            'Orden cronológico',
+            style: TextStyle(
+              fontSize: 11,
+              color: colors.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _SimpleReportCard extends StatelessWidget {
-  const _SimpleReportCard({
+/// Tarjeta ejecutiva para cada Reporte de Avería con franja lateral de severidad.
+class _ModernReportCard extends StatelessWidget {
+  const _ModernReportCard({
     required this.report,
     required this.isProcessing,
     required this.canGenerateOt,
@@ -391,179 +619,285 @@ class _SimpleReportCard extends StatelessWidget {
   final VoidCallback onResolve;
   final VoidCallback onReject;
 
+  String _formatTimestamp(DateTime? dt) {
+    if (dt == null) return '—';
+    final now = DateTime.now();
+    final dayStr = '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+    final timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+
+    final diff = now.difference(dt);
+    String relative;
+    if (diff.inMinutes < 1) {
+      relative = 'Hace un momento';
+    } else if (diff.inMinutes < 60) {
+      relative = 'Hace ${diff.inMinutes} min';
+    } else if (diff.inHours < 24 && dt.day == now.day) {
+      relative = 'Hoy a las $timeStr';
+    } else if (diff.inDays == 1 || (diff.inHours < 48 && dt.day == now.subtract(const Duration(days: 1)).day)) {
+      relative = 'Ayer a las $timeStr';
+    } else {
+      relative = '$dayStr $timeStr';
+    }
+
+    return relative;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final (sevColor, sevBg, sevLabel) = switch (report.severity) {
-      BreakdownSeverity.low => (const Color(0xFF15803D), const Color(0xFFDCFCE7), 'Baja'),
-      BreakdownSeverity.medium => (const Color(0xFFB45309), const Color(0xFFFEF3C7), 'Media'),
-      BreakdownSeverity.high => (const Color(0xFFDC2626), const Color(0xFFFEE2E2), 'Alta'),
+      BreakdownSeverity.low => (const Color(0xFF15803D), const Color(0xFFDCFCE7), 'Severidad Baja'),
+      BreakdownSeverity.medium => (const Color(0xFFB45309), const Color(0xFFFEF3C7), 'Severidad Media'),
+      BreakdownSeverity.high => (const Color(0xFFDC2626), const Color(0xFFFEE2E2), 'Severidad Alta'),
     };
 
-    final (statusColor, statusBg, statusLabel) = switch (report.status) {
-      BreakdownReportStatus.reported => (null, null, null),
+    final (statusColor, statusBg, statusLabel, statusIcon) = switch (report.status) {
+      BreakdownReportStatus.reported => (
+          const Color(0xFFC2410C),
+          const Color(0xFFFFEDD5),
+          'En Revisión',
+          Icons.error_outline,
+        ),
       BreakdownReportStatus.inWorkOrder => (
-          const Color(0xFF2563EB),
-          const Color(0xFFEFF6FF),
+          const Color(0xFF1D4ED8),
+          const Color(0xFFDBEAFE),
           report.workOrderId != null ? 'En ${report.workOrderId}' : 'En OT',
+          Icons.engineering_outlined,
         ),
       BreakdownReportStatus.resolved => (
-          const Color(0xFF16A34A),
+          const Color(0xFF15803D),
           const Color(0xFFDCFCE7),
           'Resuelta',
+          Icons.check_circle_outline,
         ),
       BreakdownReportStatus.rejected => (
-          const Color(0xFF64748B),
+          const Color(0xFF475569),
           const Color(0xFFF1F5F9),
           'Rechazada',
+          Icons.cancel_outlined,
         ),
     };
 
-    final dateStr = report.reportedAt != null
-        ? '${report.reportedAt!.day}/${report.reportedAt!.month}/${report.reportedAt!.year} '
-            '${report.reportedAt!.hour.toString().padLeft(2, '0')}:'
-            '${report.reportedAt!.minute.toString().padLeft(2, '0')}'
+    final reportedDateStr = _formatTimestamp(report.reportedAt);
+    final fullDate = report.reportedAt != null
+        ? '${report.reportedAt!.day.toString().padLeft(2, '0')}/${report.reportedAt!.month.toString().padLeft(2, '0')}/${report.reportedAt!.year} ${report.reportedAt!.hour.toString().padLeft(2, '0')}:${report.reportedAt!.minute.toString().padLeft(2, '0')}'
         : '—';
 
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 4),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.grey.shade300, width: 0.8),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Cabecera con Wrap para prevenir overflow en móviles
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      Text(
-                        '${report.assetId} — ${report.assetName}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        '· Área: ${report.areaId}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Wrap(
-                  spacing: 4,
+            // Franja lateral con acento de color de severidad
+            Container(
+              width: 5,
+              color: sevColor,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: sevBg,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        'Sev. $sevLabel',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: sevColor),
-                      ),
-                    ),
-                    if (statusLabel != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: statusBg,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          statusLabel,
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-
-            // Descripción
-            Text(
-              report.description,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
-            ),
-
-            if (report.status == BreakdownReportStatus.rejected &&
-                report.rejectionReason != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Motivo rechazo: ${report.rejectionReason}',
-                style: const TextStyle(fontSize: 12, color: Colors.red),
-              ),
-            ],
-
-            const SizedBox(height: 8),
-
-            // Pie: Info de reporte y Botones (con Wrap para móvil)
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                Text(
-                  'Reportado por: ${report.reportedByUserName}  ·  $dateStr'
-                  '${report.workOrderId != null ? " · OT: ${report.workOrderId}" : ""}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-                if (report.status == BreakdownReportStatus.reported) ...[
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (canGenerateOt)
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                    // Header: Código, Equipo, Badges
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: sevColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          onPressed: isProcessing ? null : onGenerateOt,
-                          child: const Text('Generar OT', style: TextStyle(fontSize: 12)),
+                          child: Icon(statusIcon, size: 18, color: sevColor),
                         ),
-                      if (canReject) ...[
-                        const SizedBox(width: 6),
-                        OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            foregroundColor: Colors.red,
-                            side: const BorderSide(color: Colors.red),
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(5),
+                                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                                    ),
+                                    child: Text(
+                                      report.assetId,
+                                      style: TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 11.5,
+                                        color: theme.colorScheme.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: sevBg,
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Text(
+                                      sevLabel,
+                                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: sevColor),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '${report.assetName} · Área: ${report.areaId}',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
-                          onPressed: isProcessing ? null : onReject,
-                          child: const Text('Rechazar', style: TextStyle(fontSize: 12)),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusBg,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: statusColor,
+                            ),
+                          ),
                         ),
                       ],
-                    ],
-                  ),
-                ],
-                if (report.status == BreakdownReportStatus.inWorkOrder && canResolve)
-                  FilledButton.tonal(
-                    style: FilledButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
                     ),
-                    onPressed: isProcessing ? null : onResolve,
-                    child: const Text('Marcar Resuelta', style: TextStyle(fontSize: 12)),
-                  ),
-              ],
+                    const SizedBox(height: 8),
+
+                    // Descripción de la avería
+                    Text(
+                      report.description,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+                      ),
+                    ),
+
+                    if (report.rejectionReason != null && report.rejectionReason!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Motivo del rechazo: ${report.rejectionReason}',
+                          style: TextStyle(fontSize: 11.5, color: Colors.red.shade900, fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 10),
+
+                    // Footer: Usuario y fecha
+                    Row(
+                      children: [
+                        Wrap(
+                          spacing: 14,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.person_outline, size: 14, color: Colors.grey.shade600),
+                                const SizedBox(width: 4),
+                                Text(
+                                  report.reportedByUserName,
+                                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            Tooltip(
+                              message: fullDate,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.access_time, size: 13, color: Colors.grey.shade500),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    reportedDateStr,
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        if (report.status == BreakdownReportStatus.reported) ...[
+                          if (canReject)
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFDC2626),
+                                side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                              onPressed: isProcessing ? null : onReject,
+                              icon: const Icon(Icons.close, size: 15),
+                              label: const Text('Rechazar', style: TextStyle(fontSize: 11.5)),
+                            ),
+                          if (canResolve) ...[
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF15803D),
+                                side: const BorderSide(color: Color(0xFF86EFAC)),
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                              onPressed: isProcessing ? null : onResolve,
+                              icon: const Icon(Icons.check, size: 15),
+                              label: const Text('Resolver', style: TextStyle(fontSize: 11.5)),
+                            ),
+                          ],
+                          if (canGenerateOt) ...[
+                            const SizedBox(width: 8),
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                              ),
+                              onPressed: isProcessing ? null : onGenerateOt,
+                              icon: const Icon(Icons.assignment_add, size: 15),
+                              label: const Text('Generar OT', style: TextStyle(fontSize: 11.5)),
+                            ),
+                          ],
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -582,58 +916,58 @@ class _RejectReportDialog extends StatefulWidget {
 }
 
 class _RejectReportDialogState extends State<_RejectReportDialog> {
-  final _reasonController = TextEditingController();
+  final _reasonCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   @override
   void dispose() {
-    _reasonController.dispose();
+    _reasonCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Rechazar Reporte de Avería'),
-      content: SizedBox(
-        width: responsiveDialogWidth(context, 400),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Equipo: ${widget.report.assetId} — ${widget.report.assetName}'),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _reasonController,
-                autofocus: true,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'Motivo de rechazo *',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) => (value == null || value.trim().isEmpty)
-                    ? 'El motivo es obligatorio.'
-                    : null,
+      title: const Text('Rechazar reporte de avería'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Equipo: ${widget.report.assetId} — ${widget.report.assetName}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _reasonCtrl,
+              maxLines: 3,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Motivo del rechazo *',
+                hintText: 'Explica por qué no procede esta avería...',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'El motivo es obligatorio' : null,
+            ),
+          ],
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(null),
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
           onPressed: () {
             if (_formKey.currentState!.validate()) {
-              Navigator.of(context).pop(_reasonController.text.trim());
+              Navigator.of(context).pop(_reasonCtrl.text.trim());
             }
           },
-          child: const Text('Rechazar'),
+          child: const Text('Rechazar reporte'),
         ),
       ],
     );

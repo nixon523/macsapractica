@@ -77,7 +77,7 @@ class _AssetFormViewState extends State<AssetFormView> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _brandCtrl;
   late final TextEditingController _modelCtrl;
-  late final TextEditingController _stationCtrl;
+
   late final TextEditingController _serialCtrl;
   late final TextEditingController _newAttrKeyCtrl;
   late final TextEditingController _newAttrValueCtrl;
@@ -102,7 +102,7 @@ class _AssetFormViewState extends State<AssetFormView> {
     _nameCtrl = TextEditingController(text: asset?.name ?? '');
     _brandCtrl = TextEditingController(text: asset?.brand ?? '');
     _modelCtrl = TextEditingController(text: asset?.model ?? '');
-    _stationCtrl = TextEditingController(text: asset?.stationId ?? '');
+
     _serialCtrl = TextEditingController(text: asset?.serial ?? '');
     _newAttrKeyCtrl = TextEditingController();
     _newAttrValueCtrl = TextEditingController();
@@ -139,7 +139,7 @@ class _AssetFormViewState extends State<AssetFormView> {
     _nameCtrl.dispose();
     _brandCtrl.dispose();
     _modelCtrl.dispose();
-    _stationCtrl.dispose();
+
     _serialCtrl.dispose();
     _newAttrKeyCtrl.dispose();
     _newAttrValueCtrl.dispose();
@@ -160,7 +160,7 @@ class _AssetFormViewState extends State<AssetFormView> {
       brand: _brandCtrl.text,
       model: _modelCtrl.text,
       areaId: _areaId,
-      stationId: _stationCtrl.text,
+      stationId: '',
       parentAssetId: _parentAssetId,
       level: _level,
       ancestors: asset?.ancestors ?? const [],
@@ -293,17 +293,6 @@ class _AssetFormViewState extends State<AssetFormView> {
                       : (value) => vm.checkSerial(value),
                 ),
               ],
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _stationCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Estación *',
-                  hintText: 'Ej: EST-01',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
-              ),
               const SizedBox(height: 16),
               TextFormField(
                 initialValue: _levelLabel,

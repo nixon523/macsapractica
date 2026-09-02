@@ -23,7 +23,10 @@ class AssetRemoteDataSource {
   }
 
   Future<List<Asset>> getAllAssetsByArea(String areaId) async {
-    final response = await _apiClient.get(ApiEndpoints.assetsByArea(areaId));
+    final response = await _apiClient.get(
+      ApiEndpoints.assetsByArea(areaId),
+      queryParameters: {'all': 'true'},
+    );
     if (response is List) {
       return response
           .whereType<Map<String, dynamic>>()
@@ -40,6 +43,7 @@ class AssetRemoteDataSource {
     final response = await _apiClient.get(
       ApiEndpoints.assets,
       queryParameters: {
+        if (parentAssetCode != null) 'parent': parentAssetCode,
         if (parentAssetCode != null) 'parentAssetCode': parentAssetCode,
       },
     );
@@ -47,7 +51,12 @@ class AssetRemoteDataSource {
       return response
           .whereType<Map<String, dynamic>>()
           .map((json) => AssetModel.fromJson(json))
-          .where((asset) => asset.status != AssetStatus.deleted)
+          .where((asset) =>
+              asset.status != AssetStatus.deleted &&
+              (parentAssetCode == null ||
+                  asset.parentAssetId == parentAssetCode ||
+                  asset.parentAssetId?.toLowerCase() ==
+                      parentAssetCode.toLowerCase()))
           .toList();
     }
     return [];
@@ -59,22 +68,41 @@ class AssetRemoteDataSource {
     AssetStatus? status,
   }) async {
     final query = tokens.join(' ');
+
+    // Si no hay tokens, obtener todos los activos del área
+    // en vez de llamar al endpoint de búsqueda que requiere mínimo 2 caracteres
+    if (query.trim().isEmpty) {
+      final allAssets = await getAllAssetsByArea(areaId);
+      if (status != null) {
+        return allAssets.where((a) => a.status == status).toList();
+      }
+      return allAssets;
+    }
+
     final response = await _apiClient.get(
       ApiEndpoints.assetSearch,
       queryParameters: {
         'q': query,
+        if (areaId.isNotEmpty) 'areaId': areaId,
+        if (status != null) 'status': status.name,
       },
     );
     if (response is List) {
-      final assets = response
+      var assets = response
           .whereType<Map<String, dynamic>>()
           .map((json) => AssetModel.fromJson(json))
           .where((asset) => asset.status != AssetStatus.deleted)
           .toList();
 
       if (areaId.isNotEmpty) {
-        return assets.where((a) => a.areaId == areaId).toList();
+        assets = assets.where((a) => a.areaId == areaId).toList();
       }
+
+      // Aplicar filtro de estado localmente
+      if (status != null) {
+        assets = assets.where((a) => a.status == status).toList();
+      }
+
       return assets;
     }
     return [];

@@ -189,7 +189,7 @@ class AssetCardWidget extends StatelessWidget {
                             ),
                           ),
                         Text(
-                          'Marca: ${asset.brand ?? '—'} · Modelo: ${asset.model ?? '—'} · Estación: ${asset.stationId}',
+                          'Marca: ${asset.brand ?? '—'} · Modelo: ${asset.model ?? '—'}',
                           style:
                               theme.textTheme.bodySmall?.copyWith(fontSize: 11),
                         ),

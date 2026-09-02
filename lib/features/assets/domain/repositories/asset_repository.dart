@@ -6,6 +6,13 @@ abstract class AssetRepository {
     bool forceRefresh = false,
   });
 
+  /// Devuelve TODOS los activos del área (padres e hijos, excluyendo eliminados).
+  /// Usado para la vista de árbol jerárquico completo.
+  Future<List<Asset>> getAllAssetsByArea(
+    String areaId, {
+    bool forceRefresh = false,
+  });
+
   /// Devuelve los activos hijos de un padre (o los equipos raíz del área
   /// cuando [parentAssetId] es null).
   Future<List<Asset>> getAssetsByParent({

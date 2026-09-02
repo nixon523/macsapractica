@@ -91,8 +91,14 @@ class AssetModel extends Asset {
       } catch (_) {}
     }
 
-    final createdAt = parseDate(map['createdAt'] ?? map['CreatedAt']) ??
-        parseDate(map['updatedAt'] ?? map['UpdatedAt']);
+    final createdAt = parseDate(map['CreadoEn'] ??
+            map['creadoEn'] ??
+            map['createdAt'] ??
+            map['CreatedAt']) ??
+        parseDate(map['ActualizadoEn'] ??
+            map['actualizadoEn'] ??
+            map['updatedAt'] ??
+            map['UpdatedAt']);
 
     final rawHistory = map['statusHistory'] ?? map['StatusHistory'];
     var history = <AssetStatusPeriod>[];

@@ -787,7 +787,6 @@ class _AssetInfoCard extends StatelessWidget {
       if (asset.level == AssetLevel.equipment)
         ('N° de Serie', asset.serial != null && asset.serial!.isNotEmpty ? asset.serial! : 'Sin serie registrado'),
       ('Área', asset.areaId),
-      ('Estación', asset.stationId),
       ('Marca', asset.brand ?? 'N/A'),
       ('Modelo', asset.model ?? 'N/A'),
       ('Nivel', _levelLabels[asset.level] ?? asset.level.name),

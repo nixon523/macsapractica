@@ -76,143 +76,146 @@ class _ReportForm extends StatelessWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
           child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Reportar Avería',
-                      style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Selecciona el área, el activo afectado y describe la avería. '
-                    'El reporte quedará a disposición del gestor del sistema.',
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Reportar Avería',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Selecciona el área, el activo afectado y describe la avería. '
+                        'El reporte quedará a disposición del gestor del sistema.',
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-          // Área
-          DropdownButtonFormField<String>(
-            key: const Key('breakdown-area'),
-            initialValue: vm.selectedAreaId,
-            decoration: const InputDecoration(
-              labelText: 'Área *',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              for (final area in vm.areas)
-                DropdownMenuItem(
-                  value: area.id,
-                  child: Text('${area.id} — ${area.name}'),
-                ),
-            ],
-            onChanged: vm.isLoadingAreas
-                ? null
-                : (value) {
-                    if (value != null) vm.selectArea(value);
-                  },
-          ),
-          const SizedBox(height: 12),
-
-          // Activo de la área seleccionada
-          if (vm.selectedAreaId != null) ...[
-            if (vm.isLoadingAssets)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (vm.assets.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  'El área no tiene activos registrados.',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              )
-            else
+              // Área
               DropdownButtonFormField<String>(
-                key: ValueKey('breakdown-asset-${vm.selectedAreaId}'),
-                initialValue: vm.selectedAssetId,
+                key: const Key('breakdown-area'),
+                initialValue: vm.selectedAreaId,
                 decoration: const InputDecoration(
-                  labelText: 'Activo *',
+                  labelText: 'Área *',
                   border: OutlineInputBorder(),
                 ),
                 items: [
-                  for (final Asset asset in vm.assets)
+                  for (final area in vm.areas)
                     DropdownMenuItem(
-                      value: asset.id,
-                      child: Text(
-                        '${asset.id} — ${asset.name}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      value: area.id,
+                      child: Text('${area.id} — ${area.name}'),
                     ),
                 ],
-                onChanged: (value) => vm.selectAsset(value),
+                onChanged: vm.isLoadingAreas
+                    ? null
+                    : (value) {
+                        if (value != null) vm.selectArea(value);
+                      },
               ),
-            const SizedBox(height: 12),
-          ],
+              const SizedBox(height: 12),
 
-          // Descripción
-          TextField(
-            key: const Key('breakdown-description'),
-            maxLines: 4,
-            minLines: 3,
-            onChanged: vm.setDescription,
-            decoration: const InputDecoration(
-              labelText: 'Descripción de la avería *',
-              hintText: 'Ej.: fugas de aceite en el sello, ruido excesivo...',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
+              // Activo de la área seleccionada
+              if (vm.selectedAreaId != null) ...[
+                if (vm.isLoadingAssets)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (vm.assets.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'El área no tiene activos registrados.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('breakdown-asset-${vm.selectedAreaId}'),
+                    initialValue: vm.selectedAssetId,
+                    decoration: const InputDecoration(
+                      labelText: 'Activo *',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: [
+                      for (final Asset asset in vm.assets)
+                        DropdownMenuItem(
+                          value: asset.id,
+                          child: Text(
+                            '${asset.id} — ${asset.name}',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => vm.selectAsset(value),
+                  ),
+                const SizedBox(height: 12),
+              ],
 
-          // Severidad
-          Text('Severidad', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 8),
-          SegmentedButton<BreakdownSeverity>(
-            segments: const [
-              ButtonSegment(
-                value: BreakdownSeverity.low,
-                label: Text('Baja'),
-                icon: Icon(Icons.arrow_downward),
+              // Descripción
+              TextField(
+                key: const Key('breakdown-description'),
+                maxLines: 4,
+                minLines: 3,
+                onChanged: vm.setDescription,
+                decoration: const InputDecoration(
+                  labelText: 'Descripción de la avería *',
+                  hintText:
+                      'Ej.: fugas de aceite en el sello, ruido excesivo...',
+                  border: OutlineInputBorder(),
+                ),
               ),
-              ButtonSegment(
-                value: BreakdownSeverity.medium,
-                label: Text('Media'),
-                icon: Icon(Icons.remove),
+              const SizedBox(height: 16),
+
+              // Severidad
+              Text('Severidad', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              SegmentedButton<BreakdownSeverity>(
+                segments: const [
+                  ButtonSegment(
+                    value: BreakdownSeverity.low,
+                    label: Text('Baja'),
+                    icon: Icon(Icons.arrow_downward),
+                  ),
+                  ButtonSegment(
+                    value: BreakdownSeverity.medium,
+                    label: Text('Media'),
+                    icon: Icon(Icons.remove),
+                  ),
+                  ButtonSegment(
+                    value: BreakdownSeverity.high,
+                    label: Text('Alta'),
+                    icon: Icon(Icons.arrow_upward),
+                  ),
+                ],
+                selected: {vm.severity},
+                onSelectionChanged: (selection) =>
+                    vm.setSeverity(selection.first),
               ),
-              ButtonSegment(
-                value: BreakdownSeverity.high,
-                label: Text('Alta'),
-                icon: Icon(Icons.arrow_upward),
+              const SizedBox(height: 24),
+
+              FilledButton.icon(
+                key: const Key('breakdown-submit'),
+                onPressed: vm.isSubmitting ? null : onSubmit,
+                icon: vm.isSubmitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send),
+                label: const Text('Enviar reporte'),
               ),
             ],
-            selected: {vm.severity},
-            onSelectionChanged: (selection) =>
-                vm.setSeverity(selection.first),
           ),
-          const SizedBox(height: 24),
-
-          FilledButton.icon(
-            key: const Key('breakdown-submit'),
-            onPressed: vm.isSubmitting ? null : onSubmit,
-            icon: vm.isSubmitting
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.send),
-            label: const Text('Enviar reporte'),
-          ),
-        ],
-      ),
         ),
       ),
     );

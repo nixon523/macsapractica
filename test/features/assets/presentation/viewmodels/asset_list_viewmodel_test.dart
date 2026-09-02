@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:macsapractica/features/assets/domain/entities/asset.dart';
+import 'package:macsapractica/features/assets/domain/usecases/get_all_assets_by_area.dart';
 import 'package:macsapractica/features/assets/domain/usecases/get_assets_by_area.dart';
 import 'package:macsapractica/features/assets/domain/usecases/search_assets.dart';
 import 'package:macsapractica/features/assets/presentation/states/asset_state.dart';
@@ -8,10 +9,13 @@ import 'package:mocktail/mocktail.dart';
 
 class MockGetAssetsByAreaUseCase extends Mock implements GetAssetsByAreaUseCase {}
 
+class MockGetAllAssetsByAreaUseCase extends Mock implements GetAllAssetsByAreaUseCase {}
+
 class MockSearchAssetsUseCase extends Mock implements SearchAssetsUseCase {}
 
 void main() {
   late MockGetAssetsByAreaUseCase useCase;
+  late MockGetAllAssetsByAreaUseCase getAllUseCase;
   late MockSearchAssetsUseCase searchUseCase;
   late AssetListViewModel viewModel;
 
@@ -28,14 +32,17 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(const GetAssetsByAreaParams(areaId: 'A1'));
+    registerFallbackValue(const GetAllAssetsByAreaParams(areaId: 'A1'));
     registerFallbackValue(const SearchAssetsParams(areaId: 'A1'));
   });
 
   setUp(() {
     useCase = MockGetAssetsByAreaUseCase();
+    getAllUseCase = MockGetAllAssetsByAreaUseCase();
     searchUseCase = MockSearchAssetsUseCase();
     viewModel = AssetListViewModel(
       getAssetsByAreaUseCase: useCase,
+      getAllAssetsByAreaUseCase: getAllUseCase,
       searchAssetsUseCase: searchUseCase,
     );
   });

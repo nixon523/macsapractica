@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../domain/entities/kardex_log.dart';
 import '../../domain/usecases/get_all_kardex_logs.dart';
 import '../../domain/usecases/get_kardex_logs.dart';
-import '../../../../core/usecases/usecase.dart';
 
 class KardexListViewModel extends ChangeNotifier {
   KardexListViewModel({

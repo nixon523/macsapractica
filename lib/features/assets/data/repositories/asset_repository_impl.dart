@@ -23,6 +23,14 @@ class AssetRepositoryImpl implements AssetRepository {
   }
 
   @override
+  Future<List<Asset>> getAllAssetsByArea(
+    String areaId, {
+    bool forceRefresh = false,
+  }) async {
+    return remoteDataSource.getAllAssetsByArea(areaId);
+  }
+
+  @override
   Future<List<Asset>> getAssetsByParent({
     required String areaId,
     String? parentAssetId,

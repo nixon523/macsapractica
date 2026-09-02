@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../domain/entities/work_order.dart';
 import '../../domain/usecases/get_all_work_orders.dart';
 import '../../domain/usecases/get_work_orders.dart';
-import '../../../../core/usecases/usecase.dart';
 
 class WorkOrderListViewModel extends ChangeNotifier {
   WorkOrderListViewModel({

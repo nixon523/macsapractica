@@ -14,6 +14,7 @@ import '../../features/assets/domain/usecases/create_area_usecase.dart';
 import '../../features/assets/domain/usecases/create_asset_usecase.dart';
 import '../../features/assets/domain/usecases/find_asset_by_serial.dart';
 import '../../features/assets/domain/usecases/get_areas_usecase.dart';
+import '../../features/assets/domain/usecases/get_all_assets_by_area.dart';
 import '../../features/assets/domain/usecases/get_assets_by_area.dart';
 import '../../features/assets/domain/usecases/get_assets_by_parent.dart';
 import '../../features/assets/domain/usecases/get_next_area_id_usecase.dart';
@@ -98,6 +99,9 @@ import '../../features/work_orders/presentation/viewmodels/work_order_list_viewm
 final GetIt getIt = GetIt.instance;
 
 Future<void> configureDependencies() async {
+  // Reinicia GetIt para soportar Hot Restart (R) sin colisiones de registro
+  await getIt.reset();
+
   // --- CAPA DE RED Y SESIÓN ---
   getIt.registerLazySingleton<SessionManager>(
     () => SessionManager.instance,
@@ -183,6 +187,9 @@ Future<void> configureDependencies() async {
   // --- CAPA DE DOMINIO (Casos de Uso) ---
   getIt.registerLazySingleton(
     () => GetAssetsByAreaUseCase(getIt<AssetRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => GetAllAssetsByAreaUseCase(getIt<AssetRepository>()),
   );
   getIt.registerLazySingleton(
     () => GetAssetsByParentUseCase(getIt<AssetRepository>()),
@@ -319,6 +326,7 @@ Future<void> configureDependencies() async {
   getIt.registerFactory<AssetListViewModel>(
     () => AssetListViewModel(
       getAssetsByAreaUseCase: getIt<GetAssetsByAreaUseCase>(),
+      getAllAssetsByAreaUseCase: getIt<GetAllAssetsByAreaUseCase>(),
       getAssetsByParentUseCase: getIt<GetAssetsByParentUseCase>(),
       searchAssetsUseCase: getIt<SearchAssetsUseCase>(),
     ),

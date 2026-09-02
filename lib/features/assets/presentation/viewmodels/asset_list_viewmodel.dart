@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/asset.dart';
+import '../../domain/usecases/get_all_assets_by_area.dart';
 import '../../domain/usecases/get_assets_by_area.dart';
 import '../../domain/usecases/get_assets_by_parent.dart';
 import '../../domain/usecases/search_assets.dart';
@@ -9,12 +10,15 @@ import '../states/asset_state.dart';
 class AssetListViewModel extends ChangeNotifier {
   AssetListViewModel({
     required this.getAssetsByAreaUseCase,
+    required GetAllAssetsByAreaUseCase getAllAssetsByAreaUseCase,
     GetAssetsByParentUseCase? getAssetsByParentUseCase,
     SearchAssetsUseCase? searchAssetsUseCase,
-  })  : _getAssetsByParentUseCase = getAssetsByParentUseCase,
+  })  : _getAllAssetsByAreaUseCase = getAllAssetsByAreaUseCase,
+        _getAssetsByParentUseCase = getAssetsByParentUseCase,
         _searchAssetsUseCase = searchAssetsUseCase;
 
   final GetAssetsByAreaUseCase getAssetsByAreaUseCase;
+  final GetAllAssetsByAreaUseCase _getAllAssetsByAreaUseCase;
   final GetAssetsByParentUseCase? _getAssetsByParentUseCase;
   final SearchAssetsUseCase? _searchAssetsUseCase;
 
@@ -73,6 +77,46 @@ class AssetListViewModel extends ChangeNotifier {
     }
   }
 
+  /// Obtiene TODOS los activos del área (padres e hijos) y los ordena
+  /// jerárquicamente para la vista de árbol completo.
+  Future<void> fetchAllAssets(
+    String areaId, {
+    AssetStatus? status,
+  }) async {
+    _state = _state.copyWith(
+      viewState: ViewState.loading,
+      errorMessage: '',
+      isSearching: true,
+      statusFilter: status,
+    );
+    notifyListeners();
+
+    try {
+      var assets = await _getAllAssetsByAreaUseCase(
+        GetAllAssetsByAreaParams(areaId: areaId),
+      );
+
+      // Filtrar por estado si se especifica
+      if (status != null) {
+        assets = assets.where((a) => a.status == status).toList();
+      }
+
+      final sorted = sortHierarchically(assets);
+
+      _state = _state.copyWith(
+        viewState: ViewState.success,
+        assets: sorted,
+      );
+    } catch (e) {
+      _state = _state.copyWith(
+        viewState: ViewState.error,
+        errorMessage: e.toString(),
+      );
+    } finally {
+      notifyListeners();
+    }
+  }
+
   /// Búsqueda server-side por tokens y estado (índices compuestos).
   /// Con query vacía y sin estado, la consulta se delega igualmente al server
   /// con solo el filtro de área (ordenada por nombre).
@@ -94,6 +138,11 @@ class AssetListViewModel extends ChangeNotifier {
 
     final tokens = query.trim().isEmpty ? const <String>[] : Asset.tokenize(query);
 
+    // Si no hay tokens de búsqueda, obtener todos los activos y filtrar por estado
+    if (tokens.isEmpty) {
+      return fetchAllAssets(areaId, status: status);
+    }
+
     _state = _state.copyWith(
       viewState: ViewState.loading,
       errorMessage: '',
@@ -111,7 +160,12 @@ class AssetListViewModel extends ChangeNotifier {
         ),
       );
 
-      final assets = sortHierarchically(rawAssets);
+      // Aplicar filtro de estado localmente (el API no lo soporta)
+      final filteredAssets = status != null
+          ? rawAssets.where((a) => a.status == status).toList()
+          : rawAssets;
+
+      final assets = sortHierarchically(filteredAssets);
 
       _state = _state.copyWith(
         viewState: ViewState.success,

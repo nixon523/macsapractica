@@ -192,12 +192,14 @@ class _AuthViewState extends State<AuthView> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(
-                        Icons.factory_outlined,
-                        size: 64,
-                        color: theme.colorScheme.primary,
+                      Center(
+                        child: Image.asset(
+                          'assets/images/macsa_logo.png',
+                          height: 120,
+                          fit: BoxFit.contain,
+                        ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 16),
                       Text(
                         'Grupo Macsa',
                         textAlign: TextAlign.center,

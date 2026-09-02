@@ -72,16 +72,16 @@ class SidebarWidget extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 32,
-                    height: 32,
+                    width: 38,
+                    height: 38,
+                    padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: AppTheme.sidebarSelected,
-                      borderRadius: BorderRadius.circular(6),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(
-                      Icons.handyman_outlined,
-                      color: AppTheme.sidebarIconSelected,
-                      size: 20,
+                    child: Image.asset(
+                      'assets/images/macsa_logo.png',
+                      fit: BoxFit.contain,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -116,18 +116,18 @@ class SidebarWidget extends StatelessWidget {
           : Center(
               child: InkWell(
                 onTap: onToggle,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  width: 36,
-                  height: 36,
+                  width: 40,
+                  height: 40,
+                  padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
-                    color: AppTheme.sidebarSelected,
-                    borderRadius: BorderRadius.circular(6),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(
-                    Icons.handyman_outlined,
-                    color: AppTheme.sidebarIconSelected,
-                    size: 20,
+                  child: Image.asset(
+                    'assets/images/macsa_logo.png',
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
@@ -623,19 +623,22 @@ class _Badge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      alignment: Alignment.center,
+      height: 18,
+      constraints: const BoxConstraints(minWidth: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
       decoration: BoxDecoration(
         color: const Color(0xFFE53935),
         borderRadius: BorderRadius.circular(9),
       ),
-      child: Text(
-        count > 99 ? '99+' : '$count',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w600,
+      child: Center(
+        child: Text(
+          count > 99 ? '99+' : '$count',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            height: 1.0,
+          ),
         ),
       ),
     );

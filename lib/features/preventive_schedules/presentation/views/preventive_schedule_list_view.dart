@@ -41,9 +41,15 @@ class _PreventiveScheduleListViewState
   DateTime? _startDate;
   DateTime? _endDate;
 
+  String _selectedPreset = 'hoy';
+
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _startDate = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
     _searchCtrl.addListener(() {
       setState(() {
         _searchQuery = _searchCtrl.text.trim().toLowerCase();
@@ -60,6 +66,34 @@ class _PreventiveScheduleListViewState
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _applyPreset(String preset) {
+    final now = DateTime.now();
+    setState(() {
+      _selectedPreset = preset;
+      switch (preset) {
+        case 'hoy':
+          _startDate = DateTime(now.year, now.month, now.day, 0, 0, 0);
+          _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+          break;
+        case 'proximos7dias':
+          _startDate = DateTime(now.year, now.month, now.day, 0, 0, 0);
+          final inSevenDays = now.add(const Duration(days: 7));
+          _endDate = DateTime(inSevenDays.year, inSevenDays.month, inSevenDays.day, 23, 59, 59);
+          break;
+        case 'mes':
+          _startDate = DateTime(now.year, now.month, 1, 0, 0, 0);
+          final nextMonth = DateTime(now.year, now.month + 1, 1);
+          _endDate = nextMonth.subtract(const Duration(seconds: 1));
+          break;
+        case 'todo':
+          _startDate = null;
+          _endDate = null;
+          break;
+      }
+    });
+    _loadData();
   }
 
   void _loadData() {
@@ -96,14 +130,6 @@ class _PreventiveScheduleListViewState
       });
       _loadData();
     }
-  }
-
-  void _clearDateRange() {
-    setState(() {
-      _startDate = null;
-      _endDate = null;
-    });
-    _loadData();
   }
 
   Future<void> _openCreateDialog() async {
@@ -242,10 +268,6 @@ class _PreventiveScheduleListViewState
     final canManage = authVm.hasPermission('preventive.manage');
     final isAdmin = authVm.currentUser?.role.code == 'admin';
 
-    final dateLabel = _startDate == null
-        ? 'Filtrar fecha'
-        : '${_startDate!.day}/${_startDate!.month}/${_startDate!.year} - ${_endDate!.day}/${_endDate!.month}/${_endDate!.year}';
-
     final allSchedules = vm.state.schedules;
     final urgentCount = allSchedules
         .where((s) => s.status == ScheduleStatus.active && s.alertLevel == PreventiveAlertLevel.urgent)
@@ -259,153 +281,16 @@ class _PreventiveScheduleListViewState
     return Scaffold(
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 650;
-
-                final segmented = SegmentedButton<_PreventiveFilterTab>(
-                  segments: [
-                    const ButtonSegment(
-                      value: _PreventiveFilterTab.all,
-                      label: Text('Todos'),
-                    ),
-                    ButtonSegment(
-                      value: _PreventiveFilterTab.urgent,
-                      label: Text(
-                        'Urgentes ($urgentCount)',
-                        style: TextStyle(
-                          color: urgentCount > 0 ? Colors.orange.shade800 : null,
-                          fontWeight: urgentCount > 0 ? FontWeight.bold : null,
-                        ),
-                      ),
-                    ),
-                    const ButtonSegment(
-                      value: _PreventiveFilterTab.upcoming,
-                      label: Text('Próximos'),
-                    ),
-                    const ButtonSegment(
-                      value: _PreventiveFilterTab.onSchedule,
-                      label: Text('Al día'),
-                    ),
-                    ButtonSegment(
-                      value: _PreventiveFilterTab.overdue,
-                      label: Text(
-                        'Vencidos ($overdueCount)',
-                        style: TextStyle(
-                          color: overdueCount > 0 ? Colors.red : null,
-                          fontWeight: overdueCount > 0 ? FontWeight.bold : null,
-                        ),
-                      ),
-                    ),
-                    const ButtonSegment(
-                      value: _PreventiveFilterTab.paused,
-                      label: Text('Pausados'),
-                    ),
-                  ],
-                  selected: {_tab},
-                  onSelectionChanged: (set) => setState(() => _tab = set.first),
-                );
-
-                final searchField = TextField(
-                  controller: _searchCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Buscar por equipo, plan, tipo o tarea...',
-                    prefixIcon: const Icon(Icons.search, size: 18),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 16),
-                            onPressed: () => _searchCtrl.clear(),
-                          )
-                        : null,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 9,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                );
-
-                final dateChip = Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ActionChip(
-                      avatar: Icon(
-                        Icons.date_range,
-                        size: 16,
-                        color: _startDate != null ? Theme.of(context).colorScheme.primary : null,
-                      ),
-                      label: Text(dateLabel, style: const TextStyle(fontSize: 12)),
-                      onPressed: _selectDateRange,
-                    ),
-                    if (_startDate != null) ...[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        tooltip: 'Limpiar fecha',
-                        onPressed: _clearDateRange,
-                      ),
-                    ],
-                  ],
-                );
-
-                final createBtn = canManage
-                    ? FilledButton.icon(
-                        onPressed: _openCreateDialog,
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Nuevo Plan PM'),
-                      )
-                    : null;
-
-                if (isNarrow) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: segmented,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(child: searchField),
-                          const SizedBox(width: 8),
-                          dateChip,
-                        ],
-                      ),
-                      if (createBtn != null) ...[
-                        const SizedBox(height: 8),
-                        createBtn,
-                      ],
-                    ],
-                  );
-                }
-
-                return Row(
-                  children: [
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: segmented,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(child: searchField),
-                    const SizedBox(width: 8),
-                    dateChip,
-                    if (createBtn != null) ...[
-                      const SizedBox(width: 8),
-                      createBtn,
-                    ],
-                  ],
-                );
-              },
-            ),
+          _buildFilterSection(
+            isNarrow: MediaQuery.of(context).size.width < 750,
+            urgentCount: urgentCount,
+            overdueCount: overdueCount,
+            canManage: canManage,
           ),
 
           const Divider(height: 1),
+
+          _buildSummaryBar(filteredList.length, urgentCount, overdueCount),
 
           Expanded(
             child: switch (vm.state.viewState) {
@@ -415,9 +300,38 @@ class _PreventiveScheduleListViewState
                 Center(child: Text('Error: ${vm.state.errorMessage}')),
               ViewState.initial || ViewState.success => filteredList.isEmpty
                   ? Center(
-                      child: Text(
-                        'No hay planes preventivos para el filtro seleccionado.',
-                        style: TextStyle(color: Colors.grey.shade600),
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.calendar_month_outlined, size: 56, color: Theme.of(context).colorScheme.outline),
+                            const SizedBox(height: 16),
+                            Text(
+                              _searchQuery.isNotEmpty
+                                  ? 'Sin resultados para "$_searchQuery"'
+                                  : 'No hay planes preventivos para el filtro seleccionado.',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _searchQuery.isNotEmpty
+                                  ? 'Intenta con otro término o limpia la barra de búsqueda.'
+                                  : 'Prueba cambiando el rango de fechas o el estado del plan.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                            ),
+                            if (_selectedPreset != 'todo') ...[
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: () => _applyPreset('todo'),
+                                icon: const Icon(Icons.history, size: 18),
+                                label: const Text('Ver todos los planes'),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     )
                   : RefreshIndicator(
@@ -439,6 +353,309 @@ class _PreventiveScheduleListViewState
                       ),
                     ),
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterSection({
+    required bool isNarrow,
+    required int urgentCount,
+    required int overdueCount,
+    required bool canManage,
+  }) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      color: colors.surface,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Fila 1: Selector de Fechas (Desde - Hasta) y Presets
+          if (!isNarrow)
+            Row(
+              children: [
+                _buildDateRangeButton(),
+                const SizedBox(width: 12),
+                Expanded(child: _buildPresetsRow()),
+                if (canManage) ...[
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: _openCreateDialog,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Nuevo Plan PM'),
+                  ),
+                ],
+              ],
+            )
+          else ...[
+            _buildDateRangeButton(),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: _buildPresetsRow(),
+            ),
+            if (canManage) ...[
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: _openCreateDialog,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Nuevo Plan PM'),
+              ),
+            ],
+          ],
+          const SizedBox(height: 10),
+
+          // Fila 2: Búsqueda y Chips de categoría
+          if (!isNarrow)
+            Row(
+              children: [
+                Expanded(flex: 3, child: _buildSearchBar()),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 5,
+                  child: _buildCategoryChips(
+                    urgentCount: urgentCount,
+                    overdueCount: overdueCount,
+                    scrollable: false,
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            _buildSearchBar(),
+            const SizedBox(height: 8),
+            _buildCategoryChips(
+              urgentCount: urgentCount,
+              overdueCount: overdueCount,
+              scrollable: true,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDateRangeButton() {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    String label;
+    if (_startDate == null && _endDate == null) {
+      label = 'Todo el historial';
+    } else if (_startDate != null && _endDate != null) {
+      final s = _startDate!;
+      final e = _endDate!;
+      if (s.year == e.year && s.month == e.month && s.day == e.day) {
+        label = 'Hoy: ${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year}';
+      } else {
+        label = '${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year} '
+            '➔ ${e.day.toString().padLeft(2, '0')}/${e.month.toString().padLeft(2, '0')}/${e.year}';
+      }
+    } else {
+      label = 'Filtrar rango';
+    }
+
+    return OutlinedButton.icon(
+      onPressed: _selectDateRange,
+      icon: Icon(Icons.calendar_today_outlined, size: 18, color: colors.primary),
+      label: Text(
+        label,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+          color: colors.onSurface,
+        ),
+      ),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        side: BorderSide(color: colors.outlineVariant),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        backgroundColor: colors.surfaceContainerLowest,
+      ),
+    );
+  }
+
+  Widget _buildPresetsRow() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildPresetChip('hoy', 'Hoy'),
+        const SizedBox(width: 6),
+        _buildPresetChip('proximos7dias', 'Próx. 7 días'),
+        const SizedBox(width: 6),
+        _buildPresetChip('mes', 'Este mes'),
+        const SizedBox(width: 6),
+        _buildPresetChip('todo', 'Todo'),
+      ],
+    );
+  }
+
+  Widget _buildPresetChip(String key, String label) {
+    final isSelected = _selectedPreset == key;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => _applyPreset(key),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
+      ),
+      selectedColor: colors.primary,
+      backgroundColor: colors.surfaceContainerLow,
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return TextField(
+      controller: _searchCtrl,
+      decoration: InputDecoration(
+        hintText: 'Buscar por equipo, plan, tipo o tarea…',
+        hintStyle: const TextStyle(fontSize: 12),
+        prefixIcon: const Icon(Icons.search, size: 20),
+        suffixIcon: _searchCtrl.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 18),
+                onPressed: () => _searchCtrl.clear(),
+              )
+            : null,
+        isDense: true,
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChips({
+    required int urgentCount,
+    required int overdueCount,
+    required bool scrollable,
+  }) {
+    final categories = <(_PreventiveFilterTab, String, IconData, Color)>[
+      (_PreventiveFilterTab.all, 'Todos', Icons.all_inbox_outlined, const Color(0xFF1E293B)),
+      (_PreventiveFilterTab.urgent, 'Urgentes ($urgentCount)', Icons.alarm_outlined, const Color(0xFFC2410C)),
+      (_PreventiveFilterTab.upcoming, 'Próximos', Icons.schedule_outlined, const Color(0xFFD97706)),
+      (_PreventiveFilterTab.onSchedule, 'Al día', Icons.check_circle_outline, const Color(0xFF15803D)),
+      (_PreventiveFilterTab.overdue, 'Vencidos ($overdueCount)', Icons.error_outline, const Color(0xFFDC2626)),
+      (_PreventiveFilterTab.paused, 'Pausados', Icons.pause_circle_outline, const Color(0xFF64748B)),
+    ];
+
+    final chips = categories.map((item) {
+      final isSelected = _tab == item.$1;
+      final theme = Theme.of(context);
+      final colors = theme.colorScheme;
+
+      return FilterChip(
+        avatar: Icon(
+          item.$3,
+          size: 16,
+          color: isSelected ? Colors.white : item.$4,
+        ),
+        label: Text(item.$2),
+        selected: isSelected,
+        onSelected: (_) => setState(() => _tab = item.$1),
+        selectedColor: item.$4,
+        backgroundColor: colors.surfaceContainerLow,
+        labelStyle: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? Colors.white : colors.onSurface,
+        ),
+        showCheckmark: false,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      );
+    }).toList();
+
+    if (scrollable) {
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: chips.map((c) => Padding(padding: const EdgeInsets.only(right: 6), child: c)).toList(),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: chips,
+    );
+  }
+
+  Widget _buildSummaryBar(int count, int urgent, int overdue) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
+      child: Row(
+        children: [
+          Icon(Icons.calendar_month_outlined, size: 16, color: colors.primary),
+          const SizedBox(width: 8),
+          Text(
+            '$count plan(es) preventivo(s)',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: colors.onSurface,
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (urgent > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEDD5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$urgent urgente(s)',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFC2410C)),
+              ),
+            ),
+          if (overdue > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                '$overdue vencido(s)',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+              ),
+            ),
+          ],
+          const Spacer(),
+          Text(
+            'Por fecha de ejecución',
+            style: TextStyle(
+              fontSize: 11,
+              color: colors.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -490,30 +707,33 @@ class _PreventiveCard extends StatelessWidget {
 
     final isPaused = schedule.status == ScheduleStatus.paused;
     final nextDateStr = '${schedule.nextDate.day}/${schedule.nextDate.month}/${schedule.nextDate.year}';
+    final accentColor = isPaused ? Colors.grey.shade400 : alertTextColor;
 
     return Card(
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: 4),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(
-          color: isPaused
-              ? Colors.grey.shade300
-              : schedule.alertLevel == PreventiveAlertLevel.overdue
-                  ? Colors.red.shade300
-                  : schedule.alertLevel == PreventiveAlertLevel.urgent
-                      ? Colors.orange.shade300
-                      : Colors.grey.shade300,
-        ),
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.grey.shade300, width: 0.8),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            Container(
+              width: 5,
+              color: accentColor,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                 Expanded(
                   child: Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
@@ -758,7 +978,11 @@ class _PreventiveCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ),
+  ],
+),
+),
+);
   }
 }
 

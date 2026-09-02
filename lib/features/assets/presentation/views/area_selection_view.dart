@@ -7,7 +7,7 @@ import '../../domain/entities/area.dart';
 import '../states/area_state.dart';
 import '../viewmodels/area_list_viewmodel.dart';
 
-/// Vista de selección de área: lista limpia y directa de áreas.
+/// Vista de selección de área con estándar visual y profesional del Kardex.
 class AreaSelectionView extends StatefulWidget {
   const AreaSelectionView({super.key});
 
@@ -107,31 +107,63 @@ class _AreaSelectionViewState extends State<AreaSelectionView> {
 
   @override
   Widget build(BuildContext context) {
-    final canManage =
-        context.watch<AuthViewModel>().hasPermission('asset.create');
+    final canManage = context.watch<AuthViewModel>().hasPermission('asset.create');
 
     return Scaffold(
       body: Consumer<AreaListViewModel>(
         builder: (context, viewModel, child) {
           final state = viewModel.state;
           return switch (state.viewState) {
-            ViewState.loading =>
-              const Center(child: CircularProgressIndicator()),
-            ViewState.error => Center(child: Text('Error: ${state.errorMessage}')),
+            ViewState.loading => const Center(child: CircularProgressIndicator()),
+            ViewState.error => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+                      const SizedBox(height: 12),
+                      Text('Error al cargar áreas', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 6),
+                      Text(state.errorMessage, style: const TextStyle(fontSize: 12), textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        onPressed: () => context.read<AreaListViewModel>().fetchAreas(forceRefresh: true),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ViewState.success => state.areas.isEmpty
                 ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Aún no hay áreas registradas.'),
-                        if (canManage) ...[
-                          const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: _createArea,
-                            child: const Text('Crear primera área'),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.factory_outlined, size: 56, color: Theme.of(context).colorScheme.outline),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Aún no hay áreas registradas.',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                           ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Crea un área para comenzar a registrar equipos y activos.',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                          if (canManage) ...[
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: _createArea,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Crear primera área'),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   )
                 : _AreaListView(
@@ -169,6 +201,9 @@ class _AreaListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     final filteredAreas = areas.where((area) {
       if (searchQuery.isEmpty) return true;
       final matchName = area.name.toLowerCase().contains(searchQuery);
@@ -179,8 +214,9 @@ class _AreaListView extends StatelessWidget {
 
     return Column(
       children: [
-        // Barra de Búsqueda y Crear
-        Padding(
+        // Barra de Control Responsiva
+        Container(
+          color: colors.surface,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           child: Row(
             children: [
@@ -188,31 +224,35 @@ class _AreaListView extends StatelessWidget {
                 child: TextField(
                   controller: searchCtrl,
                   decoration: InputDecoration(
-                    hintText: 'Buscar por nombre, código (A001) o ID...',
-                    prefixIcon: const Icon(Icons.search, size: 18),
+                    hintText: 'Buscar área por nombre, código (A001) o centro de costo…',
+                    hintStyle: const TextStyle(fontSize: 12),
+                    prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, size: 16),
+                            icon: const Icon(Icons.clear, size: 18),
                             onPressed: () => searchCtrl.clear(),
                           )
                         : null,
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 9,
-                    ),
+                    filled: true,
+                    fillColor: colors.surfaceContainerLowest,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: colors.outlineVariant),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: colors.outlineVariant),
                     ),
                   ),
                 ),
               ),
               if (canManage && onCreateArea != null) ...[
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 FilledButton.icon(
                   onPressed: onCreateArea,
                   icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Crear Área'),
+                  label: const Text('Nueva Área'),
                 ),
               ],
             ],
@@ -221,11 +261,57 @@ class _AreaListView extends StatelessWidget {
 
         const Divider(height: 1),
 
-        // Lista de Áreas
+        // Barra Métrica de Resumen
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
+          child: Row(
+            children: [
+              Icon(Icons.business_outlined, size: 16, color: colors.primary),
+              const SizedBox(width: 8),
+              Text(
+                '${filteredAreas.length} área(s) disponible(s)',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: colors.onSurface,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'Selecciona un área para ver sus activos',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Lista de Áreas Ejecutivas
         Expanded(
           child: filteredAreas.isEmpty
-              ? const Center(
-                  child: Text('No se encontraron áreas.'),
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.search_off, size: 48, color: colors.outline),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No se encontraron áreas con "$searchQuery"',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton(
+                          onPressed: () => searchCtrl.clear(),
+                          child: const Text('Limpiar búsqueda'),
+                        ),
+                      ],
+                    ),
+                  ),
                 )
               : RefreshIndicator(
                   onRefresh: () async {
@@ -242,39 +328,14 @@ class _AreaListView extends StatelessWidget {
                               ? area.costCenter
                               : 'CC-${area.costCenter}');
 
-                      return Card(
-                        elevation: 0,
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            radius: 18,
-                            child: Icon(Icons.factory_outlined, size: 18),
-                          ),
-                          title: Text(
-                            'Área ${area.id}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          subtitle: Text('${area.name} · Centro de costo: $ccStr'),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (canManage)
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 18),
-                                  tooltip: 'Editar nombre',
-                                  onPressed: () => onEditArea(area),
-                                ),
-                              const Icon(Icons.arrow_forward_ios, size: 14),
-                            ],
-                          ),
-                          onTap: () => Navigator.of(context).pushNamed(
-                            AppRouter.assets,
-                            arguments: area.id,
-                          ),
+                      return _ModernAreaCard(
+                        area: area,
+                        costCenterFormatted: ccStr,
+                        canManage: canManage,
+                        onEdit: () => onEditArea(area),
+                        onTap: () => Navigator.of(context).pushNamed(
+                          AppRouter.assets,
+                          arguments: area.id,
                         ),
                       );
                     },
@@ -282,6 +343,131 @@ class _AreaListView extends StatelessWidget {
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// Tarjeta moderna de área con franja lateral y estética de Kardex.
+class _ModernAreaCard extends StatelessWidget {
+  const _ModernAreaCard({
+    required this.area,
+    required this.costCenterFormatted,
+    required this.canManage,
+    required this.onEdit,
+    required this.onTap,
+  });
+
+  final Area area;
+  final String costCenterFormatted;
+  final bool canManage;
+  final VoidCallback onEdit;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const accentColor = Color(0xFF0284C7); // Azul cyan industrial
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.grey.shade300, width: 0.8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Franja lateral con acento de color de área
+              Container(
+                width: 5,
+                color: accentColor,
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.factory_outlined, size: 20, color: accentColor),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(5),
+                                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                                  ),
+                                  child: Text(
+                                    'Área ${area.id}',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11.5,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE0F2FE),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    costCenterFormatted,
+                                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              area.name,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (canManage)
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          tooltip: 'Editar nombre del área',
+                          onPressed: onEdit,
+                        ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
