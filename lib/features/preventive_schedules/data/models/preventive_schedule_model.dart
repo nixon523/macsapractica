@@ -12,8 +12,11 @@ class PreventiveScheduleModel extends PreventiveSchedule {
     super.areaName,
     required super.maintenanceType,
     required super.frequency,
+    super.frequencyInterval = 1,
+    super.frequencyUnit = 'meses',
     super.description,
     super.materials,
+    super.activities = const [],
     super.estimatedHours,
     required super.startDate,
     required super.nextDate,
@@ -84,10 +87,45 @@ class PreventiveScheduleModel extends PreventiveSchedule {
       } catch (_) {}
     }
 
+    // Parse activities
+    List<PreventiveChildActivity> activitiesList = [];
+    final rawActivities = map['activities'] ??
+        map['Activities'] ??
+        map['ActividadesJson'] ??
+        map['actividadesJson'] ??
+        map['actividades'];
+    if (rawActivities is List) {
+      activitiesList = rawActivities
+          .whereType<Map>()
+          .map((a) => PreventiveChildActivity.fromMap(Map<String, dynamic>.from(a)))
+          .toList();
+    } else if (rawActivities is String && rawActivities.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawActivities);
+        if (decoded is List) {
+          activitiesList = decoded
+              .whereType<Map>()
+              .map((a) => PreventiveChildActivity.fromMap(Map<String, dynamic>.from(a)))
+              .toList();
+        }
+      } catch (_) {}
+    }
+
     final startDate =
         parseDate(map['startDate'] ?? map['StartDate']) ?? DateTime.now();
     final nextDate =
         parseDate(map['nextDate'] ?? map['NextDate']) ?? DateTime.now();
+
+    final interval = (map['intervaloFrecuencia'] ??
+            map['IntervaloFrecuencia'] ??
+            map['frequencyInterval'] as num?)
+        ?.toInt() ??
+        1;
+    final unit = (map['unidadFrecuencia'] ??
+            map['UnidadFrecuencia'] ??
+            map['frequencyUnit'] ??
+            'meses')
+        .toString();
 
     return PreventiveScheduleModel(
       id: id,
@@ -100,8 +138,11 @@ class PreventiveScheduleModel extends PreventiveSchedule {
       maintenanceType:
           (map['maintenanceType'] ?? map['MaintenanceType'] ?? '').toString(),
       frequency: frequency,
+      frequencyInterval: interval,
+      frequencyUnit: unit,
       description: (map['description'] ?? map['Description'] ?? '').toString(),
       materials: materialsList,
+      activities: activitiesList,
       estimatedHours: (map['estimatedHours'] ?? map['EstimatedHours'] as num?)?.toDouble(),
       startDate: startDate,
       nextDate: nextDate,
@@ -140,8 +181,12 @@ class PreventiveScheduleModel extends PreventiveSchedule {
       'areaName': areaName,
       'maintenanceType': maintenanceType,
       'frequency': frequency.name,
+      'intervaloFrecuencia': frequencyInterval,
+      'unidadFrecuencia': frequencyUnit,
       'description': description,
       'materials': materials.map((m) => m.toMap()).toList(),
+      'activities': activities.map((a) => a.toMap()).toList(),
+      'actividades': activities.map((a) => a.toMap()).toList(),
       'estimatedHours': estimatedHours,
       'startDate': startDate.toIso8601String(),
       'nextDate': nextDate.toIso8601String(),
@@ -157,30 +202,6 @@ class PreventiveScheduleModel extends PreventiveSchedule {
   }
 
   Map<String, dynamic> toFirestore() {
-    return {
-      'title': title,
-      'assetId': assetId,
-      'assetName': assetName,
-      'areaId': areaId,
-      'areaName': areaName,
-      'maintenanceType': maintenanceType,
-      'frequency': frequency.name,
-      'description': description,
-      'materials': materials.map((m) => m.toMap()).toList(),
-      'estimatedHours': estimatedHours,
-      'startDate': startDate,
-      'nextDate': nextDate,
-      'lastCompleted': lastCompleted,
-      'lastWorkOrderId': lastWorkOrderId,
-      'status': status.name,
-      'notes': notes,
-      'createdByUserId': createdByUserId,
-      'createdByUserName': createdByUserName,
-      'createdAt': createdAt,
-      'amendmentDocNumber': amendmentDocNumber,
-      'amendedBy': amendedBy,
-      'amendedAt': amendedAt,
-      'amendmentReason': amendmentReason,
-    };
+    return toJson();
   }
 }

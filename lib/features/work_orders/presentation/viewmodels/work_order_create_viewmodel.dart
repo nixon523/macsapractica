@@ -97,23 +97,52 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
     _assetName = schedule.assetName ?? '';
     _areaId = schedule.areaId;
     _areaName = schedule.areaName ?? '';
-    final desc = schedule.description?.isNotEmpty == true
-        ? schedule.description
-        : schedule.maintenanceType;
-    _description = '[Mantenimiento Preventivo ${schedule.id}]: $desc';
     _requestedWorkTypes.clear();
     _requestedWorkTypes.add('preventive');
     _requestedWorkTypes.add('scheduled');
     _materials.clear();
-    if (schedule.materials != null) {
-      for (final m in schedule.materials) {
-        _materials.add(WorkOrderMaterial(
-          description: m.name,
-          quantity: (m.quantity as num).toDouble(),
-          unit: m.unit,
-        ));
+
+    final dynamic acts = schedule.activities;
+    if (acts is List && acts.isNotEmpty) {
+      final now = DateTime.now();
+      // Actividades que vencen en el mes actual o todas las pendientes
+      final monthActs = acts.where((a) {
+        final next = a.nextDate as DateTime?;
+        return next != null && next.year == now.year && next.month == now.month;
+      }).toList();
+
+      final targetActs = monthActs.isNotEmpty ? monthActs : acts;
+      final buffer = StringBuffer();
+      buffer.writeln('[Mantenimiento Preventivo ${schedule.id}] - ${schedule.assetName.isNotEmpty ? schedule.assetName : schedule.assetId}');
+      buffer.writeln('Actividades en componentes:');
+
+      for (final act in targetActs) {
+        buffer.writeln(' • [${act.childAssetId} - ${act.childAssetName}]: ${act.description}');
+        for (final m in act.materials) {
+          _materials.add(WorkOrderMaterial(
+            description: '${m.name} (para ${act.childAssetName})',
+            quantity: (m.quantity as num).toDouble(),
+            unit: m.unit,
+          ));
+        }
+      }
+      _description = buffer.toString().trim();
+    } else {
+      final desc = schedule.description?.isNotEmpty == true
+          ? schedule.description
+          : schedule.maintenanceType;
+      _description = '[Mantenimiento Preventivo ${schedule.id}]: $desc';
+      if (schedule.materials != null) {
+        for (final m in schedule.materials) {
+          _materials.add(WorkOrderMaterial(
+            description: m.name,
+            quantity: (m.quantity as num).toDouble(),
+            unit: m.unit,
+          ));
+        }
       }
     }
+
     if (schedule.estimatedHours != null) {
       _estimatedHours = (schedule.estimatedHours as num).toDouble();
     }

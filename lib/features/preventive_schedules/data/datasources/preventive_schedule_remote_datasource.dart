@@ -68,6 +68,10 @@ class PreventiveScheduleRemoteDataSource {
         'lastWorkOrderId': schedule.lastWorkOrderId,
         'status': schedule.status.name,
         'notes': schedule.notes,
+        'intervaloFrecuencia': schedule.frequencyInterval,
+        'unidadFrecuencia': schedule.frequencyUnit,
+        'actividades': schedule.activities.map((a) => a.toMap()).toList(),
+        'activities': schedule.activities.map((a) => a.toMap()).toList(),
         'materials': schedule.materials
             .map((m) => {
                   'name': m.name,
@@ -179,5 +183,23 @@ class PreventiveScheduleRemoteDataSource {
         'reason': reason.trim(),
       },
     );
+  }
+
+  Future<String> generateMonthlyWorkOrder(
+    String scheduleId, {
+    int? year,
+    int? month,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.generateMonthlyWorkOrder(scheduleId),
+      body: {
+        if (year != null) 'anio': year,
+        if (month != null) 'mes': month,
+      },
+    );
+    if (response is Map<String, dynamic>) {
+      return (response['workOrderId'] ?? response['NewWorkOrderId'] ?? '').toString();
+    }
+    return '';
   }
 }

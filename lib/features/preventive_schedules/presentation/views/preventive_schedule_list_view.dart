@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
@@ -132,7 +133,7 @@ class _PreventiveScheduleListViewState
     }
   }
 
-  Future<void> _openCreateDialog() async {
+  Future<void> _openCreateDialog([PreventiveSchedule? templateSchedule]) async {
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
@@ -140,7 +141,7 @@ class _PreventiveScheduleListViewState
       context: context,
       builder: (_) => ChangeNotifierProvider.value(
         value: context.read<PreventiveScheduleViewModel>(),
-        child: const _CreatePreventivePlanDialog(),
+        child: _CreatePreventivePlanDialog(templateSchedule: templateSchedule),
       ),
     );
 
@@ -174,6 +175,133 @@ class _PreventiveScheduleListViewState
   }
 
   Future<void> _generateWorkOrder(PreventiveSchedule schedule) async {
+    final vm = context.read<PreventiveScheduleViewModel>();
+
+    if (schedule.activities.isNotEmpty) {
+      final now = DateTime.now();
+      final dueActivities = schedule.activitiesDueInMonth(now);
+      final targetActivities = dueActivities.isNotEmpty ? dueActivities : schedule.activities;
+
+      final action = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.assignment_add, color: Color(0xFF0284C7)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Generar OT Consolidada: ${schedule.id}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Equipo Principal: ${schedule.assetId} - ${schedule.assetName}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Se generará una Orden de Trabajo consolidando las siguientes ${targetActivities.length} actividad(es) de componentes:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: targetActivities.map((a) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Expanded(
+                                child: Text(
+                                  '[${a.childAssetId} - ${a.childAssetName}]: ${a.description}',
+                                  style: const TextStyle(fontSize: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '¿Deseas generar la OT automáticamente ahora o personalizarla en el formulario?',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              child: const Text('Cancelar'),
+            ),
+            OutlinedButton(
+              onPressed: () => Navigator.pop(ctx, 'manual'),
+              child: const Text('Personalizar'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, 'auto'),
+              icon: const Icon(Icons.bolt, size: 16),
+              label: const Text('Generar Automática'),
+            ),
+          ],
+        ),
+      );
+
+      if (action == 'auto' && mounted) {
+        final otId = await vm.generateMonthlyWorkOrder(schedule.id);
+        if (otId != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Orden de Trabajo consolidada $otId generada con éxito.'),
+              backgroundColor: Colors.green.shade700,
+            ),
+          );
+          _loadData();
+        } else if (vm.errorMessage.isNotEmpty && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al generar OT: ${vm.errorMessage}'),
+              backgroundColor: Colors.red.shade700,
+            ),
+          );
+        }
+        return;
+      } else if (action == 'manual' && mounted) {
+        final created = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => WorkOrderCreateView(preventiveSchedule: schedule),
+          ),
+        );
+        if (created == true && mounted) {
+          _loadData();
+        }
+        return;
+      }
+      return;
+    }
+
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => WorkOrderCreateView(preventiveSchedule: schedule),
@@ -346,6 +474,7 @@ class _PreventiveScheduleListViewState
                             canGenerateOt: canManage,
                             isAdmin: isAdmin,
                             onGenerateOt: () => _generateWorkOrder(schedule),
+                            onDuplicate: () => _openCreateDialog(schedule),
                             onAmend: () => _openAmendDialog(schedule),
                             onToggleStatus: () => _toggleStatus(schedule),
                           );
@@ -606,6 +735,7 @@ class _PreventiveScheduleListViewState
   Widget _buildSummaryBar(int count, int urgent, int overdue) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final onTimeRatio = count > 0 ? (((count - overdue) / count) * 100).clamp(0, 100).toInt() : 100;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -649,6 +779,40 @@ class _PreventiveScheduleListViewState
               ),
             ),
           ],
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: onTimeRatio >= 85
+                  ? const Color(0xFFDCFCE7)
+                  : (onTimeRatio >= 70 ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: onTimeRatio >= 85
+                    ? const Color(0xFF15803D).withValues(alpha: 0.3)
+                    : const Color(0xFFDC2626).withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  onTimeRatio >= 85 ? Icons.trending_up : Icons.trending_down,
+                  size: 13,
+                  color: onTimeRatio >= 85 ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Salud: $onTimeRatio% al día',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: onTimeRatio >= 85 ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const Spacer(),
           Text(
             'Por fecha de ejecución',
@@ -663,12 +827,26 @@ class _PreventiveScheduleListViewState
   }
 }
 
-class _PreventiveCard extends StatelessWidget {
+String _assetLevelLabel(AssetLevel level) {
+  switch (level) {
+    case AssetLevel.equipment:
+      return 'Equipo';
+    case AssetLevel.subEquipment:
+      return 'Subequipo';
+    case AssetLevel.part:
+      return 'Parte';
+    case AssetLevel.subPart:
+      return 'Subparte';
+  }
+}
+
+class _PreventiveCard extends StatefulWidget {
   const _PreventiveCard({
     required this.schedule,
     required this.canGenerateOt,
     required this.isAdmin,
     required this.onGenerateOt,
+    required this.onDuplicate,
     required this.onAmend,
     required this.onToggleStatus,
   });
@@ -677,11 +855,20 @@ class _PreventiveCard extends StatelessWidget {
   final bool canGenerateOt;
   final bool isAdmin;
   final VoidCallback onGenerateOt;
+  final VoidCallback onDuplicate;
   final VoidCallback onAmend;
   final VoidCallback onToggleStatus;
 
   @override
+  State<_PreventiveCard> createState() => _PreventiveCardState();
+}
+
+class _PreventiveCardState extends State<_PreventiveCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final schedule = widget.schedule;
     final (alertBg, alertTextColor, alertLabel) = switch (schedule.alertLevel) {
       PreventiveAlertLevel.overdue => (
           const Color(0xFFFEE2E2),
@@ -708,6 +895,7 @@ class _PreventiveCard extends StatelessWidget {
     final isPaused = schedule.status == ScheduleStatus.paused;
     final nextDateStr = '${schedule.nextDate.day}/${schedule.nextDate.month}/${schedule.nextDate.year}';
     final accentColor = isPaused ? Colors.grey.shade400 : alertTextColor;
+    final hasActivities = schedule.activities.isNotEmpty;
 
     return Card(
       elevation: 0,
@@ -734,260 +922,507 @@ class _PreventiveCard extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                Expanded(
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      Text(
-                        schedule.id,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                      Text(
-                        '— ${schedule.assetId} (${schedule.assetName.isNotEmpty ? schedule.assetName : "Equipo"})',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      Text(
-                        '· Área: ${schedule.areaName.isNotEmpty ? schedule.areaName : schedule.areaId}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        schedule.frequency.label,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2563EB),
-                        ),
-                      ),
-                    ),
-                    if (isPaused)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'Pausado',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54),
-                        ),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: alertBg,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          alertLabel,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: alertTextColor,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 6),
-
-            Text(
-              schedule.title.isNotEmpty ? schedule.title : schedule.maintenanceType,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-            ),
-
-            if (schedule.description.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                schedule.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-              ),
-            ],
-
-            if (schedule.materials.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: schedule.materials.map((m) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Text(
-                      '${m.quantity} ${m.unit} - ${m.name}',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF334155)),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-
-            if (schedule.amendmentDocNumber != null && schedule.amendmentDocNumber!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.amber.shade200),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.verified_user_outlined, size: 14, color: Colors.orange),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Modificado con Autorización Gerencial: Doc. ${schedule.amendmentDocNumber} '
-                        '(${schedule.amendedBy ?? ""})',
-                        style: TextStyle(fontSize: 11, color: Colors.amber.shade900, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 8),
-
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                Text(
-                  'Próxima fecha: $nextDateStr'
-                  '${schedule.estimatedHours != null ? " · Est: ${schedule.estimatedHours}h" : ""}'
-                  '${schedule.lastWorkOrderId != null ? " · Última OT: ${schedule.lastWorkOrderId}" : ""}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (canGenerateOt && !isPaused)
-                      if (schedule.canGenerateWorkOrder)
-                        FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            visualDensity: VisualDensity.compact,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                          ),
-                          onPressed: onGenerateOt,
-                          icon: const Icon(Icons.assignment_add, size: 16),
-                          label: const Text('Generar OT', style: TextStyle(fontSize: 12)),
-                        )
-                      else
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.grey.shade300),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        Expanded(
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            runSpacing: 4,
                             children: [
-                              Icon(Icons.lock_clock, size: 14, color: Colors.grey.shade600),
-                              const SizedBox(width: 4),
                               Text(
-                                'Habilita en ${schedule.daysRemaining - 7}d ($nextDateStr)',
-                                style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                                schedule.id,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              Text(
+                                '— ${schedule.assetId} (${schedule.assetName.isNotEmpty ? schedule.assetName : "Equipo"})',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                              Text(
+                                '· Área: ${schedule.areaName.isNotEmpty ? schedule.areaName : schedule.areaId}',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                               ),
                             ],
                           ),
                         ),
-                    if (isAdmin) ...[
-                      const SizedBox(width: 4),
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert, size: 18),
-                        tooltip: 'Opciones de Administrador',
-                        onSelected: (value) {
-                          if (value == 'amend') onAmend();
-                          if (value == 'toggle') onToggleStatus();
-                        },
-                        itemBuilder: (_) => [
-                          const PopupMenuItem(
-                            value: 'amend',
-                            child: Row(
-                              children: [
-                                Icon(Icons.security_update_good, size: 16, color: Colors.blue),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Modificar con Autorización Gerencial',
-                                    style: TextStyle(fontSize: 13),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                        const SizedBox(width: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            if (hasActivities)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFFCBD5E1)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.account_tree_outlined, size: 12, color: Color(0xFF475569)),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '${schedule.activities.length} componentes',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                schedule.frequency.label,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2563EB),
+                                ),
+                              ),
+                            ),
+                            if (isPaused)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  'Pausado',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54),
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: alertBg,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  alertLabel,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: alertTextColor,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'toggle',
-                            child: Row(
-                              children: [
-                                Icon(isPaused ? Icons.play_arrow : Icons.pause, size: 16),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    isPaused ? 'Reactivar Plan' : 'Pausar Plan',
-                                    style: const TextStyle(fontSize: 13),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      schedule.title.isNotEmpty ? schedule.title : schedule.maintenanceType,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                    ),
+                    if (schedule.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        schedule.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                       ),
                     ],
+                    if (schedule.materials.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: schedule.materials.map((m) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Text(
+                              '${m.quantity} ${m.unit} - ${m.name}',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF334155)),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                    if (hasActivities) ...[
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: () => setState(() => _expanded = !_expanded),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                size: 18,
+                                color: const Color(0xFF0284C7),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _expanded
+                                      ? 'Ocultar actividades por componente (${schedule.activities.length})'
+                                      : 'Ver desglose por componente (${schedule.activities.length}) y frecuencias',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0284C7),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (_expanded) ...[
+                        const SizedBox(height: 8),
+                        Column(
+                          children: schedule.activities.map((act) {
+                            final actNextStr = '${act.nextDate.day}/${act.nextDate.month}/${act.nextDate.year}';
+                            final (actBg, actFg, actStatus) = switch (act.alertLevel) {
+                              PreventiveAlertLevel.overdue => (
+                                  const Color(0xFFFEE2E2),
+                                  const Color(0xFFDC2626),
+                                  'Vencido (${act.daysRemaining.abs()}d)'
+                                ),
+                              PreventiveAlertLevel.urgent => (
+                                  const Color(0xFFFFEDD5),
+                                  const Color(0xFFC2410C),
+                                  'Urgente (${act.daysRemaining}d)'
+                                ),
+                              PreventiveAlertLevel.upcoming => (
+                                  const Color(0xFFFEF3C7),
+                                  const Color(0xFFB45309),
+                                  'Próximo (${act.daysRemaining}d)'
+                                ),
+                              PreventiveAlertLevel.onSchedule => (
+                                  const Color(0xFFDCFCE7),
+                                  const Color(0xFF15803D),
+                                  'Al día (${act.daysRemaining}d)'
+                                ),
+                            };
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.settings_suggest_outlined, size: 14, color: Color(0xFF475569)),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          '${act.childAssetId} - ${act.childAssetName}',
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          act.frequencyLabel,
+                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: actBg,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          actStatus,
+                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: actFg),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Actividad: ${act.description}',
+                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
+                                  ),
+                                  Text(
+                                    'Próxima fecha: $actNextStr',
+                                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                                  ),
+                                  if (act.materials.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 4,
+                                      runSpacing: 2,
+                                      children: act.materials.map((m) {
+                                        return Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF8FAFC),
+                                            borderRadius: BorderRadius.circular(3),
+                                            border: Border.all(color: Colors.grey.shade300),
+                                          ),
+                                          child: Text(
+                                            '${m.quantity} ${m.unit} - ${m.name}',
+                                            style: const TextStyle(fontSize: 10, color: Color(0xFF334155)),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ],
+                    if (schedule.amendmentDocNumber != null && schedule.amendmentDocNumber!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.amber.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.verified_user_outlined, size: 14, color: Colors.orange),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Modificado con Autorización Gerencial: Doc. ${schedule.amendmentDocNumber} '
+                                '(${schedule.amendedBy ?? ""})',
+                                style: TextStyle(fontSize: 11, color: Colors.amber.shade900, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        Text(
+                          'Próxima fecha: $nextDateStr'
+                          '${schedule.estimatedHours != null ? " · Est: ${schedule.estimatedHours}h" : ""}'
+                          '${schedule.lastWorkOrderId != null ? " · Última OT: ${schedule.lastWorkOrderId}" : ""}',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (widget.canGenerateOt && !isPaused)
+                              if (schedule.canGenerateWorkOrder)
+                                FilledButton.icon(
+                                  style: FilledButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  ),
+                                  onPressed: widget.onGenerateOt,
+                                  icon: const Icon(Icons.assignment_add, size: 16),
+                                  label: Text(
+                                    hasActivities ? 'Generar OT Consolidada' : 'Generar OT',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_clock, size: 14, color: Colors.grey.shade600),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Habilita en ${schedule.daysRemaining - 7}d ($nextDateStr)',
+                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            if (widget.canGenerateOt || widget.isAdmin) ...[
+                              const SizedBox(width: 4),
+                              PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_vert, size: 18),
+                                tooltip: 'Opciones del Plan',
+                                onSelected: (value) {
+                                  if (value == 'duplicate') widget.onDuplicate();
+                                  if (value == 'amend') widget.onAmend();
+                                  if (value == 'toggle') widget.onToggleStatus();
+                                },
+                                itemBuilder: (_) => [
+                                  const PopupMenuItem(
+                                    value: 'duplicate',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.copy_all, size: 16, color: Color(0xFF0284C7)),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Duplicar / Usar como Plantilla',
+                                            style: TextStyle(fontSize: 13),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (widget.isAdmin) ...[
+                                    const PopupMenuItem(
+                                      value: 'amend',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.security_update_good, size: 16, color: Colors.blue),
+                                          SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              'Modificar con Autorización Gerencial',
+                                              style: TextStyle(fontSize: 13),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'toggle',
+                                      child: Row(
+                                        children: [
+                                          Icon(isPaused ? Icons.play_arrow : Icons.pause, size: 16),
+                                          SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              isPaused ? 'Reactivar Plan' : 'Pausar Plan',
+                                              style: const TextStyle(fontSize: 13),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
           ],
         ),
       ),
-    ),
-  ],
-),
-),
-);
+    );
+  }
+}
+
+/// Representa una actividad individual dentro de un componente hijo.
+class _SingleActivityDraft {
+  _SingleActivityDraft({String defaultName = ''})
+      : descCtrl = TextEditingController(text: 'Mantenimiento preventivo de $defaultName'),
+        intervalCtrl = TextEditingController(text: '2'),
+        matNameCtrl = TextEditingController(),
+        matQtyCtrl = TextEditingController(text: '1'),
+        matUnitCtrl = TextEditingController(text: 'pza');
+
+  final TextEditingController descCtrl;
+  final TextEditingController intervalCtrl;
+  String unit = 'meses'; // sin tildes para coincidir con DB
+  final List<PreventiveMaterial> materials = [];
+
+  final TextEditingController matNameCtrl;
+  final TextEditingController matQtyCtrl;
+  final TextEditingController matUnitCtrl;
+
+  void addMaterial() {
+    final name = matNameCtrl.text.trim();
+    final qty = double.tryParse(matQtyCtrl.text.trim()) ?? 1.0;
+    final u = matUnitCtrl.text.trim().isEmpty ? 'pza' : matUnitCtrl.text.trim();
+    if (name.isEmpty) return;
+    materials.add(PreventiveMaterial(name: name, quantity: qty, unit: u));
+    matNameCtrl.clear();
+    matQtyCtrl.text = '1';
+  }
+
+  void dispose() {
+    descCtrl.dispose();
+    intervalCtrl.dispose();
+    matNameCtrl.dispose();
+    matQtyCtrl.dispose();
+    matUnitCtrl.dispose();
+  }
+}
+
+class _ChildActivityDraft {
+  _ChildActivityDraft(this.child)
+      : activities = [_SingleActivityDraft(defaultName: child.name)];
+
+  final Asset child;
+  bool isSelected = true;
+  final List<_SingleActivityDraft> activities;
+
+  void addActivity() {
+    activities.add(_SingleActivityDraft(defaultName: child.name));
+  }
+
+  void removeActivity(int index) {
+    if (index >= 0 && index < activities.length && activities.length > 1) {
+      activities[index].dispose();
+      activities.removeAt(index);
+    }
+  }
+
+  void dispose() {
+    for (final a in activities) {
+      a.dispose();
+    }
   }
 }
 
 class _CreatePreventivePlanDialog extends StatefulWidget {
-  const _CreatePreventivePlanDialog();
+  const _CreatePreventivePlanDialog({this.templateSchedule});
+
+  final PreventiveSchedule? templateSchedule;
 
   @override
   State<_CreatePreventivePlanDialog> createState() =>
@@ -1000,25 +1435,43 @@ class _CreatePreventivePlanDialogState
   final _titleCtrl = TextEditingController();
   final _typeCtrl = TextEditingController(text: 'Inspección y Lubricación');
   final _descCtrl = TextEditingController();
-  final _hoursCtrl = TextEditingController(text: '2.0');
 
   List<Area> _areas = [];
-  List<Asset> _assets = [];
+  List<Asset> _allAssets = []; // todos los activos cargados (cross-area)
+  List<Asset> _equipmentAssets = []; // equipos filtrados para selección
   Area? _selectedArea;
   Asset? _selectedAsset;
-  ScheduleFrequency _selectedFrequency = ScheduleFrequency.monthly;
-  DateTime _startDate = DateTime.now().add(const Duration(days: 30));
+  bool _isTransversal = false; // Plan sin área específica
+  ScheduleFrequency _selectedFrequency = ScheduleFrequency.annual;
+  DateTime _startDate = DateTime.now();
 
   final List<PreventiveMaterial> _materials = [];
   final _matNameCtrl = TextEditingController();
   final _matQtyCtrl = TextEditingController(text: '1');
   final _matUnitCtrl = TextEditingController(text: 'pza');
 
+  List<_ChildActivityDraft> _childDrafts = [];
   bool _loadingDependencies = true;
+  bool _loadingChildren = false;
+
+  // Para búsqueda de equipos
+  final _assetSearchCtrl = TextEditingController();
+  String _assetSearchQuery = '';
 
   @override
   void initState() {
     super.initState();
+    if (widget.templateSchedule != null) {
+      final t = widget.templateSchedule!;
+      _titleCtrl.text = t.title.isNotEmpty ? '${t.title} (Copia)' : 'Copia de ${t.id}';
+      _typeCtrl.text = t.maintenanceType;
+      _descCtrl.text = t.description;
+      _selectedFrequency = t.frequency;
+      _materials.addAll(t.materials);
+      if (t.areaId.isEmpty || t.areaName == 'Transversal') {
+        _isTransversal = true;
+      }
+    }
     _loadAreasAndAssets();
   }
 
@@ -1027,10 +1480,13 @@ class _CreatePreventivePlanDialogState
     _titleCtrl.dispose();
     _typeCtrl.dispose();
     _descCtrl.dispose();
-    _hoursCtrl.dispose();
     _matNameCtrl.dispose();
     _matQtyCtrl.dispose();
     _matUnitCtrl.dispose();
+    _assetSearchCtrl.dispose();
+    for (final d in _childDrafts) {
+      d.dispose();
+    }
     super.dispose();
   }
 
@@ -1042,8 +1498,17 @@ class _CreatePreventivePlanDialogState
         setState(() {
           _areas = areas;
           if (areas.isNotEmpty) {
-            _selectedArea = areas.first;
-            _loadAssetsForArea(areas.first.id);
+            // Si viene de plantilla con área específica, intentar preseleccionar esa área
+            if (widget.templateSchedule != null && widget.templateSchedule!.areaId.isNotEmpty) {
+              final match = areas.firstWhere(
+                (a) => a.id == widget.templateSchedule!.areaId,
+                orElse: () => areas.first,
+              );
+              _selectedArea = match;
+            } else {
+              _selectedArea = areas.first;
+            }
+            _loadAssetsForArea(_selectedArea!.id);
           } else {
             _loadingDependencies = false;
           }
@@ -1057,18 +1522,83 @@ class _CreatePreventivePlanDialogState
   Future<void> _loadAssetsForArea(String areaId) async {
     try {
       final assetRepo = getIt<AssetRepository>();
-      final assets = (await assetRepo.getAssetsByArea(areaId))
+      final allAreaAssets = await assetRepo.getAllAssetsByArea(areaId);
+      final activeAssets = allAreaAssets
           .where((a) => a.status == AssetStatus.active)
           .toList();
+
+      final equipmentAssets = activeAssets
+          .where((a) => a.level == AssetLevel.equipment || a.parentAssetId == null)
+          .toList();
+
+      final listToUse = equipmentAssets.isNotEmpty ? equipmentAssets : activeAssets;
+
       if (mounted) {
         setState(() {
-          _assets = assets;
-          _selectedAsset = assets.isNotEmpty ? assets.first : null;
+          _allAssets = activeAssets;
+          _equipmentAssets = listToUse;
+          _selectedAsset = listToUse.isNotEmpty ? listToUse.first : null;
           _loadingDependencies = false;
         });
+        if (_selectedAsset != null) {
+          _loadChildrenForAsset(_selectedAsset!.id, allAreaAssets);
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _loadingDependencies = false);
+    }
+  }
+
+  Future<void> _loadChildrenForAsset(String parentId, [List<Asset>? allAreaAssets]) async {
+    setState(() => _loadingChildren = true);
+    for (final d in _childDrafts) {
+      d.dispose();
+    }
+    _childDrafts.clear();
+
+    try {
+      final assets = allAreaAssets ??
+          (_selectedArea != null
+              ? await getIt<AssetRepository>().getAllAssetsByArea(_selectedArea!.id)
+              : _allAssets);
+
+      final children = assets.where((a) {
+        return a.status == AssetStatus.active &&
+            a.id != parentId &&
+            (a.parentAssetId == parentId || a.ancestors.contains(parentId));
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _childDrafts = children.map((c) {
+            final draft = _ChildActivityDraft(c);
+            // Si viene de plantilla, precargar actividades coincidentes
+            if (widget.templateSchedule != null && widget.templateSchedule!.activities.isNotEmpty) {
+              final matchingTemplateActs = widget.templateSchedule!.activities
+                  .where((a) =>
+                      a.childAssetId == c.id ||
+                      a.childAssetName.toLowerCase() == c.name.toLowerCase() ||
+                      a.childAssetLevel == c.level.name)
+                  .toList();
+              if (matchingTemplateActs.isNotEmpty) {
+                draft.activities.clear();
+                for (final ma in matchingTemplateActs) {
+                  final actDraft = _SingleActivityDraft(defaultName: c.name);
+                  actDraft.descCtrl.text = ma.description;
+                  actDraft.intervalCtrl.text = ma.frequencyInterval.toString();
+                  actDraft.unit = ma.frequencyUnit;
+                  actDraft.materials.addAll(ma.materials);
+                  draft.activities.add(actDraft);
+                }
+              }
+            }
+            return draft;
+          }).toList();
+          _loadingChildren = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingChildren = false);
     }
   }
 
@@ -1085,11 +1615,25 @@ class _CreatePreventivePlanDialogState
     });
   }
 
+  DateTime _calculateNextDate(DateTime fromDate, int interval, String unit) {
+    switch (unit.toLowerCase()) {
+      case 'dias':
+        return fromDate.add(Duration(days: interval));
+      case 'semanas':
+        return fromDate.add(Duration(days: interval * 7));
+      case 'anios':
+        return DateTime(fromDate.year + interval, fromDate.month, fromDate.day);
+      case 'meses':
+      default:
+        return DateTime(fromDate.year, fromDate.month + interval, fromDate.day);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedArea == null || _selectedAsset == null) {
+    if (_selectedAsset == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona el área y el equipo para el plan.')),
+        const SnackBar(content: Text('Selecciona el equipo principal para el plan.')),
       );
       return;
     }
@@ -1097,20 +1641,51 @@ class _CreatePreventivePlanDialogState
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
+    final selectedDrafts = _childDrafts.where((d) => d.isSelected).toList();
+    final List<PreventiveChildActivity> activities = [];
+
+    for (final d in selectedDrafts) {
+      for (final act in d.activities) {
+        final interval = int.tryParse(act.intervalCtrl.text.trim()) ?? 1;
+        final next = _calculateNextDate(_startDate, interval, act.unit);
+        activities.add(
+          PreventiveChildActivity(
+            childAssetId: d.child.id,
+            childAssetName: d.child.name,
+            childAssetLevel: d.child.level.name,
+            description: act.descCtrl.text.trim().isNotEmpty
+                ? act.descCtrl.text.trim()
+                : 'Mantenimiento de ${d.child.name}',
+            frequencyInterval: interval,
+            frequencyUnit: act.unit,
+            startDate: _startDate,
+            nextDate: next,
+            materials: List.from(act.materials),
+          ),
+        );
+      }
+    }
+
+    DateTime computedNextDate = _selectedFrequency.calculateNextDate(_startDate);
+    if (activities.isNotEmpty) {
+      activities.sort((a, b) => a.nextDate.compareTo(b.nextDate));
+      computedNextDate = activities.first.nextDate;
+    }
+
     final schedule = PreventiveSchedule(
       id: '',
       title: _titleCtrl.text.trim(),
       assetId: _selectedAsset!.id,
       assetName: _selectedAsset!.name,
-      areaId: _selectedArea!.id,
-      areaName: _selectedArea!.name,
+      areaId: _isTransversal ? '' : (_selectedArea?.id ?? ''),
+      areaName: _isTransversal ? 'Transversal' : (_selectedArea?.name ?? ''),
       maintenanceType: _typeCtrl.text.trim(),
       frequency: _selectedFrequency,
       description: _descCtrl.text.trim(),
       materials: _materials,
-      estimatedHours: double.tryParse(_hoursCtrl.text.trim()),
-      startDate: DateTime.now(),
-      nextDate: _startDate,
+      activities: activities,
+      startDate: _startDate,
+      nextDate: computedNextDate,
       status: ScheduleStatus.active,
     );
 
@@ -1126,14 +1701,22 @@ class _CreatePreventivePlanDialogState
     }
   }
 
+  /// Unidades de frecuencia normalizadas sin tildes (coinciden con DB)
+  static const _frequencyUnits = [
+    ('dias', 'Días'),
+    ('semanas', 'Semanas'),
+    ('meses', 'Meses'),
+    ('anios', 'Años'),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<PreventiveScheduleViewModel>();
 
     return AlertDialog(
-      title: const Text('Definir Nuevo Plan Preventivo'),
+      title: const Text('Definir Plan Preventivo por Componentes'),
       content: SizedBox(
-        width: responsiveDialogWidth(context, 580),
+        width: responsiveDialogWidth(context, 720),
         child: _loadingDependencies
             ? const SizedBox(
                 height: 200,
@@ -1143,65 +1726,126 @@ class _CreatePreventivePlanDialogState
                 key: _formKey,
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isNarrow = constraints.maxWidth < 450;
+                    final isNarrow = constraints.maxWidth < 480;
 
-                    final areaField = DropdownButtonFormField<Area>(
-                      value: _selectedArea,
+                    // === Área (opcional con toggle transversal) ===
+                    Widget areaSection;
+                    if (_isTransversal) {
+                      areaSection = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0F9FF),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.public, size: 18, color: Color(0xFF0284C7)),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Plan Transversal (sin área específica)',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0369A1)),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => setState(() => _isTransversal = false),
+                              child: const Text('Seleccionar Área', style: TextStyle(fontSize: 11)),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      areaSection = Row(
+                        children: [
+                          Expanded(
+                            child: Autocomplete<Area>(
+                              displayStringForOption: (a) => '${a.id} - ${a.name}',
+                              optionsBuilder: (textEditingValue) {
+                                final query = textEditingValue.text.toLowerCase().trim();
+                                if (query.isEmpty) return _areas;
+                                return _areas.where((a) =>
+                                    a.id.toLowerCase().contains(query) ||
+                                    a.name.toLowerCase().contains(query));
+                              },
+                              onSelected: (area) {
+                                setState(() {
+                                  _selectedArea = area;
+                                  _loadAssetsForArea(area.id);
+                                });
+                              },
+                              fieldViewBuilder: (ctx, ctrl, focusNode, onSubmitted) {
+                                if (ctrl.text.isEmpty && _selectedArea != null) {
+                                  ctrl.text = '${_selectedArea!.id} - ${_selectedArea!.name}';
+                                }
+                                return TextFormField(
+                                  controller: ctrl,
+                                  focusNode: focusNode,
+                                  decoration: InputDecoration(
+                                    labelText: 'Área (buscar)',
+                                    hintText: 'Escribe para buscar área...',
+                                    border: const OutlineInputBorder(),
+                                    isDense: true,
+                                    prefixIcon: const Icon(Icons.search, size: 18),
+                                    suffixIcon: IconButton(
+                                      icon: const Icon(Icons.clear, size: 16),
+                                      tooltip: 'Plan sin área',
+                                      onPressed: () => setState(() => _isTransversal = true),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    // === Equipo Principal (filtrable) ===
+                    final filteredEquipment = _assetSearchQuery.isEmpty
+                        ? _equipmentAssets
+                        : _equipmentAssets.where((a) =>
+                            a.id.toLowerCase().contains(_assetSearchQuery) ||
+                            a.name.toLowerCase().contains(_assetSearchQuery)).toList();
+
+                    final assetField = DropdownButtonFormField<Asset>(
+                      value: filteredEquipment.contains(_selectedAsset) ? _selectedAsset : null,
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        labelText: 'Área *',
+                        labelText: 'Equipo Principal (Padre) *',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
-                      items: _areas.map((a) {
+                      items: filteredEquipment.map((a) {
                         return DropdownMenuItem(
                           value: a,
                           child: Text(
-                            '${a.id} - ${a.name}',
+                            '${a.id} - ${a.name} (${_assetLevelLabel(a.level)})',
                             overflow: TextOverflow.ellipsis,
                             maxLines: 1,
                           ),
                         );
                       }).toList(),
-                      onChanged: (area) {
-                        if (area != null) {
+                      onChanged: (asset) {
+                        if (asset != null) {
                           setState(() {
-                            _selectedArea = area;
-                            _loadAssetsForArea(area.id);
+                            _selectedAsset = asset;
+                            _loadChildrenForAsset(asset.id);
                           });
                         }
                       },
-                    );
-
-                    final assetField = DropdownButtonFormField<Asset>(
-                      value: _selectedAsset,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Equipo / Activo a intervenir *',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      items: _assets.map((ast) {
-                        return DropdownMenuItem(
-                          value: ast,
-                          child: Text(
-                            '${ast.id} - ${ast.name}',
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (ast) => setState(() => _selectedAsset = ast),
+                      validator: (v) => v == null ? 'Selecciona un equipo' : null,
                     );
 
                     final freqField = DropdownButtonFormField<ScheduleFrequency>(
                       value: _selectedFrequency,
                       isExpanded: true,
                       decoration: const InputDecoration(
-                        labelText: 'Frecuencia *',
+                        labelText: 'Frecuencia Global *',
                         border: OutlineInputBorder(),
                         isDense: true,
                       ),
-                      items: ScheduleFrequency.values.map((f) {
+                      items: ScheduleFrequency.globalFrequencies.map((f) {
                         return DropdownMenuItem(
                           value: f,
                           child: Text(
@@ -1215,7 +1859,6 @@ class _CreatePreventivePlanDialogState
                         if (f != null) {
                           setState(() {
                             _selectedFrequency = f;
-                            _startDate = f.calculateNextDate(DateTime.now());
                           });
                         }
                       },
@@ -1238,7 +1881,7 @@ class _CreatePreventivePlanDialogState
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: _startDate,
-                          firstDate: DateTime.now(),
+                          firstDate: DateTime.now().subtract(const Duration(days: 30)),
                           lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
                         );
                         if (picked != null) {
@@ -1247,18 +1890,8 @@ class _CreatePreventivePlanDialogState
                       },
                       icon: const Icon(Icons.event, size: 16),
                       label: Text(
-                        '1ª Fecha: ${_startDate.day}/${_startDate.month}/${_startDate.year}',
+                        'Fecha Base: ${_startDate.day.toString().padLeft(2, '0')}/${_startDate.month.toString().padLeft(2, '0')}/${_startDate.year}',
                         style: const TextStyle(fontSize: 12),
-                      ),
-                    );
-
-                    final hoursField = TextFormField(
-                      controller: _hoursCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Horas Est.',
-                        border: OutlineInputBorder(),
-                        isDense: true,
                       ),
                     );
 
@@ -1270,8 +1903,8 @@ class _CreatePreventivePlanDialogState
                           TextFormField(
                             controller: _titleCtrl,
                             decoration: const InputDecoration(
-                              labelText: 'Título del Plan *',
-                              hintText: 'Ej: Mantenimiento Mensual de Compresor A1',
+                              labelText: 'Título del Plan Preventivo *',
+                              hintText: 'Ej: Plan de Mantenimiento Integral Máquina Clasificadora',
                               border: OutlineInputBorder(),
                               isDense: true,
                             ),
@@ -1280,115 +1913,339 @@ class _CreatePreventivePlanDialogState
                                 : null,
                           ),
                           const SizedBox(height: 12),
-                          if (isNarrow) ...[
-                            areaField,
-                            const SizedBox(height: 10),
-                            freqField,
-                          ] else ...[
-                            Row(
-                              children: [
-                                Expanded(flex: 3, child: areaField),
-                                const SizedBox(width: 8),
-                                Expanded(flex: 2, child: freqField),
-                              ],
-                            ),
-                          ],
-                          const SizedBox(height: 12),
+
+                          // Área
+                          areaSection,
+                          const SizedBox(height: 10),
+
+                          // Equipo
                           assetField,
                           const SizedBox(height: 12),
+
                           if (isNarrow) ...[
                             typeField,
                             const SizedBox(height: 10),
-                            SizedBox(width: double.infinity, child: dateField),
+                            freqField,
                             const SizedBox(height: 10),
-                            hoursField,
+                            SizedBox(width: double.infinity, child: dateField),
                           ] else ...[
                             Row(
                               children: [
                                 Expanded(flex: 3, child: typeField),
                                 const SizedBox(width: 8),
-                                Expanded(flex: 3, child: dateField),
+                                Expanded(flex: 2, child: freqField),
                                 const SizedBox(width: 8),
-                                Expanded(flex: 2, child: hoursField),
+                                Expanded(flex: 2, child: dateField),
                               ],
                             ),
                           ],
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: _descCtrl,
-                            maxLines: 3,
+                            maxLines: 2,
                             decoration: const InputDecoration(
-                              labelText: 'Procedimiento / Actividades a Realizar *',
-                              hintText: 'Paso 1: Bloqueo de energía.\nPaso 2: Inspección y lubricación...',
+                              labelText: 'Objetivo / Procedimiento General del Equipo',
+                              hintText: 'Ej: Asegurar el óptimo funcionamiento y calibración...',
                               border: OutlineInputBorder(),
                             ),
-                            validator: (v) => (v == null || v.trim().isEmpty)
-                                ? 'Describe las actividades del mantenimiento'
-                                : null,
                           ),
-                          const SizedBox(height: 14),
-                          const Text(
-                            'Materiales y Repuestos Necesarios:',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
-                          const SizedBox(height: 6),
+
+                          const SizedBox(height: 16),
+                          const Divider(),
+                          const SizedBox(height: 8),
+
                           Row(
                             children: [
-                              Expanded(
-                                flex: 3,
-                                child: TextField(
-                                  controller: _matNameCtrl,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Nombre de insumo/repuesto',
-                                    isDense: true,
-                                    border: OutlineInputBorder(),
-                                  ),
+                              const Icon(Icons.account_tree, color: Color(0xFF0284C7), size: 20),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Actividades en Componentes Hijos (Frecuencias Custom):',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                flex: 1,
-                                child: TextField(
-                                  controller: _matQtyCtrl,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Cant.',
-                                    isDense: true,
-                                    border: OutlineInputBorder(),
-                                  ),
+                              if (_loadingChildren)
+                                const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
                                 ),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                flex: 1,
-                                child: TextField(
-                                  controller: _matUnitCtrl,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Unidad',
-                                    isDense: true,
-                                    border: OutlineInputBorder(),
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: _addMaterial,
-                                icon: const Icon(Icons.add_circle, color: Colors.blue),
-                                tooltip: 'Agregar insumo',
-                              ),
                             ],
                           ),
-                          if (_materials.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: _materials.map((m) {
-                                return Chip(
-                                  label: Text('${m.quantity} ${m.unit} - ${m.name}', style: const TextStyle(fontSize: 11)),
-                                  onDeleted: () => setState(() => _materials.remove(m)),
-                                );
-                              }).toList(),
+                          const SizedBox(height: 4),
+                          Text(
+                            _childDrafts.isNotEmpty
+                                ? 'Configura las tareas, frecuencia personalizada y repuestos de cada componente. Puedes agregar múltiples actividades por hijo:'
+                                : 'Este equipo no tiene componentes hijos registrados. Puedes definir materiales globales abajo:',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                          const SizedBox(height: 10),
+
+                          if (_childDrafts.isNotEmpty) ...[
+                            ..._childDrafts.map((draft) {
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: draft.isSelected ? const Color(0xFFF8FAFC) : Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: draft.isSelected ? const Color(0xFF0284C7).withValues(alpha: 0.5) : Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Checkbox(
+                                          value: draft.isSelected,
+                                          onChanged: (val) {
+                                            setState(() => draft.isSelected = val ?? false);
+                                          },
+                                        ),
+                                        Expanded(
+                                          child: Text(
+                                            '${draft.child.id} - ${draft.child.name} (${_assetLevelLabel(draft.child.level)})',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: draft.isSelected ? const Color(0xFF0F172A) : Colors.grey.shade500,
+                                            ),
+                                          ),
+                                        ),
+                                        if (draft.isSelected)
+                                          TextButton.icon(
+                                            onPressed: () => setState(() => draft.addActivity()),
+                                            icon: const Icon(Icons.add_circle_outline, size: 16),
+                                            label: const Text('Agregar actividad', style: TextStyle(fontSize: 11)),
+                                          ),
+                                      ],
+                                    ),
+                                    if (draft.isSelected) ...[
+                                      ...draft.activities.asMap().entries.map((entry) {
+                                        final actIdx = entry.key;
+                                        final act = entry.value;
+                                        return Container(
+                                          margin: const EdgeInsets.only(top: 6),
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: Colors.grey.shade200),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      'Actividad ${actIdx + 1}',
+                                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                                    ),
+                                                  ),
+                                                  if (draft.activities.length > 1)
+                                                    IconButton(
+                                                      icon: const Icon(Icons.remove_circle_outline, size: 16, color: Colors.red),
+                                                      tooltip: 'Eliminar esta actividad',
+                                                      onPressed: () => setState(() => draft.removeActivity(actIdx)),
+                                                      constraints: const BoxConstraints(),
+                                                      padding: EdgeInsets.zero,
+                                                    ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 4),
+                                              TextFormField(
+                                                controller: act.descCtrl,
+                                                decoration: const InputDecoration(
+                                                  labelText: 'Descripción de la actividad *',
+                                                  isDense: true,
+                                                  border: OutlineInputBorder(),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    flex: 2,
+                                                    child: TextFormField(
+                                                      controller: act.intervalCtrl,
+                                                      keyboardType: TextInputType.number,
+                                                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                                      decoration: const InputDecoration(
+                                                        labelText: 'Cada (número) *',
+                                                        isDense: true,
+                                                        border: OutlineInputBorder(),
+                                                      ),
+                                                      validator: (v) {
+                                                        if (v == null || v.trim().isEmpty) return 'Requerido';
+                                                        final n = int.tryParse(v.trim());
+                                                        if (n == null || n < 1) return '≥ 1';
+                                                        return null;
+                                                      },
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    flex: 3,
+                                                    child: DropdownButtonFormField<String>(
+                                                      value: act.unit,
+                                                      isExpanded: true,
+                                                      decoration: const InputDecoration(
+                                                        labelText: 'Unidad *',
+                                                        isDense: true,
+                                                        border: OutlineInputBorder(),
+                                                      ),
+                                                      items: _frequencyUnits.map((u) {
+                                                        return DropdownMenuItem(value: u.$1, child: Text(u.$2));
+                                                      }).toList(),
+                                                      onChanged: (u) {
+                                                        if (u != null) {
+                                                          setState(() => act.unit = u);
+                                                        }
+                                                      },
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 8),
+                                              const Text(
+                                                'Materiales/Repuestos para esta actividad:',
+                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    flex: 3,
+                                                    child: TextField(
+                                                      controller: act.matNameCtrl,
+                                                      decoration: const InputDecoration(
+                                                        hintText: 'Repuesto (ej. Rodamiento 6204)',
+                                                        isDense: true,
+                                                        border: OutlineInputBorder(),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    flex: 1,
+                                                    child: TextField(
+                                                      controller: act.matQtyCtrl,
+                                                      keyboardType: TextInputType.number,
+                                                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                                                      decoration: const InputDecoration(
+                                                        hintText: 'Cant.',
+                                                        isDense: true,
+                                                        border: OutlineInputBorder(),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Expanded(
+                                                    flex: 1,
+                                                    child: TextField(
+                                                      controller: act.matUnitCtrl,
+                                                      decoration: const InputDecoration(
+                                                        hintText: 'Unidad',
+                                                        isDense: true,
+                                                        border: OutlineInputBorder(),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  IconButton(
+                                                    onPressed: () => setState(() => act.addMaterial()),
+                                                    icon: const Icon(Icons.add_circle, color: Color(0xFF0284C7)),
+                                                    tooltip: 'Agregar material',
+                                                  ),
+                                                ],
+                                              ),
+                                              if (act.materials.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Wrap(
+                                                  spacing: 6,
+                                                  runSpacing: 4,
+                                                  children: act.materials.map((m) {
+                                                    return Chip(
+                                                      label: Text(
+                                                        '${m.quantity} ${m.unit} - ${m.name}',
+                                                        style: const TextStyle(fontSize: 11),
+                                                      ),
+                                                      onDeleted: () => setState(() => act.materials.remove(m)),
+                                                    );
+                                                  }).toList(),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }),
+                          ] else ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: TextField(
+                                    controller: _matNameCtrl,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Nombre de insumo/repuesto',
+                                      isDense: true,
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  flex: 1,
+                                  child: TextField(
+                                    controller: _matQtyCtrl,
+                                    keyboardType: TextInputType.number,
+                                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.]'))],
+                                    decoration: const InputDecoration(
+                                      hintText: 'Cant.',
+                                      isDense: true,
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  flex: 1,
+                                  child: TextField(
+                                    controller: _matUnitCtrl,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Unidad',
+                                      isDense: true,
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: _addMaterial,
+                                  icon: const Icon(Icons.add_circle, color: Colors.blue),
+                                  tooltip: 'Agregar insumo',
+                                ),
+                              ],
                             ),
+                            if (_materials.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: _materials.map((m) {
+                                  return Chip(
+                                    label: Text('${m.quantity} ${m.unit} - ${m.name}', style: const TextStyle(fontSize: 11)),
+                                    onDeleted: () => setState(() => _materials.remove(m)),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -1574,7 +2431,7 @@ class _AmendPreventivePlanDialogState
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
-                items: ScheduleFrequency.values.map((f) {
+                items: ScheduleFrequency.globalFrequencies.map((f) {
                   return DropdownMenuItem(
                     value: f,
                     child: Text(

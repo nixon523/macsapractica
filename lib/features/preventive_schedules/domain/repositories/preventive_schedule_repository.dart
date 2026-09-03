@@ -40,4 +40,10 @@ abstract class PreventiveScheduleRepository {
     required String userId,
     required String userName,
   });
+
+  Future<String> generateMonthlyWorkOrder({
+    required String scheduleId,
+    int? year,
+    int? month,
+  });
 }

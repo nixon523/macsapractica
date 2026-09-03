@@ -34,191 +34,257 @@ class AssetCardWidget extends StatelessWidget {
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isMobile = screenWidth < 600;
 
-    // Indentación adaptativa: en móvil usamos menos espacio por nivel para
-    // dejar más ancho al contenido de la tarjeta.
-    final indentUnit = isMobile ? 14.0 : 28.0;
-    final currentIndent = isMobile ? 18.0 : 32.0;
+    // Indentación proporcional y compacta para no saturar en móviles
+    final indentWidth = depth == 0 ? 0.0 : (isMobile ? depth * 10.0 : depth * 18.0);
 
-    // Color distintivo por nivel jerárquico para acentuar el árbol en la UI
-    final levelBorderColor = switch (asset.level) {
-      AssetLevel.equipment => colors.primary,
-      AssetLevel.subEquipment => Colors.teal.shade700,
-      AssetLevel.part => Colors.amber.shade800,
-      AssetLevel.subPart => Colors.purple.shade700,
+    // Paleta refinada por nivel jerárquico
+    final (levelColor, levelBg, levelLabel) = switch (asset.level) {
+      AssetLevel.equipment => (
+          const Color(0xFF0284C7),
+          const Color(0xFFF0F9FF),
+          'Equipo',
+        ),
+      AssetLevel.subEquipment => (
+          const Color(0xFF0D9488),
+          const Color(0xFFF0FDFA),
+          'Sub-equipo',
+        ),
+      AssetLevel.part => (
+          const Color(0xFFD97706),
+          const Color(0xFFFFFBEB),
+          'Parte',
+        ),
+      AssetLevel.subPart => (
+          const Color(0xFF7C3AED),
+          const Color(0xFFF5F3FF),
+          'Sub-parte',
+        ),
     };
+
+    // Subtítulo inteligente: sólo muestra datos reales si existen
+    final brandModel = [
+      if (asset.brand != null && asset.brand!.trim().isNotEmpty && asset.brand != '—') asset.brand!.trim(),
+      if (asset.model != null && asset.model!.trim().isNotEmpty && asset.model != '—') asset.model!.trim(),
+    ].join(' · ');
+
+    final hasSerial = asset.serial != null && asset.serial!.trim().isNotEmpty;
+    final hasSubtitle = hasSerial || brandModel.isNotEmpty;
 
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 8 : 12,
-        vertical: 3,
+        horizontal: isMobile ? 6 : 12,
+        vertical: depth == 0 ? 3 : 2,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // --- Sangría visual y conectores jerárquicos de árbol ---
-          if (depth > 0)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (int i = 0; i < depth - 1; i++)
-                  Container(
-                    width: indentUnit,
-                    height: 56,
-                    alignment: Alignment.center,
-                    child: Container(
-                      width: 2,
-                      height: 56,
-                      color: colors.outlineVariant.withValues(alpha: 0.5),
-                    ),
+          // Conector sutil de árbol jerárquico
+          if (depth > 0) ...[
+            SizedBox(
+              width: indentWidth,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Icon(
+                    Icons.subdirectory_arrow_right_rounded,
+                    size: isMobile ? 14 : 16,
+                    color: levelColor.withValues(alpha: 0.6),
                   ),
-                Container(
-                  width: currentIndent,
-                  height: 56,
-                  alignment: Alignment.center,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 2,
-                        height: 56,
-                        color: levelBorderColor.withValues(alpha: 0.6),
-                      ),
-                      Icon(
-                        Icons.subdirectory_arrow_right_rounded,
-                        size: isMobile ? 16 : 20,
-                        color: levelBorderColor,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                  const SizedBox(width: 2),
+                ],
+              ),
             ),
+          ],
 
-          // --- Tarjeta del Activo ---
+          // Tarjeta del Activo
           Expanded(
-            child: Card(
-              margin: EdgeInsets.zero,
-              clipBehavior: Clip.antiAlias,
-              elevation: depth == 0 ? 2 : 1,
+            child: Material(
+              color: Colors.white,
+              elevation: depth == 0 ? 0.5 : 0,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 side: BorderSide(
                   color: depth == 0
-                      ? colors.primary.withValues(alpha: 0.6)
-                      : levelBorderColor.withValues(alpha: 0.4),
-                  width: depth == 0 ? 1.8 : 1.2,
+                      ? const Color(0xFFCBD5E1)
+                      : const Color(0xFFE2E8F0),
+                  width: depth == 0 ? 1.0 : 0.8,
                 ),
               ),
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border(
-                    left: BorderSide(
-                      color: levelBorderColor,
-                      width: depth == 0 ? 0 : 4,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: levelColor,
+                        width: depth == 0 ? 4.0 : 3.0,
+                      ),
                     ),
                   ),
-                ),
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                  onTap: onTap,
-                  leading: imageData == null
-                      ? CircleAvatar(
-                          radius: depth == 0 ? 22 : 18,
-                          backgroundColor: depth == 0
-                              ? colors.primaryContainer
-                              : levelBorderColor.withValues(alpha: 0.15),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 8 : 12,
+                    vertical: isMobile ? 8 : 10,
+                  ),
+                  child: Row(
+                    children: [
+                      // Ícono o Miniatura
+                      if (imageData == null)
+                        Container(
+                          width: depth == 0 ? 36 : (isMobile ? 28 : 30),
+                          height: depth == 0 ? 36 : (isMobile ? 28 : 30),
+                          decoration: BoxDecoration(
+                            color: levelBg,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: levelColor.withValues(alpha: 0.2)),
+                          ),
+                          alignment: Alignment.center,
                           child: Icon(
                             _getIconForLevel(asset.level),
-                            size: depth == 0 ? 22 : 18,
-                            color: depth == 0
-                                ? colors.onPrimaryContainer
-                                : levelBorderColor,
+                            size: depth == 0 ? 18 : (isMobile ? 14 : 16),
+                            color: levelColor,
                           ),
                         )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(40),
+                      else
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
                           child: SizedBox(
-                            width: depth == 0 ? 44 : 36,
-                            height: depth == 0 ? 44 : 36,
+                            width: depth == 0 ? 36 : 30,
+                            height: depth == 0 ? 36 : 30,
                             child: Image.memory(
                               base64Decode(imageData.split(',').last),
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => CircleAvatar(
-                                radius: depth == 0 ? 22 : 18,
-                                backgroundColor: colors.primaryContainer,
-                                child: Icon(
-                                  Icons.broken_image_outlined,
-                                  size: 18,
-                                  color: colors.onPrimaryContainer,
-                                ),
+                              errorBuilder: (_, _, _) => Container(
+                                color: levelBg,
+                                child: Icon(Icons.broken_image_outlined, size: 16, color: levelColor),
                               ),
                             ),
                           ),
                         ),
-                  title: Text(
-                    '${asset.id} - ${asset.name}',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight:
-                          depth == 0 ? FontWeight.bold : FontWeight.w600,
-                      fontSize: depth == 0 ? 15 : 14,
-                    ),
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (asset.serial != null && asset.serial!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 2),
-                            child: Row(
-                              children: [
-                                Icon(Icons.qr_code,
-                                    size: 13, color: colors.secondary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'N° Serie: ${asset.serial}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: colors.secondary,
+
+                      const SizedBox(width: 10),
+
+                      // Título y datos esenciales
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: '${asset.id} ',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                      fontSize: depth == 0 ? 13.5 : (isMobile ? 12 : 12.5),
+                                      color: const Color(0xFF0F172A),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  TextSpan(
+                                    text: '— ${asset.name}',
+                                    style: TextStyle(
+                                      fontWeight: depth == 0 ? FontWeight.w600 : FontWeight.w500,
+                                      fontSize: depth == 0 ? 13.5 : (isMobile ? 12 : 12.5),
+                                      color: const Color(0xFF1E293B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+
+                            if (hasSubtitle) ...[
+                              const SizedBox(height: 3),
+                              Wrap(
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 2,
+                                children: [
+                                  if (hasSerial)
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.qr_code, size: 11, color: colors.secondary),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          asset.serial!,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: colors.secondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  if (brandModel.isNotEmpty)
+                                    Text(
+                                      brandModel,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 8),
+
+                      // Badges y Acciones en el lateral derecho
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Badge de Nivel
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: levelBg,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: levelColor.withValues(alpha: 0.25)),
+                            ),
+                            child: Text(
+                              levelLabel,
+                              style: TextStyle(
+                                fontSize: isMobile ? 9.5 : 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: levelColor,
+                              ),
                             ),
                           ),
-                        Text(
-                          'Marca: ${asset.brand ?? '—'} · Modelo: ${asset.model ?? '—'}',
-                          style:
-                              theme.textTheme.bodySmall?.copyWith(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // En móvil escondemos el chip de nivel (redundante con el
-                      // color del borde) para ganar espacio para el título.
-                      if (!isMobile) ...[
-                        _LevelChip(level: asset.level),
-                        const SizedBox(width: 4),
-                      ],
-                      if (!asset.isActive) ...[
-                        _StatusChip(status: asset.status),
-                        const SizedBox(width: 4),
-                      ],
-                      if (onEdit != null)
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          tooltip: 'Editar',
-                          onPressed: onEdit,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                              minWidth: 32, minHeight: 32),
-                        ),
-                      const Icon(Icons.arrow_forward_ios, size: 14),
+
+                          if (!asset.isActive) ...[
+                            const SizedBox(width: 4),
+                            _StatusChip(status: asset.status),
+                          ],
+
+                          if (onEdit != null) ...[
+                            const SizedBox(width: 2),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 16),
+                              tooltip: 'Editar activo',
+                              onPressed: onEdit,
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              color: Colors.grey.shade600,
+                            ),
+                          ],
+
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 16,
+                            color: Colors.grey.shade400,
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -231,10 +297,10 @@ class AssetCardWidget extends StatelessWidget {
   }
 
   IconData _getIconForLevel(AssetLevel level) => switch (level) {
-        AssetLevel.equipment => Icons.precision_manufacturing,
-        AssetLevel.subEquipment => Icons.settings,
-        AssetLevel.part => Icons.extension,
-        AssetLevel.subPart => Icons.grain,
+        AssetLevel.equipment => Icons.precision_manufacturing_outlined,
+        AssetLevel.subEquipment => Icons.settings_suggest_outlined,
+        AssetLevel.part => Icons.extension_outlined,
+        AssetLevel.subPart => Icons.grain_outlined,
       };
 }
 
@@ -245,66 +311,24 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = switch (status) {
-      AssetStatus.active => Colors.green,
-      AssetStatus.transferredDeactivated => Colors.orange,
-      AssetStatus.inactive => Colors.red,
-      AssetStatus.deleted => Colors.grey,
-    };
-    final label = switch (status) {
-      AssetStatus.active => 'Activo',
-      AssetStatus.transferredDeactivated => 'Transferido',
-      AssetStatus.inactive => 'Inactivo',
-      AssetStatus.deleted => 'Eliminado',
+    final (color, label) = switch (status) {
+      AssetStatus.active => (Colors.green.shade700, 'Activo'),
+      AssetStatus.transferredDeactivated => (Colors.orange.shade800, 'Traspasado'),
+      AssetStatus.inactive => (Colors.red.shade700, 'Inactivo'),
+      AssetStatus.deleted => (Colors.grey.shade600, 'Eliminado'),
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
-        style: TextStyle(
-            fontSize: 10, color: color, fontWeight: FontWeight.w600),
+        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
       ),
     );
   }
 }
-
-class _LevelChip extends StatelessWidget {
-  const _LevelChip({required this.level});
-
-  final AssetLevel level;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = switch (level) {
-      AssetLevel.equipment => Colors.blue.shade100,
-      AssetLevel.subEquipment => Colors.teal.shade100,
-      AssetLevel.part => Colors.amber.shade100,
-      AssetLevel.subPart => Colors.purple.shade100,
-    };
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        _levelLabels[level] ?? level.name,
-        style: const TextStyle(
-            fontSize: 10, color: Colors.black87, fontWeight: FontWeight.w500),
-      ),
-    );
-  }
-}
-
-const _levelLabels = {
-  AssetLevel.equipment: 'Equipo',
-  AssetLevel.subEquipment: 'Sub-equipo',
-  AssetLevel.part: 'Parte',
-  AssetLevel.subPart: 'Sub-parte',
-};

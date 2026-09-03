@@ -70,6 +70,8 @@ abstract final class ApiEndpoints {
       '/planes-preventivos/$id/ejecuciones';
   static String togglePreventiveStatus(dynamic id) =>
       '/planes-preventivos/$id/estado';
+  static String generateMonthlyWorkOrder(dynamic id) =>
+      '/planes-preventivos/$id/generar-ot-mes';
 
   // Kardex
   static const String kardexLogs = '/kardex';

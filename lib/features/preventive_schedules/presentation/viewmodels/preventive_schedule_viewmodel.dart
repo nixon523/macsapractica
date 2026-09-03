@@ -167,4 +167,32 @@ class PreventiveScheduleViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<String?> generateMonthlyWorkOrder(
+    String scheduleId, {
+    int? year,
+    int? month,
+  }) async {
+    _isSaving = true;
+    _errorMessage = '';
+    _successMessage = '';
+    notifyListeners();
+
+    try {
+      final otId = await _repository.generateMonthlyWorkOrder(
+        scheduleId: scheduleId,
+        year: year,
+        month: month,
+      );
+      _successMessage = 'Orden de Trabajo consolidada $otId generada con éxito.';
+      await loadSchedules();
+      return otId;
+    } catch (e) {
+      _errorMessage = e is Failure ? e.message : e.toString();
+      return null;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
+  }
 }

@@ -91,4 +91,17 @@ class PreventiveScheduleRepositoryImpl implements PreventiveScheduleRepository {
       userName: userName,
     );
   }
+
+  @override
+  Future<String> generateMonthlyWorkOrder({
+    required String scheduleId,
+    int? year,
+    int? month,
+  }) {
+    return _remoteDataSource.generateMonthlyWorkOrder(
+      scheduleId,
+      year: year,
+      month: month,
+    );
+  }
 }
