@@ -1454,7 +1454,14 @@ class _CreatePreventivePlanDialogState
   bool _loadingDependencies = true;
   bool _loadingChildren = false;
 
-  // Para búsqueda de equipos
+  // Para búsqueda global multiactivo transversal
+  final _transversalSearchCtrl = TextEditingController();
+  List<Asset> _allGlobalEquipments = [];
+  List<Asset> _transversalSearchResults = [];
+  final Set<Asset> _selectedTransversalAssets = {};
+  bool _loadingGlobalEquipments = false;
+
+  // Para búsqueda de equipos dentro de un área
   final _assetSearchCtrl = TextEditingController();
   String _assetSearchQuery = '';
 
@@ -1484,10 +1491,53 @@ class _CreatePreventivePlanDialogState
     _matQtyCtrl.dispose();
     _matUnitCtrl.dispose();
     _assetSearchCtrl.dispose();
+    _transversalSearchCtrl.dispose();
     for (final d in _childDrafts) {
       d.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _loadAllGlobalEquipments() async {
+    if (_allGlobalEquipments.isNotEmpty) return;
+    setState(() => _loadingGlobalEquipments = true);
+    try {
+      final assetRepo = getIt<AssetRepository>();
+      final List<Asset> globalEquipments = [];
+      for (final area in _areas) {
+        final areaAssets = await assetRepo.getAllAssetsByArea(area.id);
+        final eq = areaAssets.where((a) =>
+            a.status == AssetStatus.active &&
+            (a.level == AssetLevel.equipment || a.parentAssetId == null));
+        globalEquipments.addAll(eq);
+      }
+      if (mounted) {
+        setState(() {
+          _allGlobalEquipments = globalEquipments;
+          _transversalSearchResults = globalEquipments;
+          _loadingGlobalEquipments = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingGlobalEquipments = false);
+    }
+  }
+
+  void _filterTransversalAssets(String query) {
+    final q = query.toLowerCase().trim();
+    setState(() {
+      if (q.isEmpty) {
+        _transversalSearchResults = List.from(_allGlobalEquipments);
+      } else {
+        _transversalSearchResults = _allGlobalEquipments.where((a) {
+          final idMatch = a.id.toLowerCase().contains(q);
+          final nameMatch = a.name.toLowerCase().contains(q);
+          final brandMatch = a.brand?.toLowerCase().contains(q) ?? false;
+          final areaMatch = a.areaId.toLowerCase().contains(q);
+          return idMatch || nameMatch || brandMatch || areaMatch;
+        }).toList();
+      }
+    });
   }
 
   Future<void> _loadAreasAndAssets() async {
@@ -1631,9 +1681,14 @@ class _CreatePreventivePlanDialogState
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedAsset == null) {
+    
+    final targets = _isTransversal && _selectedTransversalAssets.isNotEmpty
+        ? _selectedTransversalAssets.toList()
+        : (_selectedAsset != null ? [_selectedAsset!] : <Asset>[]);
+
+    if (targets.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona el equipo principal para el plan.')),
+        const SnackBar(content: Text('Selecciona al menos un equipo principal para el plan.')),
       );
       return;
     }
@@ -1642,13 +1697,13 @@ class _CreatePreventivePlanDialogState
     if (user == null) return;
 
     final selectedDrafts = _childDrafts.where((d) => d.isSelected).toList();
-    final List<PreventiveChildActivity> activities = [];
+    final List<PreventiveChildActivity> baseActivities = [];
 
     for (final d in selectedDrafts) {
       for (final act in d.activities) {
         final interval = int.tryParse(act.intervalCtrl.text.trim()) ?? 1;
         final next = _calculateNextDate(_startDate, interval, act.unit);
-        activities.add(
+        baseActivities.add(
           PreventiveChildActivity(
             childAssetId: d.child.id,
             childAssetName: d.child.name,
@@ -1667,36 +1722,46 @@ class _CreatePreventivePlanDialogState
     }
 
     DateTime computedNextDate = _selectedFrequency.calculateNextDate(_startDate);
-    if (activities.isNotEmpty) {
-      activities.sort((a, b) => a.nextDate.compareTo(b.nextDate));
-      computedNextDate = activities.first.nextDate;
+    if (baseActivities.isNotEmpty) {
+      baseActivities.sort((a, b) => a.nextDate.compareTo(b.nextDate));
+      computedNextDate = baseActivities.first.nextDate;
     }
 
-    final schedule = PreventiveSchedule(
-      id: '',
-      title: _titleCtrl.text.trim(),
-      assetId: _selectedAsset!.id,
-      assetName: _selectedAsset!.name,
-      areaId: _isTransversal ? '' : (_selectedArea?.id ?? ''),
-      areaName: _isTransversal ? 'Transversal' : (_selectedArea?.name ?? ''),
-      maintenanceType: _typeCtrl.text.trim(),
-      frequency: _selectedFrequency,
-      description: _descCtrl.text.trim(),
-      materials: _materials,
-      activities: activities,
-      startDate: _startDate,
-      nextDate: computedNextDate,
-      status: ScheduleStatus.active,
-    );
-
     final vm = context.read<PreventiveScheduleViewModel>();
-    final success = await vm.createSchedule(
-      schedule: schedule,
-      userId: user.userId,
-      userName: user.username,
-    );
+    int createdCount = 0;
 
-    if (success && mounted) {
+    for (final target in targets) {
+      final schedule = PreventiveSchedule(
+        id: '',
+        title: _titleCtrl.text.trim(),
+        assetId: target.id,
+        assetName: target.name,
+        areaId: target.areaId,
+        areaName: target.areaId,
+        maintenanceType: _typeCtrl.text.trim(),
+        frequency: _selectedFrequency,
+        description: _descCtrl.text.trim(),
+        materials: _materials,
+        activities: baseActivities,
+        startDate: _startDate,
+        nextDate: computedNextDate,
+        status: ScheduleStatus.active,
+      );
+
+      final ok = await vm.createSchedule(
+        schedule: schedule,
+        userId: user.userId,
+        userName: user.username,
+      );
+      if (ok) createdCount++;
+    }
+
+    if (mounted) {
+      if (createdCount > 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('¡Se crearon $createdCount planes preventivos transversales exitosamente!')),
+        );
+      }
       Navigator.pop(context, true);
     }
   }
@@ -1716,7 +1781,7 @@ class _CreatePreventivePlanDialogState
     return AlertDialog(
       title: const Text('Definir Plan Preventivo por Componentes'),
       content: SizedBox(
-        width: responsiveDialogWidth(context, 720),
+        width: responsiveDialogWidth(context, 740),
         child: _loadingDependencies
             ? const SizedBox(
                 height: 200,
@@ -1731,6 +1796,7 @@ class _CreatePreventivePlanDialogState
                     // === Área (opcional con toggle transversal) ===
                     Widget areaSection;
                     if (_isTransversal) {
+                      _loadAllGlobalEquipments();
                       areaSection = Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
@@ -1738,20 +1804,134 @@ class _CreatePreventivePlanDialogState
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
                         ),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.public, size: 18, color: Color(0xFF0284C7)),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'Plan Transversal (sin área específica)',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0369A1)),
+                            Row(
+                              children: [
+                                const Icon(Icons.public, size: 18, color: Color(0xFF0284C7)),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Plan Transversal (Multiactivo entre Áreas)',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => setState(() => _isTransversal = false),
+                                  child: const Text('Cambiar a Plan por Área', style: TextStyle(fontSize: 11)),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Buscador de activos global
+                            TextField(
+                              controller: _transversalSearchCtrl,
+                              onChanged: _filterTransversalAssets,
+                              decoration: InputDecoration(
+                                labelText: 'Buscar tipo o nombre de equipo (ej. Aire, Bomba, Compresor...)',
+                                hintText: 'Filtra equipos en todas las áreas...',
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                                prefixIcon: const Icon(Icons.search, size: 18),
+                                suffixIcon: _transversalSearchCtrl.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear, size: 16),
+                                        onPressed: () {
+                                          _transversalSearchCtrl.clear();
+                                          _filterTransversalAssets('');
+                                        },
+                                      )
+                                    : null,
                               ),
                             ),
-                            TextButton(
-                              onPressed: () => setState(() => _isTransversal = false),
-                              child: const Text('Seleccionar Área', style: TextStyle(fontSize: 11)),
-                            ),
+                            const SizedBox(height: 8),
+                            // Resultados y multi-selección
+                            if (_loadingGlobalEquipments)
+                              const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                              )
+                            else ...[
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Equipos encontrados: ${_transversalSearchResults.length}',
+                                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                  ),
+                                  Row(
+                                    children: [
+                                      TextButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _selectedTransversalAssets.addAll(_transversalSearchResults);
+                                            if (_selectedAsset == null && _transversalSearchResults.isNotEmpty) {
+                                              _selectedAsset = _transversalSearchResults.first;
+                                              _loadChildrenForAsset(_selectedAsset!.id);
+                                            }
+                                          });
+                                        },
+                                        child: const Text('Marcar Todos', style: TextStyle(fontSize: 11)),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _selectedTransversalAssets.clear();
+                                          });
+                                        },
+                                        child: const Text('Desmarcar', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                constraints: const BoxConstraints(maxHeight: 140),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(6),
+                                  color: Colors.white,
+                                ),
+                                child: ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: _transversalSearchResults.length,
+                                  itemBuilder: (ctx, idx) {
+                                    final eq = _transversalSearchResults[idx];
+                                    final isChecked = _selectedTransversalAssets.contains(eq);
+                                    return CheckboxListTile(
+                                      value: isChecked,
+                                      dense: true,
+                                      visualDensity: VisualDensity.compact,
+                                      title: Text('${eq.id} - ${eq.name}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      subtitle: Text('Área: ${eq.areaId} · ${eq.brand ?? ""}', style: const TextStyle(fontSize: 11)),
+                                      onChanged: (val) {
+                                        setState(() {
+                                          if (val == true) {
+                                            _selectedTransversalAssets.add(eq);
+                                            _selectedAsset = eq;
+                                            _loadChildrenForAsset(eq.id);
+                                          } else {
+                                            _selectedTransversalAssets.remove(eq);
+                                            if (_selectedAsset == eq) {
+                                              _selectedAsset = _selectedTransversalAssets.isNotEmpty ? _selectedTransversalAssets.first : null;
+                                            }
+                                          }
+                                        });
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                              if (_selectedTransversalAssets.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    'ℹ️ Se creará este plan para ${_selectedTransversalAssets.length} equipo(s) seleccionado(s).',
+                                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
+                                  ),
+                                ),
+                            ],
                           ],
                         ),
                       );
@@ -1788,8 +1968,8 @@ class _CreatePreventivePlanDialogState
                                     isDense: true,
                                     prefixIcon: const Icon(Icons.search, size: 18),
                                     suffixIcon: IconButton(
-                                      icon: const Icon(Icons.clear, size: 16),
-                                      tooltip: 'Plan sin área',
+                                      icon: const Icon(Icons.public, size: 18),
+                                      tooltip: 'Cambiar a Plan Transversal',
                                       onPressed: () => setState(() => _isTransversal = true),
                                     ),
                                   ),
@@ -1834,7 +2014,7 @@ class _CreatePreventivePlanDialogState
                           });
                         }
                       },
-                      validator: (v) => v == null ? 'Selecciona un equipo' : null,
+                      validator: (v) => _isTransversal ? null : (v == null ? 'Selecciona un equipo' : null),
                     );
 
                     final freqField = DropdownButtonFormField<ScheduleFrequency>(
@@ -1918,9 +2098,11 @@ class _CreatePreventivePlanDialogState
                           areaSection,
                           const SizedBox(height: 10),
 
-                          // Equipo
-                          assetField,
-                          const SizedBox(height: 12),
+                          // Equipo (solo si es por área específica)
+                          if (!_isTransversal) ...[
+                            assetField,
+                            const SizedBox(height: 12),
+                          ],
 
                           if (isNarrow) ...[
                             typeField,

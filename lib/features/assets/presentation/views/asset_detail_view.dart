@@ -473,26 +473,7 @@ class _AssetDetailViewState extends State<AssetDetailView> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                if (_isDeactivated)
-                  FilledButton.icon(
-                    onPressed:
-                        viewModel.isReactivating || !canReactivate
-                            ? null
-                            : _confirmReactivate,
-                    icon: viewModel.isReactivating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.undo),
-                    label: Text(
-                      viewModel.isReactivating
-                          ? 'Reactivando…'
-                          : 'Reactivar activo transferido',
-                    ),
-                  )
-                else ...[
+                if (!_isDeactivated) ...[
                   if (canEdit) ...[
                     FilledButton.icon(
                       onPressed: _openEdit,
@@ -620,23 +601,45 @@ class _DeactivatedBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final targetCode = asset.transferredToId;
 
     return Card(
-      color: Colors.orange.shade50,
+      color: Colors.amber.shade50,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: Colors.amber.shade300),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.info_outline, color: Colors.orange.shade800),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                asset.transferredToId != null
-                    ? 'Este activo fue transferido (duplicado en ${asset.transferredToId}). '
-                        'Está deshabilitado y solo puede reactivarse para volver a transferirlo.'
-                    : 'Este activo está deshabilitado y solo puede reactivarse.',
-                style: theme.textTheme.bodySmall,
-              ),
+            Row(
+              children: [
+                Icon(Icons.swap_horiz_rounded, color: Colors.amber.shade900, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Activo Histórico Transferido',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              targetCode != null
+                  ? 'Este registro se encuentra archivado y desactivado en esta área. Su ciclo de vida activo continúa bajo el código $targetCode en su nueva área de operación.'
+                  : 'Este activo se encuentra desactivado por traspaso y su historial está archivado.',
+              style: TextStyle(fontSize: 12.5, color: Colors.amber.shade900, height: 1.3),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'ℹ️ Si la máquina regresa a esta área en el futuro, realice una nueva transferencia desde el activo actual en su área destino.',
+              style: TextStyle(fontSize: 11.5, fontStyle: FontStyle.italic, color: Colors.amber.shade900),
             ),
           ],
         ),
