@@ -17,6 +17,12 @@ class DashboardRemoteDataSource {
         return int.tryParse(val?.toString() ?? '') ?? 0;
       }
 
+      double parseDouble(dynamic val) {
+        if (val is double) return val;
+        if (val is num) return val.toDouble();
+        return double.tryParse(val?.toString() ?? '') ?? 100.0;
+      }
+
       return DashboardStats(
         totalAssets: parseNum(response['TotalAssets'] ?? response['totalAssets']),
         pendingWorkOrders: parseNum(
@@ -29,6 +35,14 @@ class DashboardRemoteDataSource {
             response['activeSchedules']),
         totalKardexLogs:
             parseNum(response['TotalKardexLogs'] ?? response['totalKardexLogs']),
+        openBreakdowns: parseNum(
+            response['OpenBreakdowns'] ?? response['openBreakdowns']),
+        urgentSchedules: parseNum(
+            response['UrgentPreventiveSchedules'] ?? response['urgentSchedules']),
+        overdueSchedules: parseNum(
+            response['OverduePreventiveSchedules'] ?? response['overdueSchedules']),
+        pmComplianceRate: parseDouble(
+            response['PmComplianceRate'] ?? response['pmComplianceRate']),
       );
     }
 
@@ -39,6 +53,10 @@ class DashboardRemoteDataSource {
       completedWorkOrders: 0,
       activeSchedules: 0,
       totalKardexLogs: 0,
+      openBreakdowns: 0,
+      urgentSchedules: 0,
+      overdueSchedules: 0,
+      pmComplianceRate: 100.0,
     );
   }
 }

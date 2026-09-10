@@ -17,6 +17,7 @@ class CreateWorkOrderParams {
     this.materials = const [],
     this.scheduledDate,
     this.reportId,
+    this.preventiveScheduleId,
     required this.createdByUserId,
     required this.createdByUserName,
   });
@@ -34,6 +35,7 @@ class CreateWorkOrderParams {
   final List<WorkOrderMaterial> materials;
   final DateTime? scheduledDate;
   final String? reportId;
+  final String? preventiveScheduleId;
   final String createdByUserId;
   final String createdByUserName;
 }
@@ -59,6 +61,7 @@ class CreateWorkOrderUseCase implements UseCase<WorkOrder, CreateWorkOrderParams
       materials: params.materials,
       scheduledDate: params.scheduledDate,
       reportId: params.reportId,
+      preventiveScheduleId: params.preventiveScheduleId,
       createdByUserId: params.createdByUserId,
       createdByUserName: params.createdByUserName,
     );

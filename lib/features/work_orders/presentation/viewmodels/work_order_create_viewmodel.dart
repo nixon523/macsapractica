@@ -117,7 +117,7 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
       buffer.writeln('Actividades en componentes:');
 
       for (final act in targetActs) {
-        buffer.writeln(' • [${act.childAssetId} - ${act.childAssetName}]: ${act.description}');
+        buffer.writeln(' - [${act.childAssetId} - ${act.childAssetName}]: ${act.description}');
         for (final m in act.materials) {
           _materials.add(WorkOrderMaterial(
             description: '${m.name} (para ${act.childAssetName})',
@@ -255,6 +255,7 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
           estimatedHours: _estimatedHours,
           materials: _materials,
           reportId: _report?.id,
+          preventiveScheduleId: _preventiveSchedule != null ? _preventiveSchedule.id.toString() : null,
           createdByUserId: userId,
           createdByUserName: userName,
         ),

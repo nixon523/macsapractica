@@ -80,4 +80,15 @@ abstract final class ApiEndpoints {
 
   // Dashboard
   static const String dashboardStats = '/dashboard/estadisticas';
+
+  // Reportes de Operación
+  static const String operationReports         = '/reportes-operacion';
+  static const String operationReportsWeek     = '/reportes-operacion/semana';
+  static const String processEquipment         = '/reportes-operacion/equipos';
+  static String operationReportsByAsset(String assetCode) =>
+      '/reportes-operacion/activo/${Uri.encodeComponent(assetCode)}';
+  static String operationReportMetrics(String assetCode) =>
+      '/reportes-operacion/metricas/${Uri.encodeComponent(assetCode)}';
+  static String toggleProcessEquipment(String assetCode) =>
+      '/reportes-operacion/equipos/${Uri.encodeComponent(assetCode)}/proceso';
 }

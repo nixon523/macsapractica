@@ -20,6 +20,7 @@ class AssetModel extends Asset {
     super.serial,
     super.statusHistory = const [],
     super.createdAt,
+    super.esEquipoProceso = false,
   });
 
   factory AssetModel.fromJson(Map<String, dynamic> map, [String? docId]) {
@@ -129,6 +130,9 @@ class AssetModel extends Asset {
     final brand = (map['brand'] ?? map['Brand'])?.toString();
     final model = (map['model'] ?? map['Model'])?.toString();
     final imageData = (map['imageData'] ?? map['ImageData'])?.toString();
+    final esEquipoProceso = _parseBool(
+      map['esEquipoProceso'] ?? map['EsEquipoProceso'],
+    );
 
     return AssetModel(
       id: id,
@@ -147,6 +151,7 @@ class AssetModel extends Asset {
       serial: serial,
       statusHistory: history,
       createdAt: createdAt,
+      esEquipoProceso: esEquipoProceso,
     );
   }
 
@@ -172,7 +177,15 @@ class AssetModel extends Asset {
       serial: asset.serial,
       statusHistory: asset.statusHistory,
       createdAt: asset.createdAt,
+      esEquipoProceso: asset.esEquipoProceso,
     );
+  }
+
+  static bool _parseBool(dynamic v) {
+    if (v == null) return false;
+    if (v is bool) return v;
+    if (v is int) return v != 0;
+    return v.toString().toLowerCase() == 'true' || v.toString() == '1';
   }
 
   /// Tokens de búsqueda "contiene" de un activo (ID, nombre, serial, marca, modelo).

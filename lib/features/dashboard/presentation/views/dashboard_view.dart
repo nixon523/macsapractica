@@ -6,7 +6,9 @@ import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 
 class DashboardView extends StatefulWidget {
-  const DashboardView({super.key});
+  const DashboardView({super.key, this.onNavigateToSection});
+
+  final ValueChanged<String>? onNavigateToSection;
 
   @override
   State<DashboardView> createState() => _DashboardViewState();
@@ -25,127 +27,252 @@ class _DashboardViewState extends State<DashboardView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final user = context.watch<AuthViewModel>().currentUser;
     final vm = context.watch<DashboardViewModel>();
     final stats = vm.stats;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Bienvenido, ${user?.displayName ?? user?.username ?? 'Usuario'}',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Resumen del sistema de mantenimiento',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: 24),
-          if (vm.isLoading)
-            const Center(child: CircularProgressIndicator())
-          else if (vm.errorMessage.isNotEmpty)
-            Center(
-              child: Column(
-                children: [
-                  Text('Error: ${vm.errorMessage}'),
-                  const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: () => vm.loadStats(),
-                    child: const Text('Reintentar'),
-                  ),
-                ],
-              ),
-            )
-          else ...[
-            _SummaryCardsRow(
-              cards: [
-                _SummaryCard(
-                  icon: Icons.precision_manufacturing_outlined,
-                  label: 'Activos',
-                  value: '${stats?.totalAssets ?? 0}',
-                  color: Colors.teal,
-                ),
-                _SummaryCard(
-                  icon: Icons.assignment_outlined,
-                  label: 'OTs Pendientes',
-                  value: '${stats?.pendingWorkOrders ?? 0}',
-                  color: Colors.orange,
-                ),
-                _SummaryCard(
-                  icon: Icons.event_repeat_outlined,
-                  label: 'Preventivos',
-                  value: '${stats?.activeSchedules ?? 0}',
-                  color: Colors.blue,
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _SummaryCardsRow(
-              cards: [
-                _SummaryCard(
-                  icon: Icons.pending_actions_outlined,
-                  label: 'En Progreso',
-                  value: '${stats?.inProgressWorkOrders ?? 0}',
-                  color: Colors.amber,
-                ),
-                _SummaryCard(
-                  icon: Icons.check_circle_outline,
-                  label: 'Completados',
-                  value: '${stats?.completedWorkOrders ?? 0}',
-                  color: Colors.green,
-                ),
-                _SummaryCard(
-                  icon: Icons.history_outlined,
-                  label: 'Movimientos',
-                  value: '${stats?.totalKardexLogs ?? 0}',
-                  color: Colors.purple,
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 24),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Accesos Rápidos',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+    return RefreshIndicator(
+      onRefresh: () async => context.read<DashboardViewModel>().loadStats(),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cabecera de Bienvenida
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      FilledButton.tonalIcon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.add_task),
-                        label: const Text('Ver OTs'),
+                      Text(
+                        'Bienvenido, ${user?.displayName ?? user?.username ?? 'Usuario'}',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colors.onSurface,
+                        ),
                       ),
-                      FilledButton.tonalIcon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.precision_manufacturing),
-                        label: const Text('Ver Activos'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.history),
-                        label: const Text('Ver Kardex'),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Panel de Indicadores y Trazabilidad Operativa en Tiempo Real',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
+                ),
+                IconButton.filledTonal(
+                  onPressed: () => context.read<DashboardViewModel>().loadStats(),
+                  tooltip: 'Actualizar métricas',
+                  icon: const Icon(Icons.refresh, size: 20),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            if (vm.isLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(40),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (vm.errorMessage.isNotEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      Icon(Icons.error_outline, size: 40, color: colors.error),
+                      const SizedBox(height: 8),
+                      Text('Error: ${vm.errorMessage}', style: TextStyle(color: colors.error)),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: () => vm.loadStats(),
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else ...[
+              // Fila 1: Indicadores Principales de Operación
+              _SummaryCardsRow(
+                cards: [
+                  _SummaryCard(
+                    icon: Icons.precision_manufacturing_outlined,
+                    label: 'Activos Operativos',
+                    value: '${stats?.totalAssets ?? 0}',
+                    subtitle: 'Jerarquía completa',
+                    color: const Color(0xFF0D9488),
+                  ),
+                  _SummaryCard(
+                    icon: Icons.warning_amber_rounded,
+                    label: 'Averías Abiertas',
+                    value: '${stats?.openBreakdowns ?? 0}',
+                    subtitle: 'Reportadas / En Proceso',
+                    color: (stats?.openBreakdowns ?? 0) > 0 ? const Color(0xFFE11D48) : const Color(0xFF16A34A),
+                  ),
+                  _SummaryCard(
+                    icon: Icons.event_repeat_outlined,
+                    label: 'Planes Preventivos',
+                    value: '${stats?.activeSchedules ?? 0}',
+                    subtitle: '${stats?.urgentSchedules ?? 0} urgente(s)',
+                    color: const Color(0xFF0284C7),
+                  ),
                 ],
               ),
+              const SizedBox(height: 16),
+
+              // Fila 2: Órdenes de Trabajo y Kardex
+              _SummaryCardsRow(
+                cards: [
+                  _SummaryCard(
+                    icon: Icons.pending_actions_outlined,
+                    label: 'OTs Pendientes',
+                    value: '${stats?.pendingWorkOrders ?? 0}',
+                    subtitle: 'Por iniciar ejecución',
+                    color: const Color(0xFFD97706),
+                  ),
+                  _SummaryCard(
+                    icon: Icons.autorenew_outlined,
+                    label: 'OTs En Progreso',
+                    value: '${stats?.inProgressWorkOrders ?? 0}',
+                    subtitle: 'En ejecución en planta',
+                    color: const Color(0xFF2563EB),
+                  ),
+                  _SummaryCard(
+                    icon: Icons.check_circle_outline,
+                    label: 'OTs Completadas',
+                    value: '${stats?.completedWorkOrders ?? 0}',
+                    subtitle: 'Cerradas con éxito',
+                    color: const Color(0xFF16A34A),
+                  ),
+                  _SummaryCard(
+                    icon: Icons.history_edu_outlined,
+                    label: 'Trazabilidad Kardex',
+                    value: '${stats?.totalKardexLogs ?? 0}',
+                    subtitle: 'Eventos inmutables',
+                    color: const Color(0xFF7C3AED),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Tarjeta de Salud y Cumplimiento Preventivo (PM Compliance)
+              _buildComplianceCard(context, stats?.pmComplianceRate ?? 100.0),
+
+              const SizedBox(height: 20),
+
+              // Tarjeta de Trazabilidad e Integridad del Sistema
+              _buildSystemHealthCard(context, stats),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildComplianceCard(BuildContext context, double rate) {
+    final theme = Theme.of(context);
+    final isGood = rate >= 80.0;
+    final isMedium = rate >= 60.0 && rate < 80.0;
+    final color = isGood ? const Color(0xFF16A34A) : (isMedium ? const Color(0xFFD97706) : const Color(0xFFDC2626));
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.shield_outlined, size: 22, color: color),
+                const SizedBox(width: 8),
+                Text(
+                  'Cumplimiento del Programa Preventivo (PM Compliance)',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${rate.toStringAsFixed(1)}%',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: (rate / 100.0).clamp(0.0, 1.0),
+                minHeight: 8,
+                backgroundColor: Colors.grey.shade200,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isGood
+                  ? 'La tasa de ejecución y cierre de órdenes preventivas se mantiene en niveles óptimos.'
+                  : 'Se recomienda atender las órdenes preventivas pendientes para elevar el índice de confiabilidad.',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSystemHealthCard(BuildContext context, dynamic stats) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.security, size: 20, color: Color(0xFF0284C7)),
+                const SizedBox(width: 8),
+                Text(
+                  'Trazabilidad e Integridad de Mantenimiento',
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Toda acción sobre activos, órdenes de trabajo, traspasos y averías queda registrada de forma inmutable '
+              'en la Bitácora Kardex bajo arquitectura transaccional en SQL Server.',
+              style: TextStyle(fontSize: 12, height: 1.4),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -160,10 +287,6 @@ class _SummaryCardsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Adaptación por ancho:
-        //   < 500 dp  → 1 columna (móvil vertical)
-        //   500-900   → 2 columnas
-        //   >= 900    → todas las tarjetas en una fila
         final columns = constraints.maxWidth < 500
             ? 1
             : (constraints.maxWidth < 900 ? 2 : cards.length);
@@ -190,36 +313,64 @@ class _SummaryCard extends StatelessWidget {
     required this.label,
     required this.value,
     required this.color,
+    this.subtitle,
   });
 
   final IconData icon;
   final String label;
   final String value;
   final Color color;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: color.withValues(alpha: 0.15)),
+      ),
+      color: color.withValues(alpha: 0.04),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 28),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             Text(
               value,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtitle!,
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ],
         ),
       ),

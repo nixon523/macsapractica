@@ -224,7 +224,7 @@ CREATE OR ALTER PROCEDURE dbo.uspGenerarOrdenTrabajoPreventivaMes
     @Mes                INT,
     @CreadoPorUsuarioId INT,
     @CreadoPorNombre    NVARCHAR(100),
-    @NuevaOrdenId       NVARCHAR(20) OUTPUT
+    @NuevaOrdenId       NVARCHAR(20) = NULL OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;

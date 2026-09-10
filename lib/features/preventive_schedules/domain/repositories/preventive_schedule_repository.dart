@@ -46,4 +46,12 @@ abstract class PreventiveScheduleRepository {
     int? year,
     int? month,
   });
+
+  Future<List<String>> generateBatchMonthlyWorkOrders({
+    required int year,
+    required int month,
+    String? areaId,
+    required String userId,
+    required String userName,
+  });
 }

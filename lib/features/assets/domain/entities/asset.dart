@@ -86,6 +86,9 @@ class Asset {
   final String? serial;
   final List<AssetStatusPeriod> statusHistory;
   final DateTime? createdAt;
+  /// Indica si este activo de primer nivel es un equipo de proceso
+  /// (requiere reporte semanal de disponibilidad operativa).
+  final bool esEquipoProceso;
 
   const Asset({
     required this.id,
@@ -104,6 +107,7 @@ class Asset {
     this.serial,
     this.statusHistory = const [],
     this.createdAt,
+    this.esEquipoProceso = false,
   });
 
   // ignore: avoid_positional_boolean_parameters
@@ -122,6 +126,7 @@ class Asset {
     String? imageData,
     List<AssetStatusPeriod>? statusHistory,
     DateTime? createdAt,
+    bool? esEquipoProceso,
     // serial es inmutable — no se puede cambiar con copyWith
   }) {
     return Asset(
@@ -141,6 +146,7 @@ class Asset {
       serial: serial,
       statusHistory: statusHistory ?? this.statusHistory,
       createdAt: createdAt ?? this.createdAt,
+      esEquipoProceso: esEquipoProceso ?? this.esEquipoProceso,
     );
   }
 

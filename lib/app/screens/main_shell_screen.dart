@@ -18,6 +18,8 @@ import '../../features/breakdown_reports/presentation/viewmodels/breakdown_alert
 import '../../features/breakdown_reports/presentation/viewmodels/my_reports_notifications_viewmodel.dart';
 import '../../features/auth_permissions/presentation/viewmodels/password_reset_alerts_viewmodel.dart';
 import '../../features/preventive_schedules/presentation/viewmodels/preventive_schedule_viewmodel.dart';
+import '../../features/operation_reports/presentation/views/operation_report_list_view.dart';
+import '../../features/operation_reports/presentation/viewmodels/operation_report_viewmodel.dart';
 import '../../core/audio/notification_sound.dart';
 import '../di/get_it.dart';
 import '../router/app_router.dart';
@@ -30,6 +32,7 @@ enum _ShellSection {
   assets,
   workOrders,
   preventive,
+  operationReports,
   kardex,
   reportBreakdown,
   myReports,
@@ -94,6 +97,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
       activeIcon: Icons.event_repeat,
       label: 'Mantenimiento Preventivo',
     ),
+    _ShellSection.operationReports: SidebarItem(
+      icon: Icons.speed_outlined,
+      activeIcon: Icons.speed,
+      label: 'Disponibilidad Operativa',
+    ),
     _ShellSection.kardex: SidebarItem(
       icon: Icons.history_outlined,
       activeIcon: Icons.history,
@@ -126,7 +134,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     ),
   };
 
-  /// Secciones del menú según el rol:
+  /// Secciones del menú según el rol agrupadas lógicamente:
   ///   - admin (Gestor del Sistema): todo, sin restricción.
   ///   - lector (Solo Lectura): solo información, sin acciones.
   ///   - reportador: únicamente reportar averías y ver sus propios reportes.
@@ -134,21 +142,26 @@ class _MainShellScreenState extends State<MainShellScreen> {
     return switch (user.role) {
       UserRole.admin => const [
           _ShellSection.dashboard,
+          _ShellSection.operationReports,
+          _ShellSection.kardex,
           _ShellSection.assets,
           _ShellSection.workOrders,
           _ShellSection.preventive,
-          _ShellSection.kardex,
           _ShellSection.reportBreakdown,
+          _ShellSection.myReports,
           _ShellSection.breakdownReports,
           _ShellSection.deletionRequests,
           _ShellSection.users,
         ],
       UserRole.jefe => const [
           _ShellSection.dashboard,
+          _ShellSection.operationReports,
+          _ShellSection.kardex,
           _ShellSection.assets,
           _ShellSection.workOrders,
           _ShellSection.preventive,
-          _ShellSection.kardex,
+          _ShellSection.reportBreakdown,
+          _ShellSection.myReports,
           _ShellSection.breakdownReports,
         ],
       UserRole.reportador => const [
@@ -157,10 +170,10 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ],
       UserRole.lector => const [
           _ShellSection.dashboard,
+          _ShellSection.kardex,
           _ShellSection.assets,
           _ShellSection.workOrders,
           _ShellSection.preventive,
-          _ShellSection.kardex,
           _ShellSection.breakdownReports,
         ],
     };
@@ -181,6 +194,10 @@ class _MainShellScreenState extends State<MainShellScreen> {
       _ShellSection.assets => const AreaSelectionView(),
       _ShellSection.workOrders => const WorkOrderListView(),
       _ShellSection.preventive => const PreventiveScheduleListView(),
+      _ShellSection.operationReports => ChangeNotifierProvider.value(
+          value: getIt<OperationReportViewModel>(),
+          child: const OperationReportListView(),
+        ),
       _ShellSection.kardex => const KardexListView(),
       _ShellSection.reportBreakdown => const ReportBreakdownView(),
       _ShellSection.myReports => const MyReportsView(),
@@ -362,6 +379,69 @@ class _MainShellScreenState extends State<MainShellScreen> {
         ),
     ];
 
+    final groupDefinitions = [
+      (
+        id: 'operaciones',
+        title: 'OPERACIONES Y CONTROL',
+        icon: Icons.analytics_outlined,
+        sections: const [
+          _ShellSection.dashboard,
+          _ShellSection.operationReports,
+          _ShellSection.kardex,
+        ],
+      ),
+      (
+        id: 'mantenimiento',
+        title: 'GESTIÓN DE MANTENIMIENTO',
+        icon: Icons.build_circle_outlined,
+        sections: const [
+          _ShellSection.assets,
+          _ShellSection.workOrders,
+          _ShellSection.preventive,
+        ],
+      ),
+      (
+        id: 'incidencias',
+        title: 'INCIDENCIAS Y AVERÍAS',
+        icon: Icons.warning_amber_rounded,
+        sections: const [
+          _ShellSection.reportBreakdown,
+          _ShellSection.myReports,
+          _ShellSection.breakdownReports,
+        ],
+      ),
+      (
+        id: 'administracion',
+        title: 'ADMINISTRACIÓN DEL SISTEMA',
+        icon: Icons.admin_panel_settings_outlined,
+        sections: const [
+          _ShellSection.deletionRequests,
+          _ShellSection.users,
+        ],
+      ),
+    ];
+
+    final groups = <SidebarGroup>[];
+    for (final def in groupDefinitions) {
+      final entries = <SidebarItemEntry>[];
+      for (final section in def.sections) {
+        final index = sections.indexOf(section);
+        if (index >= 0) {
+          entries.add(SidebarItemEntry(item: items[index], index: index));
+        }
+      }
+      if (entries.isNotEmpty) {
+        groups.add(
+          SidebarGroup(
+            id: def.id,
+            title: def.title,
+            icon: def.icon,
+            items: entries,
+          ),
+        );
+      }
+    }
+
     final isMobile = AppBreakpoints.isMobile(context);
 
     void onSectionTap(int index) {
@@ -380,6 +460,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
     final sidebar = SidebarWidget(
       items: items,
+      groups: groups,
       selectedIndex: safeIndex,
       onTap: (index) {
         onSectionTap(index);

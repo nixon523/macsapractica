@@ -271,10 +271,35 @@ class PreventiveSchedule {
 
   /// Próximas actividades de componentes que vencen en el mes de la fecha indicada
   List<PreventiveChildActivity> activitiesDueInMonth(DateTime monthDate) {
+    return activitiesDueInPeriod(year: monthDate.year, month: monthDate.month);
+  }
+
+  /// Actividades de componentes hijos que vencen en el año/mes especificado
+  List<PreventiveChildActivity> activitiesDueInPeriod({required int year, required int month}) {
     return activities.where((act) {
       return act.status == 'active' &&
-          act.nextDate.year == monthDate.year &&
-          act.nextDate.month == monthDate.month;
+          act.nextDate.year == year &&
+          act.nextDate.month == month;
     }).toList();
+  }
+
+  /// Actividades de componentes hijos que NO vencen en el año/mes especificado (vencen en otros meses)
+  List<PreventiveChildActivity> activitiesNotDueInPeriod({required int year, required int month}) {
+    return activities.where((act) {
+      return act.status == 'active' &&
+          (act.nextDate.year != year || act.nextDate.month != month);
+    }).toList();
+  }
+
+  /// Indica si el plan tiene actividades programadas para el año/mes especificado
+  bool hasActivitiesDueInPeriod({required int year, required int month}) {
+    if (status != ScheduleStatus.active) return false;
+    if (activities.isNotEmpty) {
+      return activities.any((act) =>
+          act.status == 'active' &&
+          act.nextDate.year == year &&
+          act.nextDate.month == month);
+    }
+    return nextDate.year == year && nextDate.month == month;
   }
 }

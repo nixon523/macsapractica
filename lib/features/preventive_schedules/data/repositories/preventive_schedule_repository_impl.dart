@@ -104,4 +104,21 @@ class PreventiveScheduleRepositoryImpl implements PreventiveScheduleRepository {
       month: month,
     );
   }
+
+  @override
+  Future<List<String>> generateBatchMonthlyWorkOrders({
+    required int year,
+    required int month,
+    String? areaId,
+    required String userId,
+    required String userName,
+  }) {
+    return _remoteDataSource.generateBatchMonthlyWorkOrders(
+      year: year,
+      month: month,
+      areaId: areaId,
+      userId: userId,
+      userName: userName,
+    );
+  }
 }

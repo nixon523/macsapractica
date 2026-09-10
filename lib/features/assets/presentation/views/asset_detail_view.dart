@@ -12,6 +12,11 @@ import '../../../asset_deletion/presentation/viewmodels/asset_deletion_request_v
 import '../../domain/entities/asset.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../kardex/presentation/views/kardex_list_view.dart';
+import '../../../operation_reports/domain/usecases/actualizar_es_equipo_proceso.dart';
+import '../../../operation_reports/presentation/viewmodels/operation_report_viewmodel.dart';
+import '../../../operation_reports/presentation/views/operation_report_form_view.dart';
+import '../../../operation_reports/presentation/views/operation_report_metrics_view.dart';
+import '../reports/asset_report_filter_dialog.dart';
 import '../viewmodels/asset_detail_viewmodel.dart';
 import 'asset_create_view.dart';
 import 'asset_edit_view.dart';
@@ -337,6 +342,59 @@ class _AssetDetailViewState extends State<AssetDetailView> {
     }
   }
 
+  Future<void> _toggleProcessEquipment() async {
+    final newVal = !_asset.esEquipoProceso;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(newVal ? 'Marcar como Equipo de Proceso' : 'Desmarcar Equipo de Proceso'),
+        content: Text(
+          newVal
+              ? '¿Deseas clasificar este activo (${_asset.id}) como Equipo de Proceso?\n\n'
+                'Los equipos de proceso se incluyen en la planilla semanal de disponibilidad y tiempos de operación para los reportes diarios de los jefes de área.'
+              : '¿Deseas remover la clasificación de Equipo de Proceso para este activo (${_asset.id})?\n\n'
+                'Dejará de aparecer en la planilla semanal de disponibilidad.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await getIt<ActualizarEsEquipoProceso>().call(_asset.id, esEquipoProceso: newVal);
+      if (mounted) {
+        setState(() {
+          _asset = _asset.copyWith(esEquipoProceso: newVal);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              newVal
+                  ? 'Activo configurado como Equipo de Proceso.'
+                  : 'Activo desmarcado de Equipos de Proceso.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al actualizar: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _openDeleteRequest() async {
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
@@ -437,6 +495,11 @@ class _AssetDetailViewState extends State<AssetDetailView> {
           title: Text('${asset.id} - ${asset.name}'),
           actions: [
             IconButton(
+              icon: const Icon(Icons.description_outlined),
+              tooltip: 'Generar Ficha / Reporte (PDF / Excel)',
+              onPressed: () => AssetReportFilterDialog.showSingleAsset(context, _asset),
+            ),
+            IconButton(
               icon: const Icon(Icons.history),
               tooltip: 'Ver historial (Kardex)',
               onPressed: _openHistory,
@@ -456,7 +519,11 @@ class _AssetDetailViewState extends State<AssetDetailView> {
                 const SizedBox(height: 16),
                 _AssetInfoCard(asset: asset),
                 const SizedBox(height: 16),
-                _AssetAvailabilityCard(asset: _asset),
+                _AssetAvailabilityCard(
+                  asset: _asset,
+                  onToggleProcessEquipment:
+                      canEdit && _isEquipment ? _toggleProcessEquipment : null,
+                ),
                 const SizedBox(height: 16),
                 if (asset.dynamicAttributes.isNotEmpty) ...[
                   _AttributesCard(attributes: asset.dynamicAttributes),
@@ -509,6 +576,16 @@ class _AssetDetailViewState extends State<AssetDetailView> {
                       label: const Text('Transferir a otra área'),
                     ),
                   ],
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.blue.shade900,
+                      side: BorderSide(color: Colors.blue.shade300),
+                    ),
+                    onPressed: () => AssetReportFilterDialog.showSingleAsset(context, _asset),
+                    icon: const Icon(Icons.description_outlined),
+                    label: const Text('Generar Ficha Técnica / Reporte (PDF / Excel)'),
+                  ),
                 ],
                 Consumer<AssetDeletionRequestViewModel>(
                   builder: (context, deletionVm, _) {
@@ -787,8 +864,10 @@ class _AssetInfoCard extends StatelessWidget {
     final rows = <(String, String)>[
       ('ID', asset.id),
       ('Nombre', asset.name),
-      if (asset.level == AssetLevel.equipment)
+      if (asset.level == AssetLevel.equipment) ...[
         ('N° de Serie', asset.serial != null && asset.serial!.isNotEmpty ? asset.serial! : 'Sin serie registrado'),
+        ('Tipo de Activo', asset.esEquipoProceso ? 'Equipo de Proceso (Monitoreo Semanal)' : 'Equipo Estándar'),
+      ],
       ('Área', asset.areaId),
       ('Marca', asset.brand ?? 'N/A'),
       ('Modelo', asset.model ?? 'N/A'),
@@ -808,6 +887,28 @@ class _AssetInfoCard extends StatelessWidget {
                 _StatusChip(status: asset.status),
                 const SizedBox(width: 8),
                 _LevelChip(level: asset.level),
+                if (asset.level == AssetLevel.equipment && asset.esEquipoProceso) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade300),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.speed, size: 12, color: Colors.blue.shade800),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Equipo de Proceso',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue.shade900),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
@@ -1055,9 +1156,13 @@ class _LevelChip extends StatelessWidget {
 }
 
 class _AssetAvailabilityCard extends StatefulWidget {
-  const _AssetAvailabilityCard({required this.asset});
+  const _AssetAvailabilityCard({
+    required this.asset,
+    this.onToggleProcessEquipment,
+  });
 
   final Asset asset;
+  final VoidCallback? onToggleProcessEquipment;
 
   @override
   State<_AssetAvailabilityCard> createState() => _AssetAvailabilityCardState();
@@ -1187,6 +1292,124 @@ class _AssetAvailabilityCardState extends State<_AssetAvailabilityCard> {
                 );
               },
             ),
+
+            // Sección de Equipo de Proceso (Solo para activos de primer nivel)
+            if (asset.level == AssetLevel.equipment) ...[
+              const SizedBox(height: 12),
+              const Divider(),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: asset.esEquipoProceso ? Colors.blue.shade50 : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: asset.esEquipoProceso ? Colors.blue.shade200 : Colors.grey.shade300,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          asset.esEquipoProceso ? Icons.speed : Icons.info_outline,
+                          size: 18,
+                          color: asset.esEquipoProceso ? Colors.blue.shade800 : Colors.grey.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            asset.esEquipoProceso
+                                ? 'Equipo de Proceso (Monitoreo Semanal)'
+                                : 'Equipo Estándar (Sin monitoreo semanal)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: asset.esEquipoProceso ? Colors.blue.shade900 : Colors.grey.shade800,
+                            ),
+                          ),
+                        ),
+                        if (widget.onToggleProcessEquipment != null)
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                            ),
+                            onPressed: widget.onToggleProcessEquipment,
+                            child: Text(
+                              asset.esEquipoProceso ? 'Desmarcar' : 'Marcar como Proceso',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: asset.esEquipoProceso ? Colors.red.shade700 : Colors.blue.shade800,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (asset.esEquipoProceso) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Este equipo forma parte del flujo principal de planta. Requiere registro semanal de tiempos de operación y paros por turno/día.',
+                        style: TextStyle(fontSize: 11.5, color: Colors.blue.shade900, height: 1.3),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              backgroundColor: Colors.blue.shade700,
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ChangeNotifierProvider.value(
+                                    value: getIt<OperationReportViewModel>(),
+                                    child: OperationReportFormView(
+                                      codigoActivo: asset.id,
+                                      nombreActivo: asset.name,
+                                      areaId: asset.areaId,
+                                      fecha: DateTime.now(),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.edit_calendar, size: 16),
+                            label: const Text('Cargar Reporte Diario', style: TextStyle(fontSize: 12)),
+                          ),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              foregroundColor: Colors.blue.shade900,
+                              side: BorderSide(color: Colors.blue.shade300),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ChangeNotifierProvider.value(
+                                    value: getIt<OperationReportViewModel>(),
+                                    child: OperationReportMetricsView(
+                                      codigoActivo: asset.id,
+                                      nombreActivo: asset.name,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.analytics_outlined, size: 16),
+                            label: const Text('Métricas de Disponibilidad', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
 
             if (history.isNotEmpty) ...[
               const SizedBox(height: 12),

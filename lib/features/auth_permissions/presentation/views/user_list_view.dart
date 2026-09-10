@@ -637,7 +637,15 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
 
   Future<void> _submit() async {
     final pass = _passwordController.text.trim();
-    if (pass.length < 4) return;
+    if (pass.length < 4) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('La contraseña debe tener al menos 4 caracteres.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     final vm = context.read<UserListViewModel>();
     final success = await vm.resetPasswordTemporary(
@@ -645,9 +653,22 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
       temporaryPassword: pass,
     );
 
-    if (success && mounted) {
+    if (!mounted) return;
+
+    if (success) {
       Navigator.pop(context, true);
       _showSuccessInfoDialog(pass);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            vm.errorMessage.isNotEmpty
+                ? vm.errorMessage
+                : 'Error al asignar la contraseña temporal.',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
     }
   }
 
@@ -745,6 +766,13 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
                 ),
               ),
             ),
+            if (vm.errorMessage.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                vm.errorMessage,
+                style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+              ),
+            ],
           ],
         ),
       ),
@@ -755,7 +783,13 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
         ),
         FilledButton(
           onPressed: vm.isSaving ? null : _submit,
-          child: const Text('Asignar Clave'),
+          child: vm.isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Asignar Clave'),
         ),
       ],
     );
@@ -891,8 +925,21 @@ class _UserFormDialogState extends State<_UserFormDialog> {
       );
     }
 
-    if (success && mounted) {
+    if (!mounted) return;
+
+    if (success) {
       Navigator.pop(context, true);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            vm.errorMessage.isNotEmpty
+                ? vm.errorMessage
+                : 'Error al procesar el usuario.',
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
     }
   }
 
@@ -1102,7 +1149,13 @@ class _UserFormDialogState extends State<_UserFormDialog> {
         ),
         FilledButton(
           onPressed: vm.isSaving ? null : _submit,
-          child: Text(isEditing ? 'Guardar' : 'Crear'),
+          child: vm.isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : Text(isEditing ? 'Guardar' : 'Crear'),
         ),
       ],
     );

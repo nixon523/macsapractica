@@ -123,11 +123,9 @@ class AuthRemoteDataSource {
     required String userId,
     required String newPassword,
   }) async {
-    // Si la API tiene cambio propio con currentPassword, enviamos newPassword
     await _apiClient.put(
       ApiEndpoints.changePassword,
       body: {
-        'currentPassword': newPassword, // o soporte para reseteo directo
         'newPassword': newPassword,
       },
     );

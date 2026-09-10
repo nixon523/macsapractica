@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/utils/upper_case_formatter.dart';
 import 'package:macsapractica/app/router/app_router.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../domain/entities/area.dart';
+import '../reports/asset_report_filter_dialog.dart';
 import '../states/area_state.dart';
 import '../viewmodels/area_list_viewmodel.dart';
 
-/// Vista de selección de área con estándar visual y profesional del Kardex.
+/// Vista de selección y gestión CRUD de áreas con paginación de 10 registros.
 class AreaSelectionView extends StatefulWidget {
   const AreaSelectionView({super.key});
 
@@ -18,6 +20,8 @@ class AreaSelectionView extends StatefulWidget {
 class _AreaSelectionViewState extends State<AreaSelectionView> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
+  int _currentPage = 0;
+  static const int _pageSize = 10;
 
   @override
   void initState() {
@@ -25,6 +29,7 @@ class _AreaSelectionViewState extends State<AreaSelectionView> {
     _searchCtrl.addListener(() {
       setState(() {
         _searchQuery = _searchCtrl.text.trim().toLowerCase();
+        _currentPage = 0; // Reset a primera página al buscar
       });
     });
 
@@ -48,57 +53,212 @@ class _AreaSelectionViewState extends State<AreaSelectionView> {
     }
   }
 
-  Future<void> _editAreaName(Area area) async {
+  Future<void> _editArea(Area area) async {
     final nameCtrl = TextEditingController(text: area.name);
+    final ccCtrl = TextEditingController(text: area.costCenter);
     final formKey = GlobalKey<FormState>();
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Editar Área ${area.id}'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: nameCtrl,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Nombre del Área / Centro de Costo',
-              border: OutlineInputBorder(),
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0284C7).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.edit_note, color: Color(0xFF0284C7), size: 22),
             ),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'El nombre es obligatorio' : null,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Editar Área: ${area.id}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 440,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Modifica los datos del área. Todo cambio quedará registrado en el Kardex.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [UpperCaseTextFormatter()],
+                  decoration: InputDecoration(
+                    labelText: 'Nombre del Área / Centro de Costo *',
+                    hintText: 'Ej: ALMACEN GENERAL',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'El nombre es obligatorio.' : null,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: ccCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [UpperCaseTextFormatter()],
+                  decoration: InputDecoration(
+                    labelText: 'Centro de Costo (CC) *',
+                    hintText: 'Ej: CC-50',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'El centro de costo es obligatorio.' : null,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(ctx).pop(false),
             child: const Text('Cancelar'),
           ),
-          FilledButton(
+          FilledButton.icon(
             onPressed: () {
               if (formKey.currentState!.validate()) {
-                Navigator.of(context).pop(true);
+                Navigator.of(ctx).pop(true);
               }
             },
-            child: const Text('Guardar'),
+            icon: const Icon(Icons.save_outlined, size: 16),
+            label: const Text('Guardar Cambios'),
           ),
         ],
       ),
     );
 
     if (confirmed == true && mounted) {
-      final ok = await context
-          .read<AreaListViewModel>()
-          .updateAreaName(area.id, nameCtrl.text.trim());
+      final formattedName = nameCtrl.text.trim().toUpperCase();
+      final formattedCC = ccCtrl.text.trim().toUpperCase();
+      final ok = await context.read<AreaListViewModel>().updateArea(
+            id: area.id,
+            name: formattedName,
+            costCenter: formattedCC,
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               ok
-                  ? 'Nombre de área actualizado correctamente.'
-                  : 'Error al actualizar el nombre del área.',
+                  ? 'Área ${area.id} actualizada correctamente.'
+                  : 'Error al actualizar el área: ${context.read<AreaListViewModel>().state.errorMessage}',
             ),
+            backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteArea(Area area) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE2E2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Eliminar Área: ${area.id}',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: 440,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '¿Estás seguro de que deseas dar de baja o eliminar el área "${area.name}" (${area.id})?',
+                style: const TextStyle(fontSize: 13, height: 1.3),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.info_outline, size: 16, color: Color(0xFFD97706)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Integridad: El sistema verificará que el área no contenga activos activos, planes preventivos u órdenes de trabajo en curso antes de proceder.',
+                        style: TextStyle(fontSize: 11.5, color: Colors.brown.shade800, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirmar Eliminación'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final ok = await context.read<AreaListViewModel>().deleteArea(area.id);
+
+      if (mounted) {
+        final error = context.read<AreaListViewModel>().state.errorMessage;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              ok
+                  ? 'Área ${area.id} eliminada exitosamente.'
+                  : (error.isNotEmpty ? error : 'No se pudo eliminar el área.'),
+            ),
+            backgroundColor: ok ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -166,12 +326,16 @@ class _AreaSelectionViewState extends State<AreaSelectionView> {
                       ),
                     ),
                   )
-                : _AreaListView(
+                : _AreaPaginatedListView(
                     areas: state.areas,
                     searchQuery: _searchQuery,
                     searchCtrl: _searchCtrl,
                     canManage: canManage,
-                    onEditArea: _editAreaName,
+                    currentPage: _currentPage,
+                    pageSize: _pageSize,
+                    onPageChanged: (newPage) => setState(() => _currentPage = newPage),
+                    onEditArea: _editArea,
+                    onDeleteArea: _deleteArea,
                     onCreateArea: canManage ? _createArea : null,
                   ),
             ViewState.initial => const SizedBox.shrink(),
@@ -182,13 +346,17 @@ class _AreaSelectionViewState extends State<AreaSelectionView> {
   }
 }
 
-class _AreaListView extends StatelessWidget {
-  const _AreaListView({
+class _AreaPaginatedListView extends StatelessWidget {
+  const _AreaPaginatedListView({
     required this.areas,
     required this.searchQuery,
     required this.searchCtrl,
     required this.canManage,
+    required this.currentPage,
+    required this.pageSize,
+    required this.onPageChanged,
     required this.onEditArea,
+    required this.onDeleteArea,
     this.onCreateArea,
   });
 
@@ -196,7 +364,11 @@ class _AreaListView extends StatelessWidget {
   final String searchQuery;
   final TextEditingController searchCtrl;
   final bool canManage;
+  final int currentPage;
+  final int pageSize;
+  final ValueChanged<int> onPageChanged;
   final Function(Area) onEditArea;
+  final Function(Area) onDeleteArea;
   final VoidCallback? onCreateArea;
 
   @override
@@ -212,9 +384,16 @@ class _AreaListView extends StatelessWidget {
       return matchName || matchId || matchCc;
     }).toList();
 
+    final totalItems = filteredAreas.length;
+    final totalPages = totalItems > 0 ? (totalItems / pageSize).ceil() : 1;
+    final validPage = currentPage.clamp(0, totalPages - 1);
+    final startIndex = validPage * pageSize;
+    final endIndex = (startIndex + pageSize).clamp(0, totalItems);
+    final pageAreas = totalItems > 0 ? filteredAreas.sublist(startIndex, endIndex) : <Area>[];
+
     return Column(
       children: [
-        // Barra de Control Responsiva
+        // Barra Superior de Control
         Container(
           color: colors.surface,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -223,8 +402,10 @@ class _AreaListView extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: searchCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: [UpperCaseTextFormatter()],
                   decoration: InputDecoration(
-                    hintText: 'Buscar área por nombre, código (A001) o centro de costo…',
+                    hintText: 'BUSCAR ÁREA POR NOMBRE, CÓDIGO (A001) O CENTRO DE COSTO…',
                     hintStyle: const TextStyle(fontSize: 12),
                     prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: searchQuery.isNotEmpty
@@ -247,8 +428,17 @@ class _AreaListView extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                onPressed: () => AssetReportFilterDialog.showMultiAreaReport(context),
+                icon: const Icon(Icons.description_outlined, size: 18),
+                label: const Text('Reportes de Activos (PDF / Excel)'),
+              ),
               if (canManage && onCreateArea != null) ...[
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 FilledButton.icon(
                   onPressed: onCreateArea,
                   icon: const Icon(Icons.add, size: 18),
@@ -261,7 +451,7 @@ class _AreaListView extends StatelessWidget {
 
         const Divider(height: 1),
 
-        // Barra Métrica de Resumen
+        // Barra Métrica de Resumen y Paginación
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
@@ -270,28 +460,36 @@ class _AreaListView extends StatelessWidget {
               Icon(Icons.business_outlined, size: 16, color: colors.primary),
               const SizedBox(width: 8),
               Text(
-                '${filteredAreas.length} área(s) disponible(s)',
+                '$totalItems área(s) disponible(s)',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: colors.onSurface,
                 ),
               ),
+              if (totalItems > 0) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '• Mostrando ${startIndex + 1}-$endIndex de $totalItems',
+                  style: TextStyle(fontSize: 11.5, color: colors.onSurfaceVariant),
+                ),
+              ],
               const Spacer(),
               Text(
-                'Selecciona un área para ver sus activos',
+                'Página ${validPage + 1} de $totalPages',
                 style: TextStyle(
-                  fontSize: 11,
-                  color: colors.onSurfaceVariant,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: colors.primary,
                 ),
               ),
             ],
           ),
         ),
 
-        // Lista de Áreas Ejecutivas
+        // Lista de 10 Áreas por Página
         Expanded(
-          child: filteredAreas.isEmpty
+          child: pageAreas.isEmpty
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32),
@@ -319,9 +517,9 @@ class _AreaListView extends StatelessWidget {
                   },
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: filteredAreas.length,
+                    itemCount: pageAreas.length,
                     itemBuilder: (context, index) {
-                      final area = filteredAreas[index];
+                      final area = pageAreas[index];
                       final ccStr = area.costCenter.startsWith('CC-')
                           ? area.costCenter
                           : (area.costCenter.startsWith('CC')
@@ -333,6 +531,7 @@ class _AreaListView extends StatelessWidget {
                         costCenterFormatted: ccStr,
                         canManage: canManage,
                         onEdit: () => onEditArea(area),
+                        onDelete: () => onDeleteArea(area),
                         onTap: () => Navigator.of(context).pushNamed(
                           AppRouter.assets,
                           arguments: area.id,
@@ -342,18 +541,93 @@ class _AreaListView extends StatelessWidget {
                   ),
                 ),
         ),
+
+        // Barra Inferior de Paginación (10 registros)
+        if (totalPages > 1)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              border: Border(top: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5))),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Botón Anterior
+                OutlinedButton.icon(
+                  onPressed: validPage > 0 ? () => onPageChanged(validPage - 1) : null,
+                  icon: const Icon(Icons.chevron_left, size: 18),
+                  label: const Text('Anterior'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+
+                // Selector Numérico de Páginas
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(totalPages, (idx) {
+                      final isSelected = idx == validPage;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: InkWell(
+                          onTap: () => onPageChanged(idx),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: isSelected ? colors.primary : colors.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isSelected ? colors.primary : colors.outlineVariant,
+                              ),
+                            ),
+                            child: Text(
+                              '${idx + 1}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? colors.onPrimary : colors.onSurface,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+
+                // Botón Siguiente
+                OutlinedButton.icon(
+                  onPressed: validPage < totalPages - 1 ? () => onPageChanged(validPage + 1) : null,
+                  icon: const Icon(Icons.chevron_right, size: 18),
+                  label: const Text('Siguiente'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
 }
 
-/// Tarjeta moderna de área con franja lateral y estética de Kardex.
+/// Tarjeta moderna de área con franja lateral, badges y acciones CRUD.
 class _ModernAreaCard extends StatelessWidget {
   const _ModernAreaCard({
     required this.area,
     required this.costCenterFormatted,
     required this.canManage,
     required this.onEdit,
+    required this.onDelete,
     required this.onTap,
   });
 
@@ -361,12 +635,13 @@ class _ModernAreaCard extends StatelessWidget {
   final String costCenterFormatted;
   final bool canManage;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const accentColor = Color(0xFF0284C7); // Azul cyan industrial
+    const accentColor = Color(0xFF0284C7);
 
     return Card(
       elevation: 0,
@@ -389,7 +664,7 @@ class _ModernAreaCard extends StatelessWidget {
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -435,7 +710,11 @@ class _ModernAreaCard extends StatelessWidget {
                                   ),
                                   child: Text(
                                     costCenterFormatted,
-                                    style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF0369A1)),
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0369A1),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -452,12 +731,27 @@ class _ModernAreaCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (canManage)
+                      IconButton(
+                        icon: const Icon(Icons.description_outlined, size: 18, color: Color(0xFF0369A1)),
+                        tooltip: 'Reporte e inventario de esta área (PDF / Excel)',
+                        onPressed: () => AssetReportFilterDialog.showAreaReport(
+                          context,
+                          areaId: area.id,
+                          areaName: area.name,
+                        ),
+                      ),
+                      if (canManage) ...[
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, size: 18),
-                          tooltip: 'Editar nombre del área',
+                          tooltip: 'Editar nombre y centro de costo',
                           onPressed: onEdit,
                         ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFDC2626)),
+                          tooltip: 'Eliminar área',
+                          onPressed: onDelete,
+                        ),
+                      ],
                       const SizedBox(width: 4),
                       const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
                     ],

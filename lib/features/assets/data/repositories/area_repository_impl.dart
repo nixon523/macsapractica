@@ -68,4 +68,10 @@ class AreaRepositoryImpl implements AreaRepository {
       costCenter: formattedCc,
     );
   }
+
+  @override
+  Future<void> deleteArea(String id) async {
+    return remoteDataSource.deleteArea(id);
+  }
 }
+

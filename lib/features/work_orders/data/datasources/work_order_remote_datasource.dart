@@ -88,6 +88,7 @@ class WorkOrderRemoteDataSource {
     List<WorkOrderMaterial> materials = const [],
     DateTime? scheduledDate,
     String? reportId,
+    String? preventiveScheduleId,
     required String createdByUserId,
     required String createdByUserName,
   }) async {
@@ -113,6 +114,8 @@ class WorkOrderRemoteDataSource {
             .toList(),
         'scheduledDate': scheduledDate?.toIso8601String(),
         'reportId': reportId != null ? int.tryParse(reportId) : null,
+        'preventiveScheduleId': preventiveScheduleId,
+        'planPreventivoId': preventiveScheduleId,
       },
     );
 
@@ -142,6 +145,7 @@ class WorkOrderRemoteDataSource {
       materials: materials,
       scheduledDate: scheduledDate,
       reportId: reportId,
+      preventiveScheduleId: preventiveScheduleId,
       createdByUserId: createdByUserId,
       createdByUserName: createdByUserName,
       createdAt: DateTime.now(),

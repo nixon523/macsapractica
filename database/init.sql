@@ -560,6 +560,7 @@ BEGIN
            EliminadoEn               = i.EliminadoEn,
            EliminadoPorUsuarioId     = i.EliminadoPorUsuarioId,
            EliminadoPorNombreUsuario = i.EliminadoPorNombreUsuario,
+           EsEquipoProceso           = i.EsEquipoProceso,
            ActualizadoEn             = SYSUTCDATETIME()
       FROM dbo.Activo a
       JOIN inserted i ON a.CodigoActivo = i.CodigoActivo;
@@ -954,7 +955,8 @@ BEGIN
            Nivel AS Level, RutaAncestros AS AncestorsPath, Estado AS Status,
            TraspasadoACodigo AS TransferredToId, Serie AS Serial,
            AtributosDinamicos AS DynamicAttributes, DatosImagen AS ImageData,
-           ContadorHijos AS ChildCounter, CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt
+           ContadorHijos AS ChildCounter, CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt,
+           EsEquipoProceso AS EsEquipoProceso
       FROM dbo.Activo
      WHERE AreaId = @AreaId AND CodigoActivoPadre IS NULL AND Estado <> 'deleted'
      ORDER BY Nombre ASC;
@@ -971,7 +973,8 @@ BEGIN
            Nivel AS Level, RutaAncestros AS AncestorsPath, Estado AS Status,
            TraspasadoACodigo AS TransferredToId, Serie AS Serial,
            AtributosDinamicos AS DynamicAttributes, DatosImagen AS ImageData,
-           ContadorHijos AS ChildCounter, CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt
+           ContadorHijos AS ChildCounter, CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt,
+           EsEquipoProceso AS EsEquipoProceso
       FROM dbo.Activo
      WHERE (@AreaId IS NULL OR AreaId = @AreaId)
        AND ((@ParentAssetCode IS NULL AND CodigoActivoPadre IS NULL) OR CodigoActivoPadre = @ParentAssetCode)
@@ -990,7 +993,8 @@ BEGIN
            a.Nivel AS Level, a.RutaAncestros AS AncestorsPath, a.Estado AS Status,
            a.TraspasadoACodigo AS TransferredToId, a.Serie AS Serial,
            a.AtributosDinamicos AS DynamicAttributes, a.DatosImagen AS ImageData,
-           a.ContadorHijos AS ChildCounter, a.CreadoEn AS CreatedAt, a.ActualizadoEn AS UpdatedAt
+           a.ContadorHijos AS ChildCounter, a.CreadoEn AS CreatedAt, a.ActualizadoEn AS UpdatedAt,
+           a.EsEquipoProceso AS EsEquipoProceso
       FROM dbo.Activo a
      CROSS APPLY (SELECT COUNT(*) AS TokenCount FROM STRING_SPLIT(@Query, ' ') WHERE LTRIM(RTRIM(value)) <> '') cnt
      WHERE (@AreaId IS NULL OR a.AreaId = @AreaId)
@@ -1012,7 +1016,8 @@ BEGIN
            Nivel AS Level, RutaAncestros AS AncestorsPath, Estado AS Status,
            TraspasadoACodigo AS TransferredToId, Serie AS Serial,
            AtributosDinamicos AS DynamicAttributes, DatosImagen AS ImageData,
-           ContadorHijos AS ChildCounter, CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt
+           ContadorHijos AS ChildCounter, CreadoEn AS CreatedAt, ActualizadoEn AS UpdatedAt,
+           EsEquipoProceso AS EsEquipoProceso
       FROM dbo.Activo
      WHERE Serie = @Serial AND Estado <> 'deleted'
      ORDER BY CASE WHEN Estado = 'active' THEN 0 ELSE 1 END, CreadoEn DESC;

@@ -749,6 +749,57 @@ class _ModernWorkOrderCard extends StatelessWidget {
                                         ),
                                       ),
                                     ),
+                                    if (order.preventiveScheduleId != null && order.preventiveScheduleId!.isNotEmpty) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.shade50,
+                                          borderRadius: BorderRadius.circular(5),
+                                          border: Border.all(color: Colors.blue.shade200),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.event_note_outlined, size: 12, color: Colors.blue.shade800),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              order.preventiveScheduleId!,
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.blue.shade800,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ] else if (order.reportId != null) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.shade50,
+                                          borderRadius: BorderRadius.circular(5),
+                                          border: Border.all(color: Colors.orange.shade200),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.report_problem_outlined, size: 12, color: Colors.orange.shade900),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Avería #${order.reportId}',
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.orange.shade900,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                                 const SizedBox(height: 3),

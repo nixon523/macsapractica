@@ -57,6 +57,7 @@ class WorkOrder {
     this.maintenanceHeadResponsible,
     this.scheduledDate,
     this.reportId,
+    this.preventiveScheduleId,
     this.createdByUserId,
     this.createdByUserName,
     this.createdAt,
@@ -102,6 +103,9 @@ class WorkOrder {
   /// Reporte de avería que dio origen a esta OT (si existe)
   final String? reportId;
 
+  /// Plan preventivo que dio origen a esta OT (si existe)
+  final String? preventiveScheduleId;
+
   final String? createdByUserId;
   final String? createdByUserName;
   final DateTime? createdAt;
@@ -109,6 +113,14 @@ class WorkOrder {
   bool get isOpen =>
       status == WorkOrderStatus.pending ||
       status == WorkOrderStatus.inProgress;
+
+  bool get isPreventive =>
+      preventiveScheduleId != null ||
+      requestedWorkTypes.contains('preventive');
+
+  bool get isCorrective =>
+      reportId != null ||
+      requestedWorkTypes.contains('corrective');
 
   String get displayCorrelative => correlativeNumber ?? id;
 
@@ -151,6 +163,7 @@ class WorkOrder {
     String? maintenanceHeadResponsible,
     DateTime? scheduledDate,
     String? reportId,
+    String? preventiveScheduleId,
     String? createdByUserId,
     String? createdByUserName,
     DateTime? createdAt,
@@ -183,6 +196,7 @@ class WorkOrder {
           maintenanceHeadResponsible ?? this.maintenanceHeadResponsible,
       scheduledDate: scheduledDate ?? this.scheduledDate,
       reportId: reportId ?? this.reportId,
+      preventiveScheduleId: preventiveScheduleId ?? this.preventiveScheduleId,
       createdByUserId: createdByUserId ?? this.createdByUserId,
       createdByUserName: createdByUserName ?? this.createdByUserName,
       createdAt: createdAt ?? this.createdAt,

@@ -40,6 +40,7 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
     List<WorkOrderMaterial> materials = const [],
     DateTime? scheduledDate,
     String? reportId,
+    String? preventiveScheduleId,
     required String createdByUserId,
     required String createdByUserName,
   }) {
@@ -57,6 +58,7 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
       materials: materials,
       scheduledDate: scheduledDate,
       reportId: reportId,
+      preventiveScheduleId: preventiveScheduleId,
       createdByUserId: createdByUserId,
       createdByUserName: createdByUserName,
     );

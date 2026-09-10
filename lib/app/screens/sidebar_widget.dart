@@ -22,10 +22,38 @@ class SidebarItem {
   final int badgeCount;
 }
 
-class SidebarWidget extends StatelessWidget {
+class SidebarItemEntry {
+  const SidebarItemEntry({
+    required this.item,
+    required this.index,
+  });
+
+  final SidebarItem item;
+  final int index;
+}
+
+class SidebarGroup {
+  const SidebarGroup({
+    required this.id,
+    required this.title,
+    this.icon,
+    required this.items,
+  });
+
+  final String id;
+  final String title;
+  final IconData? icon;
+  final List<SidebarItemEntry> items;
+
+  int get totalBadgeCount =>
+      items.fold(0, (acc, entry) => acc + entry.item.badgeCount);
+}
+
+class SidebarWidget extends StatefulWidget {
   const SidebarWidget({
     super.key,
-    required this.items,
+    this.items,
+    this.groups,
     required this.selectedIndex,
     required this.onTap,
     required this.isExpanded,
@@ -35,7 +63,8 @@ class SidebarWidget extends StatelessWidget {
     this.onLogout,
   });
 
-  final List<SidebarItem> items;
+  final List<SidebarItem>? items;
+  final List<SidebarGroup>? groups;
   final int selectedIndex;
   final ValueChanged<int> onTap;
   final bool isExpanded;
@@ -45,9 +74,37 @@ class SidebarWidget extends StatelessWidget {
   final VoidCallback? onLogout;
 
   @override
+  State<SidebarWidget> createState() => _SidebarWidgetState();
+}
+
+class _SidebarWidgetState extends State<SidebarWidget> {
+  final Set<String> _collapsedGroupIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Todos los grupos inician colapsados por defecto al entrar
+    if (widget.groups != null) {
+      for (final group in widget.groups!) {
+        _collapsedGroupIds.add(group.id);
+      }
+    }
+  }
+
+  void _toggleGroup(String groupId) {
+    setState(() {
+      if (_collapsedGroupIds.contains(groupId)) {
+        _collapsedGroupIds.remove(groupId);
+      } else {
+        _collapsedGroupIds.add(groupId);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: isExpanded ? 240 : 72,
+      width: widget.isExpanded ? 240 : 72,
       child: ColoredBox(
         color: AppTheme.sidebarBackground,
         child: Column(
@@ -66,7 +123,7 @@ class SidebarWidget extends StatelessWidget {
   Widget _buildHeader() {
     return SizedBox(
       height: 64,
-      child: isExpanded
+      child: widget.isExpanded
           ? Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -98,7 +155,7 @@ class SidebarWidget extends StatelessWidget {
                     ),
                   ),
                   GestureDetector(
-                    onTap: onToggle,
+                    onTap: widget.onToggle,
                     behavior: HitTestBehavior.opaque,
                     child: const SizedBox(
                       width: 28,
@@ -115,7 +172,7 @@ class SidebarWidget extends StatelessWidget {
             )
           : Center(
               child: InkWell(
-                onTap: onToggle,
+                onTap: widget.onToggle,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
                   width: 40,
@@ -136,116 +193,244 @@ class SidebarWidget extends StatelessWidget {
   }
 
   Widget _buildMenuItems() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final isSelected = index == selectedIndex;
+    if (widget.groups != null && widget.groups!.isNotEmpty) {
+      return ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        itemCount: widget.groups!.length,
+        itemBuilder: (context, groupIdx) {
+          final group = widget.groups![groupIdx];
+          final isCollapsed = _collapsedGroupIds.contains(group.id);
+          final hasItems = group.items.isNotEmpty;
+          if (!hasItems) return const SizedBox.shrink();
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          child: GestureDetector(
-            onTap: () => onTap(index),
-            behavior: HitTestBehavior.opaque,
-            child: MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                height: 40,
-                padding: EdgeInsets.symmetric(horizontal: isExpanded ? 12 : 0),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppTheme.sidebarSelected
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: isExpanded
-                    ? Row(
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (groupIdx > 0) ...[
+                if (!widget.isExpanded)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Divider(color: Color(0xFF37474F), height: 1),
+                  ),
+              ],
+              if (widget.isExpanded) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  child: InkWell(
+                    onTap: () => _toggleGroup(group.id),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isCollapsed
+                            ? const Color(0xFF1E293B).withValues(alpha: 0.5)
+                            : const Color(0xFF263238),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isCollapsed
+                              ? const Color(0xFF37474F).withValues(alpha: 0.5)
+                              : const Color(0xFF455A64),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
                         children: [
-                          Icon(
-                            isSelected ? item.activeIcon : item.icon,
-                            color: isSelected
-                                ? AppTheme.sidebarIconSelected
-                                : AppTheme.sidebarIcon,
-                            size: 20,
+                          Container(
+                            width: 3,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: isCollapsed
+                                  ? const Color(0xFF78909C)
+                                  : const Color(0xFF0288D1),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              item.label,
+                              group.title,
                               style: TextStyle(
-                                color: isSelected
-                                    ? AppTheme.sidebarTextSelected
-                                    : AppTheme.sidebarText,
-                                fontSize: 13,
-                                fontWeight: isSelected
-                                    ? FontWeight.w500
-                                    : FontWeight.w400,
+                                color: isCollapsed
+                                    ? const Color(0xFFB0BEC5)
+                                    : Colors.white,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (item.badgeCount > 0) ...[
-                            const SizedBox(width: 8),
-                            _Badge(count: item.badgeCount),
+                          if (isCollapsed && group.totalBadgeCount > 0) ...[
+                            _Badge(count: group.totalBadgeCount),
+                            const SizedBox(width: 6),
                           ],
-                          if (isSelected)
-                            Container(
+                          AnimatedRotation(
+                            turns: isCollapsed ? -0.25 : 0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 17,
+                              color: isCollapsed
+                                  ? const Color(0xFF90A4AE)
+                                  : Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+              AnimatedCrossFade(
+                firstChild: Padding(
+                  padding: EdgeInsets.only(
+                    left: widget.isExpanded ? 6 : 0,
+                    top: 2,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final entry in group.items)
+                        _buildItemTile(entry.item, entry.index),
+                    ],
+                  ),
+                ),
+                secondChild: const SizedBox.shrink(),
+                crossFadeState: (!widget.isExpanded || !isCollapsed)
+                    ? CrossFadeState.showFirst
+                    : CrossFadeState.showSecond,
+                duration: const Duration(milliseconds: 200),
+              ),
+              if (widget.isExpanded && groupIdx < widget.groups!.length - 1)
+                const SizedBox(height: 4),
+            ],
+          );
+        },
+      );
+    }
+
+    final flatItems = widget.items ?? const [];
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: flatItems.length,
+      itemBuilder: (context, index) {
+        final item = flatItems[index];
+        return _buildItemTile(item, index);
+      },
+    );
+  }
+
+  Widget _buildItemTile(SidebarItem item, int index) {
+    final isSelected = index == widget.selectedIndex;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: GestureDetector(
+        onTap: () => widget.onTap(index),
+        behavior: HitTestBehavior.opaque,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            height: 38,
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.isExpanded ? 12 : 0,
+            ),
+            decoration: BoxDecoration(
+              color: isSelected ? AppTheme.sidebarSelected : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: widget.isExpanded
+                ? Row(
+                    children: [
+                      Icon(
+                        isSelected ? item.activeIcon : item.icon,
+                        color: isSelected
+                            ? AppTheme.sidebarIconSelected
+                            : AppTheme.sidebarIcon,
+                        size: 19,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          item.label,
+                          style: TextStyle(
+                            color: isSelected
+                                ? AppTheme.sidebarTextSelected
+                                : AppTheme.sidebarText,
+                            fontSize: 13,
+                            fontWeight: isSelected
+                                ? FontWeight.w500
+                                : FontWeight.w400,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (item.badgeCount > 0) ...[
+                        const SizedBox(width: 8),
+                        _Badge(count: item.badgeCount),
+                      ],
+                      if (isSelected)
+                        Container(
+                          width: 3,
+                          height: 18,
+                          margin: const EdgeInsets.only(left: 6),
+                          decoration: BoxDecoration(
+                            color: AppTheme.sidebarIconSelected,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                    ],
+                  )
+                : SizedBox.expand(
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              isSelected ? item.activeIcon : item.icon,
+                              color: isSelected
+                                  ? AppTheme.sidebarIconSelected
+                                  : AppTheme.sidebarIcon,
+                              size: 20,
+                            ),
+                            if (item.badgeCount > 0)
+                              const Positioned(
+                                top: -2,
+                                right: -4,
+                                child: _BadgeDot(),
+                              ),
+                          ],
+                        ),
+                        if (isSelected)
+                          Positioned(
+                            right: 2,
+                            child: Container(
                               width: 3,
-                              height: 20,
+                              height: 18,
                               decoration: BoxDecoration(
                                 color: AppTheme.sidebarIconSelected,
                                 borderRadius: BorderRadius.circular(2),
                               ),
                             ),
-                        ],
-                      )
-                    : Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          if (isSelected)
-                            Positioned(
-                              right: 5,
-                              child: Container(
-                                width: 3,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.sidebarIconSelected,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ),
-                          Stack(
-                            clipBehavior: Clip.none,
-                            children: [
-                              Icon(
-                                isSelected ? item.activeIcon : item.icon,
-                                color: isSelected
-                                    ? AppTheme.sidebarIconSelected
-                                    : AppTheme.sidebarIcon,
-                                size: 20,
-                              ),
-                              if (item.badgeCount > 0)
-                                const Positioned(
-                                  top: -2,
-                                  right: -4,
-                                  child: _BadgeDot(),
-                                ),
-                            ],
                           ),
-                        ],
-                      ),
-              ),
-            ),
+                      ],
+                    ),
+                  ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
   Widget _buildFooter(BuildContext context) {
-    final displayName = userDisplayName ?? userName ?? 'Usuario';
+    final displayName = widget.userDisplayName ?? widget.userName ?? 'Usuario';
 
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -258,10 +443,10 @@ class SidebarWidget extends StatelessWidget {
               cursor: SystemMouseCursors.click,
               child: Padding(
                 padding: EdgeInsets.symmetric(
-                  horizontal: isExpanded ? 8 : 0,
+                  horizontal: widget.isExpanded ? 8 : 0,
                   vertical: 8,
                 ),
-                child: isExpanded
+                child: widget.isExpanded
                     ? Row(
                         children: [
                           _buildUserAvatar(displayName),
@@ -280,9 +465,9 @@ class SidebarWidget extends StatelessWidget {
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                if (userName != null)
+                                if (widget.userName != null)
                                   Text(
-                                    '@$userName',
+                                    '@${widget.userName}',
                                     style: const TextStyle(
                                       color: AppTheme.sidebarIcon,
                                       fontSize: 11,
@@ -300,11 +485,11 @@ class SidebarWidget extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           GestureDetector(
-            onTap: onLogout,
+            onTap: widget.onLogout,
             behavior: HitTestBehavior.opaque,
             child: MouseRegion(
               cursor: SystemMouseCursors.click,
-              child: isExpanded
+              child: widget.isExpanded
                   ? SizedBox(
                       width: double.infinity,
                       child: Padding(
@@ -366,7 +551,7 @@ class SidebarWidget extends StatelessWidget {
   }
 
   void _showUserDetailsDialog(BuildContext context) {
-    final displayName = userDisplayName ?? userName ?? 'Usuario';
+    final displayName = widget.userDisplayName ?? widget.userName ?? 'Usuario';
     final device = _getDeviceDescription();
 
     showDialog(
@@ -384,7 +569,7 @@ class SidebarWidget extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDetailRow('Usuario:', displayName),
-            if (userName != null) _buildDetailRow('Cuenta:', '@$userName'),
+            if (widget.userName != null) _buildDetailRow('Cuenta:', '@${widget.userName}'),
             _buildDetailRow('Dispositivo de Conexión:', device),
             _buildDetailRow('Tipo de Conexión:', kIsWeb ? 'Cliente Web' : 'Aplicación Nativa'),
             const SizedBox(height: 12),

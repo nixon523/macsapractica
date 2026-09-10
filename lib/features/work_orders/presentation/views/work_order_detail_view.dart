@@ -75,8 +75,14 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
       }
 
       if (!mounted) return;
+      final statusLabel = switch (status) {
+        WorkOrderStatus.pending => 'Pendiente',
+        WorkOrderStatus.inProgress => 'En Progreso',
+        WorkOrderStatus.completed => 'Completada',
+        WorkOrderStatus.cancelled => 'Cancelada',
+      };
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Estado de la OT actualizado a ${status.name}.')),
+        SnackBar(content: Text('Estado de la OT actualizado a $statusLabel.')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -354,6 +360,13 @@ class _WorkOrderDetail extends StatelessWidget {
                         _Tag(label: order.statusLabel, color: statusColor),
                         const SizedBox(width: 6),
                         _Tag(label: 'Prioridad ${order.priorityLabel}', color: priorityColor),
+                        if (order.preventiveScheduleId != null && order.preventiveScheduleId!.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          _Tag(label: 'Preventivo (${order.preventiveScheduleId})', color: Colors.blue.shade700),
+                        ] else if (order.reportId != null) ...[
+                          const SizedBox(width: 6),
+                          _Tag(label: 'Avería #${order.reportId}', color: Colors.deepOrange),
+                        ],
                       ],
                     ),
                     Text(
@@ -364,6 +377,10 @@ class _WorkOrderDetail extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 _InfoRow(label: 'N° Correlativo', value: order.displayCorrelative),
+                if (order.preventiveScheduleId != null && order.preventiveScheduleId!.isNotEmpty)
+                  _InfoRow(label: 'Plan Preventivo', value: order.preventiveScheduleId!),
+                if (order.reportId != null)
+                  _InfoRow(label: 'Reporte de Avería', value: '#${order.reportId}'),
                 _InfoRow(label: 'Activo', value: '${order.assetId} — ${order.assetName}'),
                 if (order.areaId != null) _InfoRow(label: 'Área', value: order.areaId!),
                 _InfoRow(label: 'Falla / Trabajo', value: order.description),

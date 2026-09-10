@@ -14,6 +14,7 @@ class PreventiveScheduleViewModel extends ChangeNotifier {
 
   PreventiveScheduleState _state = const PreventiveScheduleState();
   PreventiveScheduleState get state => _state;
+  List<PreventiveSchedule> get schedules => _state.schedules;
 
   bool _isSaving = false;
   bool get isSaving => _isSaving;
@@ -190,6 +191,42 @@ class PreventiveScheduleViewModel extends ChangeNotifier {
     } catch (e) {
       _errorMessage = e is Failure ? e.message : e.toString();
       return null;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<String>> generateBatchMonthlyWorkOrders({
+    required int year,
+    required int month,
+    String? areaId,
+    required String userId,
+    required String userName,
+  }) async {
+    _isSaving = true;
+    _errorMessage = '';
+    _successMessage = '';
+    notifyListeners();
+
+    try {
+      final ots = await _repository.generateBatchMonthlyWorkOrders(
+        year: year,
+        month: month,
+        areaId: areaId,
+        userId: userId,
+        userName: userName,
+      );
+      if (ots.isNotEmpty) {
+        _successMessage = 'Se generaron ${ots.length} Órdenes de Trabajo preventivas exitosamente.';
+      } else {
+        _errorMessage = 'No se encontraron actividades preventivas pendientes para el periodo seleccionado.';
+      }
+      await loadSchedules();
+      return ots;
+    } catch (e) {
+      _errorMessage = e is Failure ? e.message : e.toString();
+      return [];
     } finally {
       _isSaving = false;
       notifyListeners();

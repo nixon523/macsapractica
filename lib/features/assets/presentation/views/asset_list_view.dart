@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../../app/di/get_it.dart';
 import '../../domain/entities/asset.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
+import '../reports/asset_report_filter_dialog.dart';
 import '../states/asset_state.dart';
 import '../viewmodels/asset_list_viewmodel.dart';
 import 'asset_create_view.dart';
@@ -36,16 +37,15 @@ class _AssetListViewState extends State<AssetListView> {
   bool _showFullTree = false;
   int _currentPage = 0;
 
-  late DateTime? _startDate;
-  late DateTime? _endDate;
-  String _selectedPreset = 'hoy';
+  DateTime? _startDate;
+  DateTime? _endDate;
+  String _selectedPreset = 'todo';
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _startDate = DateTime(now.year, now.month, now.day, 0, 0, 0);
-    _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    _startDate = null;
+    _endDate = null;
 
     _searchCtrl.addListener(() {
       _runSearch();
@@ -241,6 +241,14 @@ class _AssetListViewState extends State<AssetListView> {
           title: const Text('Activos del Área'),
           actions: [
             IconButton(
+              icon: const Icon(Icons.description_outlined),
+              tooltip: 'Generar Reporte / Inventario (PDF / Excel)',
+              onPressed: () => AssetReportFilterDialog.showAreaReport(
+                context,
+                areaId: widget.areaId,
+              ),
+            ),
+            IconButton(
               icon: Icon(
                 _showFullTree ? Icons.account_tree : Icons.account_tree_outlined,
                 color: _showFullTree ? Theme.of(context).colorScheme.primary : null,
@@ -403,13 +411,13 @@ class _AssetListViewState extends State<AssetListView> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        _buildPresetChip('todo', 'Todo'),
+        const SizedBox(width: 6),
         _buildPresetChip('hoy', 'Hoy'),
         const SizedBox(width: 6),
         _buildPresetChip('semana', 'Semana'),
         const SizedBox(width: 6),
         _buildPresetChip('mes', 'Mes'),
-        const SizedBox(width: 6),
-        _buildPresetChip('todo', 'Todo'),
       ],
     );
   }
@@ -775,13 +783,19 @@ class _EmptyView extends StatelessWidget {
             Text(
               isSearching
                   ? 'Sin resultados para la búsqueda o filtro aplicado.'
-                  : 'No hay activos registrados en este periodo.',
+                  : (selectedPreset == 'todo'
+                      ? 'No hay activos registrados en esta área.'
+                      : 'No hay activos registrados en este periodo.'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             Text(
-              'Prueba cambiando el rango de fechas o seleccionando "Todo".',
+              isSearching
+                  ? 'Prueba con otros términos de búsqueda o limpia los filtros.'
+                  : (selectedPreset == 'todo'
+                      ? 'Puedes agregar un nuevo equipo con el botón inferior.'
+                      : 'Prueba cambiando el rango de fechas o seleccionando "Todo".'),
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),

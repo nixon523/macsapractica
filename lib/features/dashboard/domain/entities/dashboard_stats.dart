@@ -6,6 +6,10 @@ class DashboardStats {
     required this.completedWorkOrders,
     required this.activeSchedules,
     required this.totalKardexLogs,
+    this.openBreakdowns = 0,
+    this.urgentSchedules = 0,
+    this.overdueSchedules = 0,
+    this.pmComplianceRate = 100.0,
   });
 
   final int totalAssets;
@@ -14,4 +18,9 @@ class DashboardStats {
   final int completedWorkOrders;
   final int activeSchedules;
   final int totalKardexLogs;
+  final int openBreakdowns;
+  final int urgentSchedules;
+  final int overdueSchedules;
+  final double pmComplianceRate;
 }
+

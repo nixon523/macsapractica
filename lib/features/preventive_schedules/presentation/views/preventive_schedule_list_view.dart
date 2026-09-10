@@ -9,10 +9,11 @@ import '../../../assets/domain/entities/asset.dart';
 import '../../../assets/domain/repositories/area_repository.dart';
 import '../../../assets/domain/repositories/asset_repository.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
-import '../../../work_orders/presentation/views/work_order_create_view.dart';
 import '../../domain/entities/preventive_schedule.dart';
 import '../states/preventive_schedule_state.dart';
 import '../viewmodels/preventive_schedule_viewmodel.dart';
+import '../widgets/batch_generate_preventive_ots_dialog.dart';
+import '../widgets/generate_preventive_ot_dialog.dart';
 
 enum _PreventiveFilterTab {
   all('Todos'),
@@ -42,14 +43,13 @@ class _PreventiveScheduleListViewState
   DateTime? _startDate;
   DateTime? _endDate;
 
-  String _selectedPreset = 'hoy';
+  String _selectedPreset = 'todo';
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _startDate = DateTime(now.year, now.month, now.day, 0, 0, 0);
-    _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    _startDate = null;
+    _endDate = null;
 
     _searchCtrl.addListener(() {
       setState(() {
@@ -175,140 +175,30 @@ class _PreventiveScheduleListViewState
   }
 
   Future<void> _generateWorkOrder(PreventiveSchedule schedule) async {
-    final vm = context.read<PreventiveScheduleViewModel>();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => GeneratePreventiveOtDialog(schedule: schedule),
+    );
 
-    if (schedule.activities.isNotEmpty) {
-      final now = DateTime.now();
-      final dueActivities = schedule.activitiesDueInMonth(now);
-      final targetActivities = dueActivities.isNotEmpty ? dueActivities : schedule.activities;
-
-      final action = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Row(
-            children: [
-              const Icon(Icons.assignment_add, color: Color(0xFF0284C7)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Generar OT Consolidada: ${schedule.id}',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 480,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Equipo Principal: ${schedule.assetId} - ${schedule.assetName}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Se generará una Orden de Trabajo consolidando las siguientes ${targetActivities.length} actividad(es) de componentes:',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: targetActivities.map((a) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('• ', style: TextStyle(fontWeight: FontWeight.bold)),
-                              Expanded(
-                                child: Text(
-                                  '[${a.childAssetId} - ${a.childAssetName}]: ${a.description}',
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    '¿Deseas generar la OT automáticamente ahora o personalizarla en el formulario?',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, 'cancel'),
-              child: const Text('Cancelar'),
-            ),
-            OutlinedButton(
-              onPressed: () => Navigator.pop(ctx, 'manual'),
-              child: const Text('Personalizar'),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.pop(ctx, 'auto'),
-              icon: const Icon(Icons.bolt, size: 16),
-              label: const Text('Generar Automática'),
-            ),
-          ],
-        ),
-      );
-
-      if (action == 'auto' && mounted) {
-        final otId = await vm.generateMonthlyWorkOrder(schedule.id);
-        if (otId != null && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Orden de Trabajo consolidada $otId generada con éxito.'),
-              backgroundColor: Colors.green.shade700,
-            ),
-          );
-          _loadData();
-        } else if (vm.errorMessage.isNotEmpty && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al generar OT: ${vm.errorMessage}'),
-              backgroundColor: Colors.red.shade700,
-            ),
-          );
-        }
-        return;
-      } else if (action == 'manual' && mounted) {
-        final created = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => WorkOrderCreateView(preventiveSchedule: schedule),
-          ),
-        );
-        if (created == true && mounted) {
-          _loadData();
-        }
-        return;
-      }
-      return;
+    if (result == true && mounted) {
+      _loadData();
     }
+  }
 
-    final created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => WorkOrderCreateView(preventiveSchedule: schedule),
+  Future<void> _openBatchGenerateDialog() async {
+    final schedules = context.read<PreventiveScheduleViewModel>().schedules;
+    final areas = await getIt<AreaRepository>().getAreas();
+    if (!mounted) return;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => BatchGeneratePreventiveOtsDialog(
+        schedules: schedules,
+        areas: areas,
       ),
     );
 
-    if (created == true && mounted) {
+    if (result == true && mounted) {
       _loadData();
     }
   }
@@ -511,7 +401,13 @@ class _PreventiveScheduleListViewState
                 const SizedBox(width: 12),
                 Expanded(child: _buildPresetsRow()),
                 if (canManage) ...[
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _openBatchGenerateDialog,
+                    icon: const Icon(Icons.playlist_add_check, size: 18),
+                    label: const Text('Programar OTs del Mes'),
+                  ),
+                  const SizedBox(width: 8),
                   FilledButton.icon(
                     onPressed: _openCreateDialog,
                     icon: const Icon(Icons.add, size: 18),
@@ -529,10 +425,24 @@ class _PreventiveScheduleListViewState
             ),
             if (canManage) ...[
               const SizedBox(height: 8),
-              FilledButton.icon(
-                onPressed: _openCreateDialog,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('Nuevo Plan PM'),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _openBatchGenerateDialog,
+                      icon: const Icon(Icons.playlist_add_check, size: 16),
+                      label: const Text('Programar OTs', style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _openCreateDialog,
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Nuevo Plan PM', style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ],
@@ -1453,6 +1363,7 @@ class _CreatePreventivePlanDialogState
   List<_ChildActivityDraft> _childDrafts = [];
   bool _loadingDependencies = true;
   bool _loadingChildren = false;
+  bool _isSaving = false;
 
   // Para búsqueda global multiactivo transversal
   final _transversalSearchCtrl = TextEditingController();
@@ -1461,9 +1372,7 @@ class _CreatePreventivePlanDialogState
   final Set<Asset> _selectedTransversalAssets = {};
   bool _loadingGlobalEquipments = false;
 
-  // Para búsqueda de equipos dentro de un área
-  final _assetSearchCtrl = TextEditingController();
-  String _assetSearchQuery = '';
+  Map<String, PreventiveSchedule> _existingPlanByAsset = {};
 
   @override
   void initState() {
@@ -1490,7 +1399,6 @@ class _CreatePreventivePlanDialogState
     _matNameCtrl.dispose();
     _matQtyCtrl.dispose();
     _matUnitCtrl.dispose();
-    _assetSearchCtrl.dispose();
     _transversalSearchCtrl.dispose();
     for (final d in _childDrafts) {
       d.dispose();
@@ -1502,6 +1410,12 @@ class _CreatePreventivePlanDialogState
     if (_allGlobalEquipments.isNotEmpty) return;
     setState(() => _loadingGlobalEquipments = true);
     try {
+      final schedules = context.read<PreventiveScheduleViewModel>().schedules;
+      _existingPlanByAsset = {
+        for (final s in schedules)
+          s.assetId: s
+      };
+
       final assetRepo = getIt<AssetRepository>();
       final List<Asset> globalEquipments = [];
       for (final area in _areas) {
@@ -1542,24 +1456,28 @@ class _CreatePreventivePlanDialogState
 
   Future<void> _loadAreasAndAssets() async {
     try {
+      final schedules = context.read<PreventiveScheduleViewModel>().schedules;
+      _existingPlanByAsset = {
+        for (final s in schedules)
+          s.assetId: s
+      };
+
       final areaRepo = getIt<AreaRepository>();
       final areas = await areaRepo.getAreas();
       if (mounted) {
         setState(() {
           _areas = areas;
-          if (areas.isNotEmpty) {
-            // Si viene de plantilla con área específica, intentar preseleccionar esa área
-            if (widget.templateSchedule != null && widget.templateSchedule!.areaId.isNotEmpty) {
-              final match = areas.firstWhere(
-                (a) => a.id == widget.templateSchedule!.areaId,
-                orElse: () => areas.first,
-              );
-              _selectedArea = match;
-            } else {
-              _selectedArea = areas.first;
-            }
+          if (widget.templateSchedule != null && widget.templateSchedule!.areaId.isNotEmpty) {
+            final match = areas.firstWhere(
+              (a) => a.id == widget.templateSchedule!.areaId,
+              orElse: () => areas.first,
+            );
+            _selectedArea = match;
             _loadAssetsForArea(_selectedArea!.id);
           } else {
+            _selectedArea = null;
+            _selectedAsset = null;
+            _equipmentAssets = [];
             _loadingDependencies = false;
           }
         });
@@ -1571,6 +1489,12 @@ class _CreatePreventivePlanDialogState
 
   Future<void> _loadAssetsForArea(String areaId) async {
     try {
+      final schedules = context.read<PreventiveScheduleViewModel>().schedules;
+      _existingPlanByAsset = {
+        for (final s in schedules)
+          s.assetId: s
+      };
+
       final assetRepo = getIt<AssetRepository>();
       final allAreaAssets = await assetRepo.getAllAssetsByArea(areaId);
       final activeAssets = allAreaAssets
@@ -1587,12 +1511,9 @@ class _CreatePreventivePlanDialogState
         setState(() {
           _allAssets = activeAssets;
           _equipmentAssets = listToUse;
-          _selectedAsset = listToUse.isNotEmpty ? listToUse.first : null;
+          _selectedAsset = null;
           _loadingDependencies = false;
         });
-        if (_selectedAsset != null) {
-          _loadChildrenForAsset(_selectedAsset!.id, allAreaAssets);
-        }
       }
     } catch (_) {
       if (mounted) setState(() => _loadingDependencies = false);
@@ -1686,9 +1607,19 @@ class _CreatePreventivePlanDialogState
         ? _selectedTransversalAssets.toList()
         : (_selectedAsset != null ? [_selectedAsset!] : <Asset>[]);
 
-    if (targets.isEmpty) {
+    final duplicateTargets = targets.where((t) => _existingPlanByAsset.containsKey(t.id)).toList();
+    if (duplicateTargets.isNotEmpty) {
+      final first = duplicateTargets.first;
+      final existingPlan = _existingPlanByAsset[first.id]!;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selecciona al menos un equipo principal para el plan.')),
+        SnackBar(
+          content: Text(
+            'El equipo ${first.id} (${first.name}) ya cuenta con el Plan Preventivo ${existingPlan.id}. '
+            'No se permite crear múltiples planes para el mismo equipo; use la opción "Editar Plan" con autorización gerencial.',
+          ),
+          backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 5),
+        ),
       );
       return;
     }
@@ -1696,73 +1627,94 @@ class _CreatePreventivePlanDialogState
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
-    final selectedDrafts = _childDrafts.where((d) => d.isSelected).toList();
-    final List<PreventiveChildActivity> baseActivities = [];
+    setState(() => _isSaving = true);
 
-    for (final d in selectedDrafts) {
-      for (final act in d.activities) {
-        final interval = int.tryParse(act.intervalCtrl.text.trim()) ?? 1;
-        final next = _calculateNextDate(_startDate, interval, act.unit);
-        baseActivities.add(
-          PreventiveChildActivity(
-            childAssetId: d.child.id,
-            childAssetName: d.child.name,
-            childAssetLevel: d.child.level.name,
-            description: act.descCtrl.text.trim().isNotEmpty
-                ? act.descCtrl.text.trim()
-                : 'Mantenimiento de ${d.child.name}',
-            frequencyInterval: interval,
-            frequencyUnit: act.unit,
-            startDate: _startDate,
-            nextDate: next,
-            materials: List.from(act.materials),
-          ),
-        );
+    try {
+      final selectedDrafts = _childDrafts.where((d) => d.isSelected).toList();
+      final List<PreventiveChildActivity> baseActivities = [];
+
+      for (final d in selectedDrafts) {
+        for (final act in d.activities) {
+          final interval = int.tryParse(act.intervalCtrl.text.trim()) ?? 1;
+          final next = _calculateNextDate(_startDate, interval, act.unit);
+          baseActivities.add(
+            PreventiveChildActivity(
+              childAssetId: d.child.id,
+              childAssetName: d.child.name,
+              childAssetLevel: d.child.level.name,
+              description: act.descCtrl.text.trim().isNotEmpty
+                  ? act.descCtrl.text.trim()
+                  : 'Mantenimiento de ${d.child.name}',
+              frequencyInterval: interval,
+              frequencyUnit: act.unit,
+              startDate: _startDate,
+              nextDate: next,
+              materials: List.from(act.materials),
+            ),
+          );
+        }
       }
-    }
 
-    DateTime computedNextDate = _selectedFrequency.calculateNextDate(_startDate);
-    if (baseActivities.isNotEmpty) {
-      baseActivities.sort((a, b) => a.nextDate.compareTo(b.nextDate));
-      computedNextDate = baseActivities.first.nextDate;
-    }
-
-    final vm = context.read<PreventiveScheduleViewModel>();
-    int createdCount = 0;
-
-    for (final target in targets) {
-      final schedule = PreventiveSchedule(
-        id: '',
-        title: _titleCtrl.text.trim(),
-        assetId: target.id,
-        assetName: target.name,
-        areaId: target.areaId,
-        areaName: target.areaId,
-        maintenanceType: _typeCtrl.text.trim(),
-        frequency: _selectedFrequency,
-        description: _descCtrl.text.trim(),
-        materials: _materials,
-        activities: baseActivities,
-        startDate: _startDate,
-        nextDate: computedNextDate,
-        status: ScheduleStatus.active,
-      );
-
-      final ok = await vm.createSchedule(
-        schedule: schedule,
-        userId: user.userId,
-        userName: user.username,
-      );
-      if (ok) createdCount++;
-    }
-
-    if (mounted) {
-      if (createdCount > 1) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('¡Se crearon $createdCount planes preventivos transversales exitosamente!')),
-        );
+      DateTime computedNextDate = _selectedFrequency.calculateNextDate(_startDate);
+      if (baseActivities.isNotEmpty) {
+        baseActivities.sort((a, b) => a.nextDate.compareTo(b.nextDate));
+        computedNextDate = baseActivities.first.nextDate;
       }
-      Navigator.pop(context, true);
+
+      final vm = context.read<PreventiveScheduleViewModel>();
+      int createdCount = 0;
+
+      for (final target in targets) {
+        final schedule = PreventiveSchedule(
+          id: '',
+          title: _titleCtrl.text.trim(),
+          assetId: target.id,
+          assetName: target.name,
+          areaId: target.areaId,
+          areaName: target.areaId,
+          maintenanceType: _typeCtrl.text.trim(),
+          frequency: _selectedFrequency,
+          description: _descCtrl.text.trim(),
+          materials: _materials,
+          activities: baseActivities,
+          startDate: _startDate,
+          nextDate: computedNextDate,
+          status: ScheduleStatus.active,
+        );
+
+        final ok = await vm.createSchedule(
+          schedule: schedule,
+          userId: user.userId,
+          userName: user.username,
+        );
+        if (ok) {
+          createdCount++;
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                vm.errorMessage.isNotEmpty
+                    ? vm.errorMessage
+                    : 'Error al crear el plan preventivo.',
+              ),
+              backgroundColor: Colors.red.shade700,
+            ),
+          );
+        }
+      }
+
+      if (mounted && createdCount > 0) {
+        if (createdCount > 1) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('¡Se crearon $createdCount planes preventivos transversales exitosamente!')),
+          );
+        }
+        Navigator.pop(context, true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 
@@ -1776,8 +1728,6 @@ class _CreatePreventivePlanDialogState
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<PreventiveScheduleViewModel>();
-
     return AlertDialog(
       title: const Text('Definir Plan Preventivo por Componentes'),
       content: SizedBox(
@@ -1796,7 +1746,6 @@ class _CreatePreventivePlanDialogState
                     // === Área (opcional con toggle transversal) ===
                     Widget areaSection;
                     if (_isTransversal) {
-                      _loadAllGlobalEquipments();
                       areaSection = Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         decoration: BoxDecoration(
@@ -1899,12 +1848,29 @@ class _CreatePreventivePlanDialogState
                                   itemBuilder: (ctx, idx) {
                                     final eq = _transversalSearchResults[idx];
                                     final isChecked = _selectedTransversalAssets.contains(eq);
+                                    final existingPlan = _existingPlanByAsset[eq.id];
                                     return CheckboxListTile(
                                       value: isChecked,
                                       dense: true,
                                       visualDensity: VisualDensity.compact,
-                                      title: Text('${eq.id} - ${eq.name}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                      subtitle: Text('Área: ${eq.areaId} · ${eq.brand ?? ""}', style: const TextStyle(fontSize: 11)),
+                                      title: Text(
+                                        '${eq.id} - ${eq.name}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: existingPlan != null ? Colors.amber.shade900 : null,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        existingPlan != null
+                                            ? 'Área: ${eq.areaId} · ${eq.brand ?? ""} · ⚠️ Ya tiene Plan: ${existingPlan.id}'
+                                            : 'Área: ${eq.areaId} · ${eq.brand ?? ""}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: existingPlan != null ? Colors.amber.shade900 : null,
+                                          fontWeight: existingPlan != null ? FontWeight.w500 : null,
+                                        ),
+                                      ),
                                       onChanged: (val) {
                                         setState(() {
                                           if (val == true) {
@@ -1936,86 +1902,237 @@ class _CreatePreventivePlanDialogState
                         ),
                       );
                     } else {
-                      areaSection = Row(
-                        children: [
-                          Expanded(
-                            child: Autocomplete<Area>(
-                              displayStringForOption: (a) => '${a.id} - ${a.name}',
-                              optionsBuilder: (textEditingValue) {
-                                final query = textEditingValue.text.toLowerCase().trim();
-                                if (query.isEmpty) return _areas;
-                                return _areas.where((a) =>
-                                    a.id.toLowerCase().contains(query) ||
-                                    a.name.toLowerCase().contains(query));
-                              },
-                              onSelected: (area) {
-                                setState(() {
-                                  _selectedArea = area;
-                                  _loadAssetsForArea(area.id);
-                                });
-                              },
-                              fieldViewBuilder: (ctx, ctrl, focusNode, onSubmitted) {
-                                if (ctrl.text.isEmpty && _selectedArea != null) {
-                                  ctrl.text = '${_selectedArea!.id} - ${_selectedArea!.name}';
-                                }
-                                return TextFormField(
-                                  controller: ctrl,
-                                  focusNode: focusNode,
-                                  decoration: InputDecoration(
-                                    labelText: 'Área (buscar)',
-                                    hintText: 'Escribe para buscar área...',
-                                    border: const OutlineInputBorder(),
-                                    isDense: true,
-                                    prefixIcon: const Icon(Icons.search, size: 18),
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(Icons.public, size: 18),
-                                      tooltip: 'Cambiar a Plan Transversal',
-                                      onPressed: () => setState(() => _isTransversal = true),
-                                    ),
-                                  ),
-                                );
-                              },
+                      areaSection = Autocomplete<Area>(
+                        displayStringForOption: (a) => '${a.id} - ${a.name}',
+                        initialValue: _selectedArea != null
+                            ? TextEditingValue(text: '${_selectedArea!.id} - ${_selectedArea!.name}')
+                            : null,
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) {
+                            return _areas;
+                          }
+                          final q = textEditingValue.text.toLowerCase().trim();
+                          return _areas.where((a) =>
+                              a.id.toLowerCase().contains(q) ||
+                              a.name.toLowerCase().contains(q));
+                        },
+                        onSelected: (Area selection) {
+                          setState(() {
+                            _selectedArea = selection;
+                            _selectedAsset = null;
+                            _equipmentAssets = [];
+                            _childDrafts.clear();
+                            _loadAssetsForArea(selection.id);
+                          });
+                        },
+                        optionsViewBuilder: (context, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 220, maxWidth: 680),
+                                child: ListView.builder(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (context, index) {
+                                    final a = options.elementAt(index);
+                                    return ListTile(
+                                      dense: true,
+                                      leading: const Icon(Icons.location_city, size: 18),
+                                      title: Text('${a.id} - ${a.name}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                      onTap: () => onSelected(a),
+                                    );
+                                  },
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
+                          );
+                        },
+                        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                          return TextFormField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Buscar Área *',
+                              hintText: 'Escribe código o nombre del área...',
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                              prefixIcon: const Icon(Icons.location_city, size: 18),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (controller.text.isNotEmpty)
+                                    IconButton(
+                                      icon: const Icon(Icons.clear, size: 16),
+                                      tooltip: 'Limpiar selección',
+                                      onPressed: () {
+                                        controller.clear();
+                                        setState(() {
+                                          _selectedArea = null;
+                                          _selectedAsset = null;
+                                          _equipmentAssets = [];
+                                          _childDrafts.clear();
+                                        });
+                                      },
+                                    ),
+                                  IconButton(
+                                    icon: const Icon(Icons.public, size: 18),
+                                    tooltip: 'Cambiar a Plan Transversal',
+                                    onPressed: () {
+                                      setState(() => _isTransversal = true);
+                                      _loadAllGlobalEquipments();
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            validator: (v) => _isTransversal ? null : (_selectedArea == null ? 'Busca y selecciona un área' : null),
+                          );
+                        },
                       );
                     }
 
-                    // === Equipo Principal (filtrable) ===
-                    final filteredEquipment = _assetSearchQuery.isEmpty
-                        ? _equipmentAssets
-                        : _equipmentAssets.where((a) =>
-                            a.id.toLowerCase().contains(_assetSearchQuery) ||
-                            a.name.toLowerCase().contains(_assetSearchQuery)).toList();
-
-                    final assetField = DropdownButtonFormField<Asset>(
-                      value: filteredEquipment.contains(_selectedAsset) ? _selectedAsset : null,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Equipo Principal (Padre) *',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      items: filteredEquipment.map((a) {
-                        return DropdownMenuItem(
-                          value: a,
-                          child: Text(
-                            '${a.id} - ${a.name} (${_assetLevelLabel(a.level)})',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (asset) {
-                        if (asset != null) {
+                    // === Equipo Principal (filtrable por búsqueda) ===
+                    Widget assetField;
+                    if (_selectedArea == null) {
+                      assetField = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.search, size: 18, color: Colors.grey.shade600),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Busca y selecciona un área arriba para listar sus equipos disponibles',
+                                style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else if (_equipmentAssets.isEmpty) {
+                      assetField = Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 18, color: Colors.orange.shade700),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No se encontraron equipos principales activos en ${_selectedArea!.name}',
+                                style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      assetField = Autocomplete<Asset>(
+                        displayStringForOption: (a) => '${a.id} - ${a.name}',
+                        initialValue: _selectedAsset != null
+                            ? TextEditingValue(text: '${_selectedAsset!.id} - ${_selectedAsset!.name}')
+                            : null,
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) {
+                            return _equipmentAssets;
+                          }
+                          final q = textEditingValue.text.toLowerCase().trim();
+                          return _equipmentAssets.where((a) =>
+                              a.id.toLowerCase().contains(q) ||
+                              a.name.toLowerCase().contains(q) ||
+                              (a.brand?.toLowerCase().contains(q) ?? false));
+                        },
+                        onSelected: (Asset selection) {
                           setState(() {
-                            _selectedAsset = asset;
-                            _loadChildrenForAsset(asset.id);
+                            _selectedAsset = selection;
+                            _loadChildrenForAsset(selection.id);
                           });
-                        }
-                      },
-                      validator: (v) => _isTransversal ? null : (v == null ? 'Selecciona un equipo' : null),
-                    );
+                        },
+                        optionsViewBuilder: (context, onSelected, options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              elevation: 4,
+                              borderRadius: BorderRadius.circular(8),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 250, maxWidth: 680),
+                                child: ListView.builder(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (context, index) {
+                                    final a = options.elementAt(index);
+                                    final existingPlan = _existingPlanByAsset[a.id];
+                                    return ListTile(
+                                      dense: true,
+                                      title: Text(
+                                        '${a.id} - ${a.name} (${_assetLevelLabel(a.level)})',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: existingPlan != null ? Colors.amber.shade900 : null,
+                                        ),
+                                      ),
+                                      subtitle: existingPlan != null
+                                          ? Text('⚠️ Ya cuenta con el Plan ${existingPlan.id}', style: TextStyle(fontSize: 11, color: Colors.amber.shade900))
+                                          : (a.brand != null && a.brand!.isNotEmpty ? Text('Marca: ${a.brand}', style: const TextStyle(fontSize: 11)) : null),
+                                      trailing: existingPlan != null ? const Icon(Icons.warning_amber, size: 16, color: Colors.amber) : null,
+                                      onTap: () => onSelected(a),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                          return TextFormField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Buscar Equipo Principal *',
+                              hintText: 'Escribe código o nombre del equipo...',
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                              prefixIcon: const Icon(Icons.precision_manufacturing, size: 18),
+                              suffixIcon: controller.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear, size: 16),
+                                      tooltip: 'Limpiar selección',
+                                      onPressed: () {
+                                        controller.clear();
+                                        setState(() {
+                                          _selectedAsset = null;
+                                          _childDrafts.clear();
+                                        });
+                                      },
+                                    )
+                                  : null,
+                            ),
+                            validator: (v) {
+                              if (_isTransversal) return null;
+                              if (_selectedAsset == null) return 'Busca y selecciona un equipo';
+                              if (_existingPlanByAsset.containsKey(_selectedAsset!.id)) {
+                                return 'Este equipo ya tiene el plan ${_existingPlanByAsset[_selectedAsset!.id]!.id}. Edítelo con autorización gerencial.';
+                              }
+                              return null;
+                            },
+                          );
+                        },
+                      );
+                    }
 
                     final freqField = DropdownButtonFormField<ScheduleFrequency>(
                       value: _selectedFrequency,
@@ -2101,7 +2218,41 @@ class _CreatePreventivePlanDialogState
                           // Equipo (solo si es por área específica)
                           if (!_isTransversal) ...[
                             assetField,
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
+                            if (_selectedAsset != null && _existingPlanByAsset.containsKey(_selectedAsset!.id)) ...[
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.amber.shade400),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800, size: 22),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'El equipo ${_selectedAsset!.id} ya cuenta con el Plan ${_existingPlanByAsset[_selectedAsset!.id]!.id}',
+                                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.amber.shade900, fontSize: 13),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'No se permite crear múltiples planes para un mismo equipo. Para modificar tareas, frecuencias o materiales, utilice la opción "Editar Plan" en la lista de planes (requiere autorización gerencial).',
+                                            style: TextStyle(color: Colors.amber.shade900, fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                           ],
 
                           if (isNarrow) ...[
@@ -2438,12 +2589,18 @@ class _CreatePreventivePlanDialogState
       ),
       actions: [
         TextButton(
-          onPressed: vm.isSaving ? null : () => Navigator.pop(context, false),
+          onPressed: _isSaving ? null : () => Navigator.pop(context, false),
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: vm.isSaving ? null : _submit,
-          child: const Text('Guardar Plan'),
+          onPressed: _isSaving ? null : _submit,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Guardar Plan'),
         ),
       ],
     );
@@ -2477,6 +2634,7 @@ class _AmendPreventivePlanDialogState
   final _matNameCtrl = TextEditingController();
   final _matQtyCtrl = TextEditingController(text: '1');
   final _matUnitCtrl = TextEditingController(text: 'pza');
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -2524,44 +2682,49 @@ class _AmendPreventivePlanDialogState
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
-    final updated = PreventiveSchedule(
-      id: widget.schedule.id,
-      title: _titleCtrl.text.trim(),
-      assetId: widget.schedule.assetId,
-      assetName: widget.schedule.assetName,
-      areaId: widget.schedule.areaId,
-      areaName: widget.schedule.areaName,
-      maintenanceType: widget.schedule.maintenanceType,
-      frequency: _selectedFrequency,
-      description: _descCtrl.text.trim(),
-      materials: _materials,
-      estimatedHours: double.tryParse(_hoursCtrl.text.trim()),
-      startDate: widget.schedule.startDate,
-      nextDate: _nextDate,
-      lastCompleted: widget.schedule.lastCompleted,
-      lastWorkOrderId: widget.schedule.lastWorkOrderId,
-      status: widget.schedule.status,
-    );
+    setState(() => _isSaving = true);
 
-    final vm = context.read<PreventiveScheduleViewModel>();
-    final success = await vm.amendSchedule(
-      scheduleId: widget.schedule.id,
-      amendmentDocNumber: _docNumberCtrl.text.trim(),
-      authorizedByManager: _managerCtrl.text.trim(),
-      amendmentReason: _reasonCtrl.text.trim(),
-      updatedSchedule: updated,
-      userId: user.userId,
-      userName: user.username,
-    );
+    try {
+      final updated = PreventiveSchedule(
+        id: widget.schedule.id,
+        title: _titleCtrl.text.trim(),
+        assetId: widget.schedule.assetId,
+        assetName: widget.schedule.assetName,
+        areaId: widget.schedule.areaId,
+        areaName: widget.schedule.areaName,
+        maintenanceType: widget.schedule.maintenanceType,
+        frequency: _selectedFrequency,
+        description: _descCtrl.text.trim(),
+        materials: _materials,
+        estimatedHours: double.tryParse(_hoursCtrl.text.trim()),
+        startDate: widget.schedule.startDate,
+        nextDate: _nextDate,
+        lastCompleted: widget.schedule.lastCompleted,
+        lastWorkOrderId: widget.schedule.lastWorkOrderId,
+        status: widget.schedule.status,
+      );
 
-    if (success && mounted) {
-      Navigator.pop(context, true);
+      final vm = context.read<PreventiveScheduleViewModel>();
+      final success = await vm.amendSchedule(
+        scheduleId: widget.schedule.id,
+        amendmentDocNumber: _docNumberCtrl.text.trim(),
+        authorizedByManager: _managerCtrl.text.trim(),
+        amendmentReason: _reasonCtrl.text.trim(),
+        updatedSchedule: updated,
+        userId: user.userId,
+        userName: user.username,
+      );
+
+      if (success && mounted) {
+        Navigator.pop(context, true);
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<PreventiveScheduleViewModel>();
 
     return AlertDialog(
       title: Row(
@@ -2813,12 +2976,18 @@ class _AmendPreventivePlanDialogState
       ),
       actions: [
         TextButton(
-          onPressed: vm.isSaving ? null : () => Navigator.pop(context, false),
+          onPressed: _isSaving ? null : () => Navigator.pop(context, false),
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: vm.isSaving ? null : _submit,
-          child: const Text('Aplicar Modificación'),
+          onPressed: _isSaving ? null : _submit,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Aplicar Modificación'),
         ),
       ],
     );
@@ -2845,6 +3014,7 @@ class _AuthorizeStatusChangeDialogState
   final _docNumberCtrl = TextEditingController();
   final _managerCtrl = TextEditingController();
   final _reasonCtrl = TextEditingController();
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -2860,25 +3030,30 @@ class _AuthorizeStatusChangeDialogState
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
-    final vm = context.read<PreventiveScheduleViewModel>();
-    final success = await vm.toggleScheduleStatus(
-      scheduleId: widget.schedule.id,
-      status: widget.newStatus,
-      amendmentDocNumber: _docNumberCtrl.text.trim(),
-      authorizedByManager: _managerCtrl.text.trim(),
-      reason: _reasonCtrl.text.trim(),
-      userId: user.userId,
-      userName: user.username,
-    );
+    setState(() => _isSaving = true);
 
-    if (success && mounted) {
-      Navigator.pop(context, true);
+    try {
+      final vm = context.read<PreventiveScheduleViewModel>();
+      final success = await vm.toggleScheduleStatus(
+        scheduleId: widget.schedule.id,
+        status: widget.newStatus,
+        amendmentDocNumber: _docNumberCtrl.text.trim(),
+        authorizedByManager: _managerCtrl.text.trim(),
+        reason: _reasonCtrl.text.trim(),
+        userId: user.userId,
+        userName: user.username,
+      );
+
+      if (success && mounted) {
+        Navigator.pop(context, true);
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<PreventiveScheduleViewModel>();
     final isPausing = widget.newStatus == ScheduleStatus.paused;
 
     return AlertDialog(
@@ -2983,12 +3158,18 @@ class _AuthorizeStatusChangeDialogState
       ),
       actions: [
         TextButton(
-          onPressed: vm.isSaving ? null : () => Navigator.pop(context, false),
+          onPressed: _isSaving ? null : () => Navigator.pop(context, false),
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed: vm.isSaving ? null : _submit,
-          child: Text(isPausing ? 'Confirmar Suspensión' : 'Confirmar Reactivación'),
+          onPressed: _isSaving ? null : _submit,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : Text(isPausing ? 'Confirmar Suspensión' : 'Confirmar Reactivación'),
         ),
       ],
     );

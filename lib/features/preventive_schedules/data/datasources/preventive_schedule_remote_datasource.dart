@@ -202,4 +202,34 @@ class PreventiveScheduleRemoteDataSource {
     }
     return '';
   }
+
+  Future<List<String>> generateBatchMonthlyWorkOrders({
+    required int year,
+    required int month,
+    String? areaId,
+    required String userId,
+    required String userName,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        '/planes-preventivos/generar-ots-masivas',
+        body: {
+          'anio': year,
+          'mes': month,
+          if (areaId != null && areaId.isNotEmpty) 'areaId': areaId,
+          'usuarioId': int.tryParse(userId),
+          'nombreUsuario': userName,
+        },
+      );
+      if (response is List) {
+        return response
+            .whereType<Map<String, dynamic>>()
+            .where((r) => r['Exitoso'] == true || r['exitoso'] == true)
+            .map((r) => (r['WorkOrderId'] ?? r['workOrderId'] ?? '').toString())
+            .where((id) => id.isNotEmpty)
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
 }

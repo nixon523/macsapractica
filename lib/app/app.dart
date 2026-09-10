@@ -15,6 +15,7 @@ class MacsaApp extends StatelessWidget {
       providers: appProviders,
       child: MaterialApp(
         title: AppConstants.appName,
+        debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: ThemeMode.light,

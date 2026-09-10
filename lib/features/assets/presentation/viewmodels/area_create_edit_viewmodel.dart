@@ -41,10 +41,12 @@ class AreaCreateEditViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final cleanName = name.trim().toUpperCase();
+      final cleanCC = costCenter.trim().toUpperCase();
       final area = await createAreaUseCase(
         CreateAreaParams(
-          name: name,
-          costCenter: costCenter,
+          name: cleanName,
+          costCenter: cleanCC,
           customId: customId,
         ),
       );

@@ -59,4 +59,9 @@ class AreaRemoteDataSource {
       },
     );
   }
+
+  Future<void> deleteArea(String id) async {
+    await _apiClient.delete(ApiEndpoints.areaById(id));
+  }
 }
+

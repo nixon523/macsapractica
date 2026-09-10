@@ -24,6 +24,7 @@ abstract class WorkOrderRepository {
     List<WorkOrderMaterial> materials = const [],
     DateTime? scheduledDate,
     String? reportId,
+    String? preventiveScheduleId,
     required String createdByUserId,
     required String createdByUserName,
   });

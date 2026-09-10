@@ -29,6 +29,7 @@ class WorkOrderModel extends WorkOrder {
     super.maintenanceHeadResponsible,
     super.scheduledDate,
     super.reportId,
+    super.preventiveScheduleId,
     super.createdByUserId,
     super.createdByUserName,
     super.createdAt,
@@ -148,6 +149,7 @@ class WorkOrderModel extends WorkOrder {
       maintenanceHeadResponsible: (map['maintenanceHeadResponsible'] ?? map['MaintenanceHeadResponsible'])?.toString(),
       scheduledDate: parseDate(map['scheduledDate'] ?? map['ScheduledDate']),
       reportId: (map['reportId'] ?? map['ReportId'])?.toString(),
+      preventiveScheduleId: (map['preventiveScheduleId'] ?? map['PreventiveScheduleId'] ?? map['planPreventivoId'] ?? map['PlanPreventivoId'])?.toString(),
       createdByUserId: (map['createdByUserId'] ?? map['CreatedByUserId'])?.toString(),
       createdByUserName: (map['createdByUserName'] ?? map['CreatedByUserName'])?.toString(),
       createdAt: parseDate(map['createdAt'] ?? map['CreatedAt']),
@@ -181,6 +183,8 @@ class WorkOrderModel extends WorkOrder {
       'reprogramDate': reprogramDate?.toIso8601String(),
       'scheduledDate': scheduledDate?.toIso8601String(),
       'reportId': reportId != null ? int.tryParse(reportId!) : null,
+      'preventiveScheduleId': preventiveScheduleId,
+      'planPreventivoId': preventiveScheduleId,
     };
   }
 
@@ -218,6 +222,7 @@ class WorkOrderModel extends WorkOrder {
       if (scheduledDate != null)
         'scheduledDate': scheduledDate,
       if (reportId != null) 'reportId': reportId,
+      if (preventiveScheduleId != null) 'preventiveScheduleId': preventiveScheduleId,
       if (createdByUserId != null) 'createdByUserId': createdByUserId,
       if (createdByUserName != null) 'createdByUserName': createdByUserName,
       if (createdAt != null) 'createdAt': createdAt,

@@ -12,6 +12,7 @@ import '../../features/assets/domain/repositories/area_repository.dart';
 import '../../features/assets/domain/repositories/asset_repository.dart';
 import '../../features/assets/domain/usecases/create_area_usecase.dart';
 import '../../features/assets/domain/usecases/create_asset_usecase.dart';
+import '../../features/assets/domain/usecases/delete_area_usecase.dart';
 import '../../features/assets/domain/usecases/find_asset_by_serial.dart';
 import '../../features/assets/domain/usecases/get_areas_usecase.dart';
 import '../../features/assets/domain/usecases/get_all_assets_by_area.dart';
@@ -95,6 +96,16 @@ import '../../features/work_orders/domain/usecases/update_work_order_status.dart
 import '../../features/work_orders/presentation/viewmodels/work_order_create_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_detail_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_list_viewmodel.dart';
+import '../../features/operation_reports/data/datasources/operation_report_remote_datasource.dart';
+import '../../features/operation_reports/data/repositories/operation_report_repository_impl.dart';
+import '../../features/operation_reports/domain/repositories/operation_report_repository.dart';
+import '../../features/operation_reports/domain/usecases/registrar_reporte_operacion.dart';
+import '../../features/operation_reports/domain/usecases/obtener_reportes_por_activo.dart';
+import '../../features/operation_reports/domain/usecases/obtener_reporte_semana.dart';
+import '../../features/operation_reports/domain/usecases/obtener_metricas_operacion.dart';
+import '../../features/operation_reports/domain/usecases/listar_equipos_proceso.dart';
+import '../../features/operation_reports/domain/usecases/actualizar_es_equipo_proceso.dart';
+import '../../features/operation_reports/presentation/viewmodels/operation_report_viewmodel.dart';
 
 final GetIt getIt = GetIt.instance;
 
@@ -212,6 +223,10 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton(
     () => UpdateAreaUseCase(getIt<AreaRepository>()),
   );
+  getIt.registerLazySingleton(
+    () => DeleteAreaUseCase(getIt<AreaRepository>()),
+  );
+
   getIt.registerLazySingleton(
     () => CreateAssetUseCase(getIt<AssetRepository>()),
   );
@@ -355,6 +370,7 @@ Future<void> configureDependencies() async {
     () => AreaListViewModel(
       getAreasUseCase: getIt<GetAreasUseCase>(),
       updateAreaUseCase: getIt<UpdateAreaUseCase>(),
+      deleteAreaUseCase: getIt<DeleteAreaUseCase>(),
     ),
   );
   getIt.registerFactory(
@@ -454,5 +470,40 @@ Future<void> configureDependencies() async {
   );
   getIt.registerLazySingleton<DashboardViewModel>(
     () => DashboardViewModel(dashboardRepository: getIt<DashboardRepository>()),
+  );
+
+  // --- MÓDULO: Reportes de Operación / Disponibilidad ---
+  getIt.registerLazySingleton<OperationReportRemoteDataSource>(
+    () => OperationReportRemoteDataSource(getIt<ApiClient>()),
+  );
+  getIt.registerLazySingleton<OperationReportRepository>(
+    () => OperationReportRepositoryImpl(getIt<OperationReportRemoteDataSource>()),
+  );
+  getIt.registerLazySingleton<RegistrarReporteOperacion>(
+    () => RegistrarReporteOperacion(getIt<OperationReportRepository>()),
+  );
+  getIt.registerLazySingleton<ObtenerReportesPorActivo>(
+    () => ObtenerReportesPorActivo(getIt<OperationReportRepository>()),
+  );
+  getIt.registerLazySingleton<ObtenerReporteSemana>(
+    () => ObtenerReporteSemana(getIt<OperationReportRepository>()),
+  );
+  getIt.registerLazySingleton<ObtenerMetricasOperacion>(
+    () => ObtenerMetricasOperacion(getIt<OperationReportRepository>()),
+  );
+  getIt.registerLazySingleton<ListarEquiposProceso>(
+    () => ListarEquiposProceso(getIt<OperationReportRepository>()),
+  );
+  getIt.registerLazySingleton<ActualizarEsEquipoProceso>(
+    () => ActualizarEsEquipoProceso(getIt<OperationReportRepository>()),
+  );
+  getIt.registerLazySingleton<OperationReportViewModel>(
+    () => OperationReportViewModel(
+      registrar:       getIt<RegistrarReporteOperacion>(),
+      obtenerSemana:   getIt<ObtenerReporteSemana>(),
+      obtenerMetricas: getIt<ObtenerMetricasOperacion>(),
+      listarEquipos:   getIt<ListarEquiposProceso>(),
+      actualizarEquipo: getIt<ActualizarEsEquipoProceso>(),
+    ),
   );
 }

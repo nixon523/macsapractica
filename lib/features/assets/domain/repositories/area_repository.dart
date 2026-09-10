@@ -16,4 +16,7 @@ abstract class AreaRepository {
     required String name,
     String? costCenter,
   });
+
+  Future<void> deleteArea(String id);
 }
+
