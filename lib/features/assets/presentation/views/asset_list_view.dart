@@ -568,31 +568,39 @@ class _AssetListViewState extends State<AssetListView> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Icon(Icons.precision_manufacturing_outlined, size: 16, color: colors.primary),
-          const SizedBox(width: 8),
-          Text(
-            '$total activo(s)',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: colors.onSurface,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.precision_manufacturing_outlined, size: 16, color: colors.primary),
+              const SizedBox(width: 8),
+              Text(
+                '$total activo(s)',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: colors.onSurface,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '$active operativo(s)',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              '$active operativo(s)',
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
-            ),
-          ),
-          const Spacer(),
           if (_showFullTree)
             Text(
               'Árbol completo (padres e hijos)',

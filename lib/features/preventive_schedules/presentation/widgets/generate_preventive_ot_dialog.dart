@@ -190,62 +190,95 @@ class _GeneratePreventiveOtDialogState
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.grey.shade200),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.event_note, size: 20, color: Color(0xFF475569)),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Periodo Objetivo:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Color(0xFF334155),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isCompact = constraints.maxWidth < 420;
+                    final monthField = DropdownButtonFormField<int>(
+                      value: _selectedMonth,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Mes',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 3,
-                      child: DropdownButtonFormField<int>(
-                        value: _selectedMonth,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Mes',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      items: List.generate(12, (index) {
+                        return DropdownMenuItem(
+                          value: index + 1,
+                          child: Text(_monthNames[index]),
+                        );
+                      }),
+                      onChanged: (m) {
+                        if (m != null) setState(() => _selectedMonth = m);
+                      },
+                    );
+
+                    final yearField = DropdownButtonFormField<int>(
+                      value: _selectedYear,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Año',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      items: years.map((y) {
+                        return DropdownMenuItem(value: y, child: Text('$y'));
+                      }).toList(),
+                      onChanged: (y) {
+                        if (y != null) setState(() => _selectedYear = y);
+                      },
+                    );
+
+                    if (isCompact) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.event_note, size: 18, color: Color(0xFF475569)),
+                              SizedBox(width: 8),
+                              Text(
+                                'Periodo Objetivo:',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(flex: 3, child: monthField),
+                              const SizedBox(width: 8),
+                              Expanded(flex: 2, child: yearField),
+                            ],
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        const Icon(Icons.event_note, size: 20, color: Color(0xFF475569)),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Periodo Objetivo:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: Color(0xFF334155),
+                          ),
                         ),
-                        items: List.generate(12, (index) {
-                          return DropdownMenuItem(
-                            value: index + 1,
-                            child: Text(_monthNames[index]),
-                          );
-                        }),
-                        onChanged: (m) {
-                          if (m != null) setState(() => _selectedMonth = m);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: DropdownButtonFormField<int>(
-                        value: _selectedYear,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Año',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        ),
-                        items: years.map((y) {
-                          return DropdownMenuItem(value: y, child: Text('$y'));
-                        }).toList(),
-                        onChanged: (y) {
-                          if (y != null) setState(() => _selectedYear = y);
-                        },
-                      ),
-                    ),
-                  ],
+                        const SizedBox(width: 12),
+                        Expanded(flex: 3, child: monthField),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 2, child: yearField),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 16),
@@ -253,14 +286,14 @@ class _GeneratePreventiveOtDialogState
               // Sección 1: Actividades que SÍ corresponden al periodo
               Row(
                 children: [
-                  const Icon(Icons.check_circle_outline, color: Color(0xFF047857), size: 18),
+                  const Icon(Icons.check_circle_outline, color: Color(0xFF0055A5), size: 18),
                   const SizedBox(width: 6),
                   Text(
                     'Tareas a Realizar en este Periodo (${includedActs.isNotEmpty ? includedActs.length : (canGenerate ? 1 : 0)}):',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: Color(0xFF047857),
+                      color: Color(0xFF0055A5),
                     ),
                   ),
                 ],
@@ -275,16 +308,16 @@ class _GeneratePreventiveOtDialogState
                       margin: const EdgeInsets.only(bottom: 6),
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50.withValues(alpha: 0.5),
+                        color: const Color(0xFF0055A5).withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.green.shade200),
+                        border: Border.all(color: const Color(0xFF0055A5).withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Padding(
                             padding: EdgeInsets.only(top: 2),
-                            child: Icon(Icons.task_alt, size: 16, color: Color(0xFF047857)),
+                            child: Icon(Icons.task_alt, size: 16, color: Color(0xFF0055A5)),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -292,7 +325,7 @@ class _GeneratePreventiveOtDialogState
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '[${act.childAssetId}] ${act.childAssetName}',
+                                  '${act.childAssetName} (${act.childAssetId})',
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
@@ -310,7 +343,7 @@ class _GeneratePreventiveOtDialogState
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: isOverdue ? Colors.red.shade100 : Colors.blue.shade50,
+                                        color: isOverdue ? Colors.red.shade100 : const Color(0xFF0055A5).withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
@@ -318,7 +351,7 @@ class _GeneratePreventiveOtDialogState
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
-                                          color: isOverdue ? Colors.red.shade800 : Colors.blue.shade800,
+                                          color: isOverdue ? Colors.red.shade800 : const Color(0xFF0055A5),
                                         ),
                                       ),
                                     ),
@@ -340,9 +373,9 @@ class _GeneratePreventiveOtDialogState
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: Colors.green.shade200),
+                      border: Border.all(color: const Color(0xFF0055A5).withValues(alpha: 0.2)),
                     ),
                     child: Text(
                       '• Mantenimiento General de Equipo: ${schedule.description.isNotEmpty ? schedule.description : schedule.maintenanceType}',

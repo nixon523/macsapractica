@@ -49,6 +49,11 @@ class BreakdownAlertsViewModel extends ChangeNotifier {
     _timer = Timer.periodic(_pollInterval, (_) => _poll());
   }
 
+  /// Fuerza una consulta inmediata para refrescar el contador.
+  Future<void> refresh() async {
+    await _poll();
+  }
+
   Future<void> _poll() async {
     try {
       final openReports = await _repository?.getOpenReports() ?? [];

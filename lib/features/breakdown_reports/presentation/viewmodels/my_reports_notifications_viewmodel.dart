@@ -56,6 +56,11 @@ class MyReportsNotificationsViewModel extends ChangeNotifier {
     _timer = Timer.periodic(_pollInterval, (_) => _poll());
   }
 
+  /// Fuerza una consulta inmediata para refrescar el estado.
+  Future<void> refresh() async {
+    await _poll();
+  }
+
   Future<void> _poll() async {
     final userId = _currentUserId;
     if (userId == null) return;

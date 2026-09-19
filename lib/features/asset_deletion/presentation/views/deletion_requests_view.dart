@@ -577,32 +577,41 @@ class _DeletionRequestsContentState extends State<_DeletionRequestsContent> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Icon(Icons.assignment_late_outlined, size: 16, color: colors.primary),
-          const SizedBox(width: 8),
-          Text(
-            '$count solicitud(es)',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: colors.onSurface,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.assignment_late_outlined, size: 16, color: colors.primary),
+              const SizedBox(width: 8),
+              Text(
+                '$count solicitud(es)',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: colors.onSurface,
+                ),
+              ),
+              if (pendingCount > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEDD5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '$pendingCount pendiente(s)',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFC2410C)),
+                  ),
+                ),
+              ],
+            ],
           ),
-          const SizedBox(width: 12),
-          if (pendingCount > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFEDD5),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '$pendingCount pendiente(s)',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFC2410C)),
-              ),
-            ),
-          const Spacer(),
           Text(
             'Por fecha de solicitud',
             style: TextStyle(
@@ -716,7 +725,10 @@ class _ModernDeletionRequestCard extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -735,7 +747,6 @@ class _ModernDeletionRequestCard extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
@@ -810,7 +821,11 @@ class _ModernDeletionRequestCard extends StatelessWidget {
                     const SizedBox(height: 10),
 
                     // Footer: Metadatos y acciones
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Wrap(
                           spacing: 12,
@@ -855,31 +870,34 @@ class _ModernDeletionRequestCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const Spacer(),
-                        if (request.status == DeletionRequestStatus.pending) ...[
-                          OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFFDC2626),
-                              side: const BorderSide(color: Color(0xFFFCA5A5)),
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                            ),
-                            onPressed: isProcessing ? null : onReject,
-                            icon: const Icon(Icons.close, size: 15),
-                            label: const Text('Rechazar', style: TextStyle(fontSize: 11.5)),
+                        if (request.status == DeletionRequestStatus.pending)
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFFDC2626),
+                                  side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                ),
+                                onPressed: isProcessing ? null : onReject,
+                                icon: const Icon(Icons.close, size: 15),
+                                label: const Text('Rechazar', style: TextStyle(fontSize: 11.5)),
+                              ),
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF15803D),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                ),
+                                onPressed: isProcessing ? null : onApprove,
+                                icon: const Icon(Icons.check, size: 15),
+                                label: const Text('Aprobar', style: TextStyle(fontSize: 11.5)),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFF15803D),
-                              visualDensity: VisualDensity.compact,
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                            ),
-                            onPressed: isProcessing ? null : onApprove,
-                            icon: const Icon(Icons.check, size: 15),
-                            label: const Text('Aprobar', style: TextStyle(fontSize: 11.5)),
-                          ),
-                        ],
                       ],
                     ),
                   ],

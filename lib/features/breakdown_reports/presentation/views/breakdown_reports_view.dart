@@ -128,50 +128,6 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
     }
   }
 
-  Future<void> _confirmResolve(BreakdownReport report) async {
-    final user = context.read<AuthViewModel>().currentUser;
-    if (user == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Resolver reporte de avería'),
-        content: Text(
-          '¿Confirmas que la avería en ${report.assetId} (${report.assetName}) ha sido resuelta?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF15803D)),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Confirmar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    final viewModel = context.read<BreakdownReportsViewModel>();
-    final ok = await viewModel.resolve(
-      report: report,
-      resolvedByUserId: user.userId,
-      resolvedByUserName: user.username,
-    );
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok ? 'Avería marcada como resuelta.' : 'Error: ${viewModel.errorMessage}',
-        ),
-      ),
-    );
-  }
-
   Future<void> _confirmReject(BreakdownReport report) async {
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
@@ -304,10 +260,8 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
                             report: report,
                             isProcessing: vm.isProcessing,
                             canGenerateOt: canManage,
-                            canResolve: canManage,
                             canReject: canManage,
                             onGenerateOt: () => _generateWorkOrder(report),
-                            onResolve: () => _confirmResolve(report),
                             onReject: () => _confirmReject(report),
                           );
                         },
@@ -603,20 +557,16 @@ class _ModernReportCard extends StatelessWidget {
     required this.report,
     required this.isProcessing,
     required this.canGenerateOt,
-    required this.canResolve,
     required this.canReject,
     required this.onGenerateOt,
-    required this.onResolve,
     required this.onReject,
   });
 
   final BreakdownReport report;
   final bool isProcessing;
   final bool canGenerateOt;
-  final bool canResolve;
   final bool canReject;
   final VoidCallback onGenerateOt;
-  final VoidCallback onResolve;
   final VoidCallback onReject;
 
   String _formatTimestamp(DateTime? dt) {
@@ -724,7 +674,10 @@ class _ModernReportCard extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -743,7 +696,6 @@ class _ModernReportCard extends StatelessWidget {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                     decoration: BoxDecoration(
@@ -818,7 +770,11 @@ class _ModernReportCard extends StatelessWidget {
                     const SizedBox(height: 10),
 
                     // Footer: Usuario y fecha
-                    Row(
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Wrap(
                           spacing: 14,
@@ -852,47 +808,35 @@ class _ModernReportCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const Spacer(),
-                        if (report.status == BreakdownReportStatus.reported) ...[
-                          if (canReject)
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFFDC2626),
-                                side: const BorderSide(color: Color(0xFFFCA5A5)),
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                              ),
-                              onPressed: isProcessing ? null : onReject,
-                              icon: const Icon(Icons.close, size: 15),
-                              label: const Text('Rechazar', style: TextStyle(fontSize: 11.5)),
-                            ),
-                          if (canResolve) ...[
-                            const SizedBox(width: 8),
-                            OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF15803D),
-                                side: const BorderSide(color: Color(0xFF86EFAC)),
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                              ),
-                              onPressed: isProcessing ? null : onResolve,
-                              icon: const Icon(Icons.check, size: 15),
-                              label: const Text('Resolver', style: TextStyle(fontSize: 11.5)),
-                            ),
-                          ],
-                          if (canGenerateOt) ...[
-                            const SizedBox(width: 8),
-                            FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                              ),
-                              onPressed: isProcessing ? null : onGenerateOt,
-                              icon: const Icon(Icons.assignment_add, size: 15),
-                              label: const Text('Generar OT', style: TextStyle(fontSize: 11.5)),
-                            ),
-                          ],
-                        ],
+                        if (report.status == BreakdownReportStatus.reported)
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 6,
+                            children: [
+                              if (canReject)
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFDC2626),
+                                    side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  ),
+                                  onPressed: isProcessing ? null : onReject,
+                                  icon: const Icon(Icons.close, size: 15),
+                                  label: const Text('Rechazar', style: TextStyle(fontSize: 11.5)),
+                                ),
+                              if (canGenerateOt)
+                                FilledButton.icon(
+                                  style: FilledButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  ),
+                                  onPressed: isProcessing ? null : onGenerateOt,
+                                  icon: const Icon(Icons.assignment_add, size: 15),
+                                  label: const Text('Generar OT', style: TextStyle(fontSize: 11.5)),
+                                ),
+                            ],
+                          ),
                       ],
                     ),
                   ],

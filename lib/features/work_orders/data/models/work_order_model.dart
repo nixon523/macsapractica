@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../../core/utils/text_sanitizer.dart';
 import '../../domain/entities/work_order.dart';
 
 class WorkOrderModel extends WorkOrder {
@@ -104,16 +105,69 @@ class WorkOrderModel extends WorkOrder {
     final rawTypes = map['requestedWorkTypes'] ??
         map['workTypes'] ??
         map['WorkTypes'] ??
-        map['WorkTypesJson'];
+        map['WorkTypesJson'] ??
+        map['WorkTypesCsv'] ??
+        map['workTypesCsv'];
     if (rawTypes is List) {
-      workTypesList = rawTypes.map((e) => e.toString()).toList();
+      workTypesList = rawTypes
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
     } else if (rawTypes is String && rawTypes.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(rawTypes);
-        if (decoded is List) {
-          workTypesList = decoded.map((e) => e.toString()).toList();
-        }
-      } catch (_) {}
+      final trimmed = rawTypes.trim();
+      if (trimmed.startsWith('[')) {
+        try {
+          final decoded = jsonDecode(trimmed);
+          if (decoded is List) {
+            workTypesList = decoded
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList();
+          }
+        } catch (_) {}
+      } else {
+        workTypesList = trimmed
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+    }
+
+    String? prevPlanId = (map['preventiveScheduleId'] ??
+            map['PreventiveScheduleId'] ??
+            map['planPreventivoId'] ??
+            map['PlanPreventivoId'])
+        ?.toString();
+    if (prevPlanId == null || prevPlanId.isEmpty || prevPlanId == 'null') {
+      final desc = (map['description'] ?? map['Description'] ?? '').toString();
+      final match = RegExp(r'Plan\s+([A-Z0-9-]+)', caseSensitive: false).firstMatch(desc);
+      if (match != null) {
+        prevPlanId = match.group(1);
+      } else {
+        prevPlanId = null;
+      }
+    }
+
+    if (prevPlanId != null &&
+        prevPlanId.isNotEmpty &&
+        !workTypesList.contains('preventive')) {
+      workTypesList.add('preventive');
+    }
+
+    String? repId = (map['reportId'] ?? map['ReportId'])?.toString();
+    if (repId == 'null' || repId == '') repId = null;
+    if (repId == null) {
+      final desc = (map['description'] ?? map['Description'] ?? '').toString();
+      final match = RegExp(r'Aver[ií]a\s+#?(\d+)', caseSensitive: false).firstMatch(desc);
+      if (match != null) {
+        repId = match.group(1);
+      }
+    }
+    if (repId != null &&
+        repId.isNotEmpty &&
+        !workTypesList.contains('corrective')) {
+      workTypesList.add('corrective');
     }
 
     final isCompletedVal = map['isCompleted'] ?? map['IsCompleted'];
@@ -126,7 +180,7 @@ class WorkOrderModel extends WorkOrder {
       assetName: (map['assetName'] ?? map['AssetName'] ?? '').toString(),
       areaId: (map['areaId'] ?? map['AreaId'])?.toString(),
       areaName: (map['areaName'] ?? map['AreaName'])?.toString(),
-      description: (map['description'] ?? map['Description'] ?? '').toString(),
+      description: TextSanitizer.cleanDescription((map['description'] ?? map['Description'] ?? '').toString()),
       status: status,
       priority: priority,
       requestedWorkTypes: workTypesList,
@@ -137,7 +191,9 @@ class WorkOrderModel extends WorkOrder {
       estimatedHours: (map['estimatedHours'] ?? map['EstimatedHours'] as num?)?.toDouble(),
       actualHours: (map['actualHours'] ?? map['ActualHours'] as num?)?.toDouble(),
       materials: materialsList,
-      workDoneDescription: (map['workDoneDescription'] ?? map['WorkDoneDescription'])?.toString(),
+      workDoneDescription: (map['workDoneDescription'] ?? map['WorkDoneDescription']) != null
+          ? TextSanitizer.cleanDescription((map['workDoneDescription'] ?? map['WorkDoneDescription']).toString())
+          : null,
       isCompleted: isCompletedVal is bool
           ? isCompletedVal
           : (isCompletedVal == 1 ? true : (isCompletedVal == 0 ? false : null)),
@@ -148,8 +204,8 @@ class WorkOrderModel extends WorkOrder {
       areaHeadResponsible: (map['areaHeadResponsible'] ?? map['AreaHeadResponsible'])?.toString(),
       maintenanceHeadResponsible: (map['maintenanceHeadResponsible'] ?? map['MaintenanceHeadResponsible'])?.toString(),
       scheduledDate: parseDate(map['scheduledDate'] ?? map['ScheduledDate']),
-      reportId: (map['reportId'] ?? map['ReportId'])?.toString(),
-      preventiveScheduleId: (map['preventiveScheduleId'] ?? map['PreventiveScheduleId'] ?? map['planPreventivoId'] ?? map['PlanPreventivoId'])?.toString(),
+      reportId: repId,
+      preventiveScheduleId: prevPlanId,
       createdByUserId: (map['createdByUserId'] ?? map['CreatedByUserId'])?.toString(),
       createdByUserName: (map['createdByUserName'] ?? map['CreatedByUserName'])?.toString(),
       createdAt: parseDate(map['createdAt'] ?? map['CreatedAt']),

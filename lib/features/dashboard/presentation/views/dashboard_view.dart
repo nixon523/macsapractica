@@ -111,6 +111,7 @@ class _DashboardViewState extends State<DashboardView> {
                     value: '${stats?.totalAssets ?? 0}',
                     subtitle: 'Jerarquía completa',
                     color: const Color(0xFF0D9488),
+                    onTap: () => widget.onNavigateToSection?.call('assets'),
                   ),
                   _SummaryCard(
                     icon: Icons.warning_amber_rounded,
@@ -118,6 +119,7 @@ class _DashboardViewState extends State<DashboardView> {
                     value: '${stats?.openBreakdowns ?? 0}',
                     subtitle: 'Reportadas / En Proceso',
                     color: (stats?.openBreakdowns ?? 0) > 0 ? const Color(0xFFE11D48) : const Color(0xFF16A34A),
+                    onTap: () => widget.onNavigateToSection?.call('breakdownReports'),
                   ),
                   _SummaryCard(
                     icon: Icons.event_repeat_outlined,
@@ -125,6 +127,7 @@ class _DashboardViewState extends State<DashboardView> {
                     value: '${stats?.activeSchedules ?? 0}',
                     subtitle: '${stats?.urgentSchedules ?? 0} urgente(s)',
                     color: const Color(0xFF0284C7),
+                    onTap: () => widget.onNavigateToSection?.call('preventive'),
                   ),
                 ],
               ),
@@ -139,6 +142,7 @@ class _DashboardViewState extends State<DashboardView> {
                     value: '${stats?.pendingWorkOrders ?? 0}',
                     subtitle: 'Por iniciar ejecución',
                     color: const Color(0xFFD97706),
+                    onTap: () => widget.onNavigateToSection?.call('workOrders'),
                   ),
                   _SummaryCard(
                     icon: Icons.autorenew_outlined,
@@ -146,6 +150,7 @@ class _DashboardViewState extends State<DashboardView> {
                     value: '${stats?.inProgressWorkOrders ?? 0}',
                     subtitle: 'En ejecución en planta',
                     color: const Color(0xFF2563EB),
+                    onTap: () => widget.onNavigateToSection?.call('workOrders'),
                   ),
                   _SummaryCard(
                     icon: Icons.check_circle_outline,
@@ -153,6 +158,7 @@ class _DashboardViewState extends State<DashboardView> {
                     value: '${stats?.completedWorkOrders ?? 0}',
                     subtitle: 'Cerradas con éxito',
                     color: const Color(0xFF16A34A),
+                    onTap: () => widget.onNavigateToSection?.call('workOrders'),
                   ),
                   _SummaryCard(
                     icon: Icons.history_edu_outlined,
@@ -160,6 +166,7 @@ class _DashboardViewState extends State<DashboardView> {
                     value: '${stats?.totalKardexLogs ?? 0}',
                     subtitle: 'Eventos inmutables',
                     color: const Color(0xFF7C3AED),
+                    onTap: () => widget.onNavigateToSection?.call('kardex'),
                   ),
                 ],
               ),
@@ -197,14 +204,20 @@ class _DashboardViewState extends State<DashboardView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Icon(Icons.shield_outlined, size: 22, color: color),
                 const SizedBox(width: 8),
-                Text(
-                  'Cumplimiento del Programa Preventivo (PM Compliance)',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    'Cumplimiento del Programa Preventivo (PM Compliance)',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
@@ -213,7 +226,7 @@ class _DashboardViewState extends State<DashboardView> {
                   ),
                   child: Text(
                     '${rate.toStringAsFixed(1)}%',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color),
                   ),
                 ),
               ],
@@ -256,12 +269,18 @@ class _DashboardViewState extends State<DashboardView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const Icon(Icons.security, size: 20, color: Color(0xFF0284C7)),
                 const SizedBox(width: 8),
-                Text(
-                  'Trazabilidad e Integridad de Mantenimiento',
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    'Trazabilidad e Integridad de Mantenimiento',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -314,6 +333,7 @@ class _SummaryCard extends StatelessWidget {
     required this.value,
     required this.color,
     this.subtitle,
+    this.onTap,
   });
 
   final IconData icon;
@@ -321,57 +341,76 @@ class _SummaryCard extends StatelessWidget {
   final String value;
   final Color color;
   final String? subtitle;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: color.withValues(alpha: 0.15)),
       ),
       color: color.withValues(alpha: 0.04),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        hoverColor: color.withValues(alpha: 0.08),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  child: Icon(icon, color: color, size: 18),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(icon, color: color, size: 18),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  if (onTap != null)
+                    Icon(Icons.arrow_forward_ios, size: 12, color: color.withValues(alpha: 0.5)),
+                ],
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                subtitle!,
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );

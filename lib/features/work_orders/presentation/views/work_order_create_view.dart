@@ -7,6 +7,7 @@ import '../../../breakdown_reports/domain/entities/breakdown_report.dart';
 import '../../domain/entities/work_order.dart';
 import '../viewmodels/work_order_create_viewmodel.dart';
 
+/// Vista para crear u originar una Orden de Trabajo oficial (REG.GMC-MTN-001).
 class WorkOrderCreateView extends StatefulWidget {
   const WorkOrderCreateView({
     super.key,
@@ -14,8 +15,7 @@ class WorkOrderCreateView extends StatefulWidget {
     this.preventiveSchedule,
   });
 
-  /// Reporte de avería que origina la OT (pre-rellena el formulario y, al
-  /// guardar, la OT queda vinculada al reporte).
+  /// Reporte de avería que origina la OT.
   final BreakdownReport? report;
 
   /// Plan preventivo que origina la OT.
@@ -57,31 +57,68 @@ class _WorkOrderCreateViewState extends State<WorkOrderCreateView> {
 
     if (created != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Orden de Trabajo ${created.displayCorrelative} creada con éxito.')),
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          backgroundColor: const Color(0xFF16A34A),
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Orden de Trabajo ${created.displayCorrelative} creada con éxito.',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
       Navigator.of(context).pop(true);
-    } else {
+    } else if (_viewModel.errorMessage.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${_viewModel.errorMessage}')),
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          backgroundColor: const Color(0xFFDC2626),
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _viewModel.errorMessage,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final title = widget.report != null
+        ? 'Generar OT desde Avería'
+        : (widget.preventiveSchedule != null
+            ? 'Generar OT desde Preventivo'
+            : 'Nueva Orden de Trabajo');
+
     return ChangeNotifierProvider<WorkOrderCreateViewModel>.value(
       value: _viewModel,
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            widget.report != null
-                ? 'Generar OT desde Avería'
-                : 'Nueva Orden de Trabajo (REG.GMC-MTN-001)',
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
         ),
         body: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
+            constraints: const BoxConstraints(maxWidth: 780),
             child: _WorkOrderCreateForm(
               viewModel: _viewModel,
               onSubmit: _submit,
@@ -161,319 +198,718 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
   Widget build(BuildContext context) {
     final vm = context.watch<WorkOrderCreateViewModel>();
     final isFromReport = vm.report != null;
+    final isFromPreventive = vm.preventiveSchedule != null;
     final theme = Theme.of(context);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       children: [
-        if (isFromReport)
-          Card(
-            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
-            child: ListTile(
-              leading: Icon(Icons.report_problem, color: theme.colorScheme.primary),
-              title: const Text('Reporte de Avería vinculado'),
-              subtitle: Text(
-                'Activo: ${vm.report!.assetId} — ${vm.report!.assetName}\n'
-                'Falla: ${vm.report!.description}',
-              ),
+        // Header Banner Oficial REG.GMC-MTN-001
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                theme.colorScheme.primary.withValues(alpha: 0.08),
+                theme.colorScheme.surface,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(alpha: 0.2),
+              width: 1,
             ),
           ),
-        const SizedBox(height: 16),
-
-        // --- Área para ser llenada por el SOLICITANTE ---
-        _SectionHeader(
-          title: 'Área para ser llenada por el SOLICITANTE',
-          color: Colors.green.shade700,
-        ),
-        const SizedBox(height: 12),
-
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                key: const Key('ot-asset-id'),
-                enabled: !isFromReport,
-                controller: _assetIdCtrl,
-                onChanged: vm.setAssetId,
-                decoration: const InputDecoration(
-                  labelText: 'ID del activo *',
-                  border: OutlineInputBorder(),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.assignment_outlined,
+                  color: theme.colorScheme.primary,
+                  size: 26,
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                key: const Key('ot-asset-name'),
-                enabled: !isFromReport,
-                controller: _assetNameCtrl,
-                onChanged: vm.setAssetName,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del activo',
-                  border: OutlineInputBorder(),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Formulario de Orden de Trabajo',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16.5,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'REG.GMC-MTN-001',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'monospace',
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    if (isFromReport)
+                      Text(
+                        'Generando orden correctiva a partir de la Avería #${vm.report!.id}. El reporte se vinculará y se resolverá automáticamente al cerrar la OT.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.3),
+                      )
+                    else if (isFromPreventive)
+                      Text(
+                        'Generando orden a partir del Plan Preventivo PM-${vm.preventiveSchedule.id}.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.3),
+                      )
+                    else
+                      Text(
+                        'Completa los datos del equipo y las instrucciones de intervención para emitir la orden formal de mantenimiento.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.3),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _areaIdCtrl,
-          onChanged: vm.setAreaId,
-          decoration: const InputDecoration(
-            labelText: 'Área de Trabajo / Ubicación',
-            border: OutlineInputBorder(),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
 
-        Text(
-          'Tipo de trabajo solicitado:',
-          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: kWorkTypeLabels.entries
-              .where((entry) => !const {'urgency', 'corrective', 'preventive', 'scheduled'}.contains(entry.key))
-              .map((entry) {
-            final isSelected = vm.requestedWorkTypes.contains(entry.key);
-            return FilterChip(
-              label: Text(entry.value),
-              selected: isSelected,
-              onSelected: (_) => vm.toggleWorkType(entry.key),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
 
-        TextField(
-          key: const Key('ot-description'),
-          maxLines: 4,
-          minLines: 3,
-          controller: _descriptionCtrl,
-          onChanged: vm.setDescription,
-          decoration: const InputDecoration(
-            labelText: 'Descripción detalle de la falla y/o trabajo requerido *',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        // --- Área para ser llenada por personal de Mantenimiento ---
-        _SectionHeader(
-          title: 'Área para ser llenada por personal de Mantenimiento',
-          color: Colors.green.shade800,
-        ),
-        const SizedBox(height: 12),
-
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _assignedStaffCountCtrl,
-                keyboardType: TextInputType.number,
-                onChanged: (val) => vm.setAssignedStaffCount(int.tryParse(val)),
-                decoration: const InputDecoration(
-                  labelText: 'Personal asignado (cant.)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _estimatedHoursCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                onChanged: (val) => vm.setEstimatedHours(double.tryParse(val)),
-                decoration: const InputDecoration(
-                  labelText: 'Horas estimadas para la tarea',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          key: const Key('ot-assigned-to'),
-          controller: _assignedToCtrl,
-          onChanged: vm.setAssignedTo,
-          decoration: const InputDecoration(
-            labelText: 'Responsable / Técnico asignado',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // --- Tabla de Materiales, Refacciones y Herramientas ---
-        Text(
-          'Material, Equipo, Herramienta y/o Refacciones a utilizar:',
-          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final descField = TextField(
-              controller: _matDescCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Descripción de la refacción/material',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            );
-            final qtyField = TextField(
-              controller: _matQtyCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Cant.',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            );
-            final addButton = IconButton.filled(
-              icon: const Icon(Icons.add),
-              tooltip: 'Agregar material',
-              onPressed: _addMaterial,
-            );
-
-            // Móvil (< 500 dp): descripción en línea completa,
-            // cantidad + botón en línea inferior.
-            if (constraints.maxWidth < 500) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+        // Bloque 1: Datos del Solicitante y Equipo
+        _FormCard(
+          title: '1. Datos del Solicitante y Equipo',
+          icon: Icons.precision_manufacturing_outlined,
+          theme: theme,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  descField,
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: qtyField),
-                      const SizedBox(width: 8),
-                      addButton,
-                    ],
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      key: const Key('ot-asset-id'),
+                      enabled: !isFromReport && !isFromPreventive,
+                      controller: _assetIdCtrl,
+                      onChanged: vm.setAssetId,
+                      decoration: InputDecoration(
+                        labelText: 'ID del activo *',
+                        hintText: 'Ej: A001-001',
+                        prefixIcon: const Icon(Icons.tag, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      key: const Key('ot-asset-name'),
+                      enabled: !isFromReport && !isFromPreventive,
+                      controller: _assetNameCtrl,
+                      onChanged: vm.setAssetName,
+                      decoration: InputDecoration(
+                        labelText: 'Nombre del activo',
+                        hintText: 'Nombre o descripción',
+                        prefixIcon: const Icon(Icons.settings_outlined, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
                   ),
                 ],
-              );
-            }
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _areaIdCtrl,
+                enabled: !isFromReport && !isFromPreventive,
+                onChanged: vm.setAreaId,
+                decoration: InputDecoration(
+                  labelText: 'Área de Trabajo / Ubicación',
+                  hintText: 'Ej: A001 o PROCESO GENERAL',
+                  prefixIcon: const Icon(Icons.business_outlined, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 18),
 
-            return Row(
-              children: [
-                Expanded(flex: 3, child: descField),
-                const SizedBox(width: 8),
-                Expanded(flex: 1, child: qtyField),
-                const SizedBox(width: 8),
-                addButton,
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 8),
+              // Naturaleza del Mantenimiento
+              Text(
+                'Naturaleza del Mantenimiento:',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: (isFromReport || isFromPreventive)
+                          ? null
+                          : () => vm.setMaintenanceNature(isPreventive: false),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: vm.isCorrective
+                              ? Colors.orange.shade50
+                              : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: vm.isCorrective
+                                ? Colors.orange.shade700
+                                : Colors.grey.shade300,
+                            width: vm.isCorrective ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.build_circle_outlined,
+                              size: 18,
+                              color: vm.isCorrective
+                                  ? Colors.orange.shade800
+                                  : Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Correctivo',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: vm.isCorrective ? FontWeight.bold : FontWeight.w500,
+                                color: vm.isCorrective
+                                    ? Colors.orange.shade900
+                                    : Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      onTap: (isFromReport || isFromPreventive)
+                          ? null
+                          : () => vm.setMaintenanceNature(isPreventive: true),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: vm.isPreventive
+                              ? const Color(0xFF0055A5).withValues(alpha: 0.1)
+                              : Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: vm.isPreventive
+                                ? const Color(0xFF0055A5)
+                                : Colors.grey.shade300,
+                            width: vm.isPreventive ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.event_note_outlined,
+                              size: 18,
+                              color: vm.isPreventive
+                                  ? const Color(0xFF0055A5)
+                                  : Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Preventivo',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: vm.isPreventive ? FontWeight.bold : FontWeight.w500,
+                                color: vm.isPreventive
+                                    ? const Color(0xFF0055A5)
+                                    : Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
 
-        if (vm.materials.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              'No se han agregado materiales o refacciones a esta OT.',
-              style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
-            ),
-          )
-        else
-          Card(
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: vm.materials.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final mat = vm.materials[index];
-                return ListTile(
-                  dense: true,
-                  leading: CircleAvatar(
-                    radius: 12,
-                    child: Text('${index + 1}', style: const TextStyle(fontSize: 10)),
-                  ),
-                  title: Text(mat.description),
-                  subtitle: Text('Cantidad: ${mat.quantity} ${mat.unit}'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    onPressed: () => vm.removeMaterial(index),
-                  ),
-                );
-              },
-            ),
+              Text(
+                'Especialidad / Tipo de trabajo solicitado:',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: kWorkTypeLabels.entries
+                    .where((entry) => !const {'urgency', 'corrective', 'preventive', 'scheduled'}.contains(entry.key))
+                    .map((entry) {
+                  final isSelected = vm.requestedWorkTypes.contains(entry.key);
+                  return FilterChip(
+                    label: Text(entry.value),
+                    selected: isSelected,
+                    selectedColor: theme.colorScheme.primary.withValues(alpha: 0.15),
+                    checkmarkColor: theme.colorScheme.primary,
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? theme.colorScheme.primary : Colors.grey.shade800,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: isSelected ? theme.colorScheme.primary : Colors.grey.shade300,
+                      ),
+                    ),
+                    onSelected: (_) => vm.toggleWorkType(entry.key),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 18),
+
+              TextField(
+                key: const Key('ot-description'),
+                maxLines: 4,
+                minLines: 3,
+                controller: _descriptionCtrl,
+                onChanged: vm.setDescription,
+                decoration: InputDecoration(
+                  labelText: 'Descripción del trabajo / Falla a intervenir *',
+                  hintText: 'Especifica con claridad los síntomas o las actividades a realizar...',
+                  alignLabelWithHint: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.all(14),
+                ),
+              ),
+            ],
           ),
+        ),
+
         const SizedBox(height: 16),
 
-        Text('Prioridad de Atenciones', style: theme.textTheme.titleSmall),
-        const SizedBox(height: 8),
-        SegmentedButton<WorkOrderPriority>(
-          segments: const [
-            ButtonSegment(
-              value: WorkOrderPriority.low,
-              label: Text('Baja'),
-            ),
-            ButtonSegment(
-              value: WorkOrderPriority.medium,
-              label: Text('Media'),
-            ),
-            ButtonSegment(
-              value: WorkOrderPriority.high,
-              label: Text('Alta'),
-            ),
-          ],
-          selected: {vm.priority},
-          onSelectionChanged: (selection) => vm.setPriority(selection.first),
+        // Bloque 2: Personal y Planificación de Mantenimiento
+        _FormCard(
+          title: '2. Asignación y Planificación de Mantenimiento',
+          icon: Icons.engineering_outlined,
+          theme: theme,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _assignedStaffCountCtrl,
+                      keyboardType: TextInputType.number,
+                      onChanged: (val) => vm.setAssignedStaffCount(int.tryParse(val)),
+                      decoration: InputDecoration(
+                        labelText: 'Personal asignado (cant.)',
+                        hintText: 'Ej: 2',
+                        prefixIcon: const Icon(Icons.people_outline, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _estimatedHoursCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (val) => vm.setEstimatedHours(double.tryParse(val)),
+                      decoration: InputDecoration(
+                        labelText: 'Horas estimadas (hrs)',
+                        hintText: 'Ej: 1.5',
+                        prefixIcon: const Icon(Icons.access_time, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('ot-assigned-to'),
+                controller: _assignedToCtrl,
+                onChanged: vm.setAssignedTo,
+                decoration: InputDecoration(
+                  labelText: 'Responsable / Técnico asignado',
+                  hintText: 'Nombre del técnico o cuadrilla responsable',
+                  prefixIcon: const Icon(Icons.person_outline, size: 18),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+            ],
+          ),
         ),
+
+        const SizedBox(height: 16),
+
+        // Bloque 3: Materiales, Refacciones y Herramientas
+        _FormCard(
+          title: '3. Materiales, Refacciones y Herramientas',
+          icon: Icons.inventory_2_outlined,
+          theme: theme,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: TextField(
+                      controller: _matDescCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Descripción del material / refacción',
+                        hintText: 'Ej: Rodamiento 6204, Aceite ISO 68...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _matQtyCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Cant.',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 44,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Agregar', style: TextStyle(fontSize: 12)),
+                      onPressed: _addMaterial,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              if (vm.materials.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Text(
+                    'No se han agregado materiales o refacciones a esta orden.',
+                    style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                )
+              else
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: Column(
+                    children: vm.materials.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final mat = entry.value;
+                      return Container(
+                        decoration: BoxDecoration(
+                          border: idx > 0 ? Border(top: BorderSide(color: Colors.grey.shade200)) : null,
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 22,
+                              height: 22,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${idx + 1}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                mat.description,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '${mat.quantity} ${mat.unit}',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFDC2626)),
+                              tooltip: 'Quitar',
+                              onPressed: () => vm.removeMaterial(idx),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Bloque 4: Prioridad de Atención
+        _FormCard(
+          title: '4. Prioridad de Atención',
+          icon: Icons.flag_outlined,
+          theme: theme,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 360;
+              final cards = [
+                _PriorityOptionCard(
+                  priority: WorkOrderPriority.low,
+                  label: 'Baja',
+                  color: const Color(0xFF16A34A),
+                  isSelected: vm.priority == WorkOrderPriority.low,
+                  onTap: () => vm.setPriority(WorkOrderPriority.low),
+                ),
+                _PriorityOptionCard(
+                  priority: WorkOrderPriority.medium,
+                  label: 'Media',
+                  color: const Color(0xFFD97706),
+                  isSelected: vm.priority == WorkOrderPriority.medium,
+                  onTap: () => vm.setPriority(WorkOrderPriority.medium),
+                ),
+                _PriorityOptionCard(
+                  priority: WorkOrderPriority.high,
+                  label: 'Alta / Urgente',
+                  color: const Color(0xFFDC2626),
+                  isSelected: vm.priority == WorkOrderPriority.high,
+                  onTap: () => vm.setPriority(WorkOrderPriority.high),
+                ),
+              ];
+
+              if (isCompact) {
+                return Column(
+                  children: [
+                    for (int i = 0; i < cards.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 8),
+                      cards[i],
+                    ],
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  for (int i = 0; i < cards.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 10),
+                    Expanded(child: cards[i]),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+
         const SizedBox(height: 24),
 
-        if (vm.errorMessage.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              vm.errorMessage,
-              style: TextStyle(color: theme.colorScheme.error),
+        // Botón Final de Guardar
+        SizedBox(
+          width: double.infinity,
+          height: 48,
+          child: FilledButton.icon(
+            key: const Key('ot-submit'),
+            onPressed: vm.isSubmitting ? null : widget.onSubmit,
+            icon: vm.isSubmitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.check_circle_outline, size: 20),
+            label: Text(
+              vm.isSubmitting
+                  ? 'Generando Orden de Trabajo...'
+                  : 'Emitir Orden de Trabajo (REG.GMC-MTN-001)',
+              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
             ),
           ),
-
-        FilledButton.icon(
-          key: const Key('ot-submit'),
-          onPressed: vm.isSubmitting ? null : widget.onSubmit,
-          icon: vm.isSubmitting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.check_circle_outline),
-          label: const Text('Generar Orden de Trabajo (REG.GMC-MTN-001)'),
         ),
       ],
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.color});
+class _FormCard extends StatelessWidget {
+  const _FormCard({
+    required this.title,
+    required this.icon,
+    required this.theme,
+    required this.child,
+  });
 
   final String title;
-  final Color color;
+  final IconData icon;
+  final ThemeData theme;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(6),
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade300, width: 0.8),
       ),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PriorityOptionCard extends StatelessWidget {
+  const _PriorityOptionCard({
+    required this.priority,
+    required this.label,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final WorkOrderPriority priority;
+  final String label;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withValues(alpha: 0.1) : Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade300,
+            width: isSelected ? 1.8 : 0.8,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+              size: 16,
+              color: isSelected ? color : Colors.grey.shade500,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                  fontSize: 12.5,
+                  color: isSelected ? color : Colors.grey.shade800,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );

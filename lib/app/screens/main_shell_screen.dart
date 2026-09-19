@@ -18,9 +18,12 @@ import '../../features/breakdown_reports/presentation/viewmodels/breakdown_alert
 import '../../features/breakdown_reports/presentation/viewmodels/my_reports_notifications_viewmodel.dart';
 import '../../features/auth_permissions/presentation/viewmodels/password_reset_alerts_viewmodel.dart';
 import '../../features/preventive_schedules/presentation/viewmodels/preventive_schedule_viewmodel.dart';
+import '../../features/work_orders/presentation/viewmodels/work_order_alerts_viewmodel.dart';
 import '../../features/operation_reports/presentation/views/operation_report_list_view.dart';
 import '../../features/operation_reports/presentation/viewmodels/operation_report_viewmodel.dart';
 import '../../core/audio/notification_sound.dart';
+import '../../core/notifications/local_notification_service.dart';
+import '../../core/notifications/notification_queue.dart';
 import '../di/get_it.dart';
 import '../router/app_router.dart';
 import '../theme/app_breakpoints.dart';
@@ -51,20 +54,38 @@ class MainShellScreen extends StatefulWidget {
 class _MainShellScreenState extends State<MainShellScreen> {
   int _selectedIndex = 0;
   bool _sidebarExpanded = true;
+  final Set<String> _collapsedGroupIds = {};
+  bool _groupsInitialized = false;
 
   @override
   void initState() {
     super.initState();
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
-    if (user.isAdmin || user.role == UserRole.jefe) {
+
+    // Inicializar servicio de notificaciones locales de Android / sistema
+    final localNotifications = getIt<LocalNotificationService>();
+    localNotifications.initialize(
+      onSelectNotification: (response) {
+        _handleNotificationPayload(response.payload);
+      },
+    );
+    localNotifications.requestPermissions();
+
+    if (user.isAdmin || user.role == UserRole.jefe || user.hasPermission(AppPermissions.breakdownManage)) {
       getIt<BreakdownAlertsViewModel>().start();
     }
-    if (user.isAdmin) {
+    if (user.isAdmin || user.hasPermission(AppPermissions.userManage)) {
       getIt<PasswordResetAlertsViewModel>().start();
     }
-    if (user.role == UserRole.reportador) {
+    if (user.role == UserRole.reportador || user.hasPermission(AppPermissions.breakdownReport)) {
       getIt<MyReportsNotificationsViewModel>().start(user.userId);
+    }
+    // Alerta de OTs pendientes/vencidas para roles que gestionan OTs
+    if (user.isAdmin || user.role == UserRole.jefe ||
+        user.hasPermission(AppPermissions.workOrderView) ||
+        user.hasPermission(AppPermissions.workOrderCreate)) {
+      getIt<WorkOrderAlertsViewModel>().start();
     }
   }
 
@@ -73,6 +94,8 @@ class _MainShellScreenState extends State<MainShellScreen> {
     getIt<BreakdownAlertsViewModel>().stop();
     getIt<PasswordResetAlertsViewModel>().stop();
     getIt<MyReportsNotificationsViewModel>().stop();
+    getIt<WorkOrderAlertsViewModel>().stop();
+    getIt<NotificationQueue>().clear();
     super.dispose();
   }
 
@@ -134,49 +157,83 @@ class _MainShellScreenState extends State<MainShellScreen> {
     ),
   };
 
-  /// Secciones del menú según el rol agrupadas lógicamente:
-  ///   - admin (Gestor del Sistema): todo, sin restricción.
-  ///   - lector (Solo Lectura): solo información, sin acciones.
-  ///   - reportador: únicamente reportar averías y ver sus propios reportes.
   static List<_ShellSection> _sectionsFor(AppUser user) {
-    return switch (user.role) {
-      UserRole.admin => const [
-          _ShellSection.dashboard,
-          _ShellSection.operationReports,
-          _ShellSection.kardex,
-          _ShellSection.assets,
-          _ShellSection.workOrders,
-          _ShellSection.preventive,
-          _ShellSection.reportBreakdown,
-          _ShellSection.myReports,
-          _ShellSection.breakdownReports,
-          _ShellSection.deletionRequests,
-          _ShellSection.users,
-        ],
-      UserRole.jefe => const [
-          _ShellSection.dashboard,
-          _ShellSection.operationReports,
-          _ShellSection.kardex,
-          _ShellSection.assets,
-          _ShellSection.workOrders,
-          _ShellSection.preventive,
-          _ShellSection.reportBreakdown,
-          _ShellSection.myReports,
-          _ShellSection.breakdownReports,
-        ],
-      UserRole.reportador => const [
-          _ShellSection.reportBreakdown,
-          _ShellSection.myReports,
-        ],
-      UserRole.lector => const [
-          _ShellSection.dashboard,
-          _ShellSection.kardex,
-          _ShellSection.assets,
-          _ShellSection.workOrders,
-          _ShellSection.preventive,
-          _ShellSection.breakdownReports,
-        ],
-    };
+    if (user.isAdmin) {
+      return const [
+        _ShellSection.dashboard,
+        _ShellSection.operationReports,
+        _ShellSection.kardex,
+        _ShellSection.assets,
+        _ShellSection.workOrders,
+        _ShellSection.preventive,
+        _ShellSection.reportBreakdown,
+        _ShellSection.myReports,
+        _ShellSection.breakdownReports,
+        _ShellSection.deletionRequests,
+        _ShellSection.users,
+      ];
+    }
+
+    final sections = <_ShellSection>[];
+
+    // Operaciones y Control
+    if (user.hasPermission(AppPermissions.dashboardView)) {
+      sections.add(_ShellSection.dashboard);
+    }
+    if (user.hasPermission('operation_report.view') ||
+        user.hasPermission(AppPermissions.dashboardView) ||
+        user.role == UserRole.jefe) {
+      sections.add(_ShellSection.operationReports);
+    }
+    if (user.hasPermission(AppPermissions.kardexView)) {
+      sections.add(_ShellSection.kardex);
+    }
+
+    // Gestión de Mantenimiento
+    if (user.hasPermission(AppPermissions.assetView) ||
+        user.hasPermission(AppPermissions.assetCreate) ||
+        user.hasPermission(AppPermissions.assetEdit) ||
+        user.hasPermission(AppPermissions.assetTransfer)) {
+      sections.add(_ShellSection.assets);
+    }
+    if (user.hasPermission(AppPermissions.workOrderView) ||
+        user.hasPermission(AppPermissions.workOrderCreate) ||
+        user.hasPermission(AppPermissions.workOrderPrint)) {
+      sections.add(_ShellSection.workOrders);
+    }
+    if (user.hasPermission(AppPermissions.preventiveView)) {
+      sections.add(_ShellSection.preventive);
+    }
+
+    // Incidencias y Averías
+    if (user.hasPermission(AppPermissions.breakdownReport)) {
+      sections.add(_ShellSection.reportBreakdown);
+    }
+    if (user.hasPermission(AppPermissions.breakdownReport) ||
+        user.hasPermission(AppPermissions.breakdownView) ||
+        user.role == UserRole.reportador) {
+      sections.add(_ShellSection.myReports);
+    }
+    if (user.hasPermission(AppPermissions.breakdownView) ||
+        user.hasPermission(AppPermissions.breakdownManage)) {
+      sections.add(_ShellSection.breakdownReports);
+    }
+
+    // Administración del Sistema
+    if (user.hasPermission(AppPermissions.assetDeleteApprove) ||
+        user.hasPermission(AppPermissions.assetDeleteRequest)) {
+      sections.add(_ShellSection.deletionRequests);
+    }
+    if (user.hasPermission(AppPermissions.userManage)) {
+      sections.add(_ShellSection.users);
+    }
+
+    // Salvaguarda: si no tiene ninguna sección visible, agregar al menos 'Mis Reportes'
+    if (sections.isEmpty) {
+      sections.add(_ShellSection.myReports);
+    }
+
+    return sections;
   }
 
   String _getTitle(int index, AppUser user, List<_ShellSection> sections) {
@@ -188,9 +245,25 @@ class _MainShellScreenState extends State<MainShellScreen> {
     return _sectionToItem[section]?.label ?? 'Grupo Macsa';
   }
 
-  Widget _buildContent(_ShellSection section) {
+  Widget _buildContent(_ShellSection section, List<_ShellSection> sections) {
     return switch (section) {
-      _ShellSection.dashboard => const DashboardView(),
+      _ShellSection.dashboard => DashboardView(
+          onNavigateToSection: (sectionKey) {
+            final target = switch (sectionKey) {
+              'assets' => _ShellSection.assets,
+              'workOrders' => _ShellSection.workOrders,
+              'preventive' => _ShellSection.preventive,
+              'breakdownReports' => _ShellSection.breakdownReports,
+              'kardex' => _ShellSection.kardex,
+              'operationReports' => _ShellSection.operationReports,
+              _ => null,
+            };
+            if (target != null) {
+              final idx = sections.indexOf(target);
+              if (idx >= 0) setState(() => _selectedIndex = idx);
+            }
+          },
+        ),
       _ShellSection.assets => const AreaSelectionView(),
       _ShellSection.workOrders => const WorkOrderListView(),
       _ShellSection.preventive => const PreventiveScheduleListView(),
@@ -207,6 +280,35 @@ class _MainShellScreenState extends State<MainShellScreen> {
     };
   }
 
+  /// Maneja los taps en notificaciones nativas de Android / sistema.
+  void _handleNotificationPayload(String? payload) {
+    if (payload == null || !mounted) return;
+    final user = context.read<AuthViewModel>().currentUser;
+    if (user == null) return;
+    final sections = _sectionsFor(user);
+
+    _ShellSection? targetSection;
+    if (payload.startsWith('breakdown:')) {
+      targetSection = _ShellSection.breakdownReports;
+    } else if (payload.startsWith('work_order:')) {
+      targetSection = _ShellSection.workOrders;
+    } else if (payload.startsWith('my_report:')) {
+      targetSection = _ShellSection.myReports;
+    } else if (payload.startsWith('password_reset:')) {
+      targetSection = _ShellSection.users;
+    }
+
+    if (targetSection != null) {
+      final index = sections.indexOf(targetSection);
+      if (index >= 0) {
+        setState(() => _selectedIndex = index);
+        if (targetSection == _ShellSection.myReports) {
+          getIt<MyReportsNotificationsViewModel>().markSectionSeen();
+        }
+      }
+    }
+  }
+
   /// Muestra el aviso cuando llega una avería nueva (una vez por reporte).
   void _showNewReportAlert(BreakdownAlertsViewModel alertsVm, AppUser user) {
     if (alertsVm.latestNewReport == null) return;
@@ -216,31 +318,34 @@ class _MainShellScreenState extends State<MainShellScreen> {
       final report = alertsVm.consumeLatestReport();
       if (report == null) return;
 
-      getIt<NotificationSound>().play();
+      // 1. Notificación local en la barra del sistema Android
+      getIt<LocalNotificationService>().showBreakdownNotification(
+        reportId: report.id,
+        assetId: report.assetId,
+        assetName: report.assetName,
+        reportedBy: report.reportedByUserName,
+        areaId: report.areaId,
+      );
 
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 6),
-            dismissDirection: DismissDirection.horizontal,
-            content: Text(
-              'Nueva avería reportada por ${report.reportedByUserName}: '
+      // 2. Alerta flotante in-app (SnackBar en cola)
+      final queue = getIt<NotificationQueue>();
+      queue.enqueue(
+        context,
+        NotificationItem(
+          icon: Icons.warning_amber_rounded,
+          iconColor: Colors.amberAccent,
+          message: 'Nueva avería reportada por ${report.reportedByUserName}: '
               '${report.assetId} — ${report.assetName} '
               '(Área ${report.areaId}).',
-            ),
-            action: SnackBarAction(
-              label: 'Ver',
-              onPressed: () {
-                final sections = _sectionsFor(user);
-                final index = sections.indexOf(_ShellSection.breakdownReports);
-                if (index >= 0) {
-                  setState(() => _selectedIndex = index);
-                }
-              },
-            ),
-          ),
-        );
+          actionLabel: 'Ver',
+          onAction: () {
+            final sections = _sectionsFor(user);
+            final index = sections.indexOf(_ShellSection.breakdownReports);
+            if (index >= 0) setState(() => _selectedIndex = index);
+          },
+          soundCallback: () => getIt<NotificationSound>().play(),
+        ),
+      );
     });
   }
 
@@ -257,6 +362,17 @@ class _MainShellScreenState extends State<MainShellScreen> {
       if (outcome == null) return;
 
       final report = outcome.report;
+      final isAccepted = outcome.kind == ReportOutcomeKind.workOrderGenerated;
+
+      // 1. Notificación local en la barra del sistema Android
+      getIt<LocalNotificationService>().showReportOutcomeNotification(
+        reportId: report.id,
+        assetId: report.assetId,
+        isAccepted: isAccepted,
+        workOrderId: report.workOrderId,
+        rejectionReason: report.rejectionReason,
+      );
+
       final message = switch (outcome.kind) {
         ReportOutcomeKind.workOrderGenerated =>
           'Tu reporte de ${report.assetId} fue atendido: se generó la OT '
@@ -266,28 +382,27 @@ class _MainShellScreenState extends State<MainShellScreen> {
           'Motivo: ${report.rejectionReason ?? '—'}',
       };
 
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 6),
-            dismissDirection: DismissDirection.horizontal,
-            content: Text(message),
-            action: SnackBarAction(
-              label: 'Ver',
-              onPressed: () {
-                final sections = _sectionsFor(user);
-                final index = sections.indexOf(_ShellSection.myReports);
-                if (index >= 0) {
-                  setState(() {
-                    _selectedIndex = index;
-                    getIt<MyReportsNotificationsViewModel>().markSectionSeen();
-                  });
-                }
-              },
-            ),
-          ),
-        );
+      // 2. Alerta flotante in-app (SnackBar en cola)
+      final queue = getIt<NotificationQueue>();
+      queue.enqueue(
+        context,
+        NotificationItem(
+          icon: isAccepted ? Icons.check_circle_outline : Icons.cancel_outlined,
+          iconColor: isAccepted ? Colors.greenAccent : Colors.redAccent,
+          message: message,
+          actionLabel: 'Ver',
+          onAction: () {
+            final sections = _sectionsFor(user);
+            final index = sections.indexOf(_ShellSection.myReports);
+            if (index >= 0) {
+              setState(() {
+                _selectedIndex = index;
+                getIt<MyReportsNotificationsViewModel>().markSectionSeen();
+              });
+            }
+          },
+        ),
+      );
     });
   }
 
@@ -303,38 +418,73 @@ class _MainShellScreenState extends State<MainShellScreen> {
       final requestUser = resetVm.consumeLatestRequest();
       if (requestUser == null) return;
 
-      getIt<NotificationSound>().play();
+      // 1. Notificación local en la barra del sistema Android
+      getIt<LocalNotificationService>().showPasswordResetNotification(
+        username: requestUser.username,
+        displayName: requestUser.displayName,
+      );
 
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            duration: const Duration(seconds: 7),
-            dismissDirection: DismissDirection.horizontal,
-            content: Row(
-              children: [
-                const Icon(Icons.key, color: Colors.amberAccent, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Solicitud de clave: ${requestUser.displayName ?? requestUser.username} (@${requestUser.username}) solicitó una clave temporal.',
-                  ),
-                ),
-              ],
-            ),
-            action: SnackBarAction(
-              label: 'Atender',
-              textColor: Colors.amberAccent,
-              onPressed: () {
-                final sections = _sectionsFor(user);
-                final index = sections.indexOf(_ShellSection.users);
-                if (index >= 0) {
-                  setState(() => _selectedIndex = index);
-                }
-              },
-            ),
-          ),
-        );
+      // 2. Alerta flotante in-app (SnackBar en cola)
+      final queue = getIt<NotificationQueue>();
+      queue.enqueue(
+        context,
+        NotificationItem(
+          icon: Icons.key,
+          iconColor: Colors.amberAccent,
+          message: 'Solicitud de clave: '
+              '${requestUser.displayName ?? requestUser.username} '
+              '(@${requestUser.username}) solicitó una clave temporal.',
+          actionLabel: 'Atender',
+          onAction: () {
+            final sections = _sectionsFor(user);
+            final index = sections.indexOf(_ShellSection.users);
+            if (index >= 0) setState(() => _selectedIndex = index);
+          },
+          soundCallback: () => getIt<NotificationSound>().play(),
+        ),
+      );
+    });
+  }
+
+  /// Muestra el aviso cuando se detecta una OT nueva de alta prioridad.
+  void _showWorkOrderAlert(
+    WorkOrderAlertsViewModel woAlertsVm,
+    AppUser user,
+  ) {
+    if (woAlertsVm.latestAlert == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final order = woAlertsVm.consumeLatestAlert();
+      if (order == null) return;
+
+      // 1. Notificación local en la barra del sistema Android
+      getIt<LocalNotificationService>().showWorkOrderNotification(
+        orderId: order.id,
+        correlative: order.displayCorrelative,
+        assetName: order.assetName,
+        description: order.description,
+      );
+
+      // 2. Alerta flotante in-app (SnackBar en cola)
+      final queue = getIt<NotificationQueue>();
+      queue.enqueue(
+        context,
+        NotificationItem(
+          icon: Icons.priority_high,
+          iconColor: const Color(0xFFE11D48),
+          message: 'OT de alta prioridad: '
+              '${order.displayCorrelative} — ${order.assetName} '
+              '(${order.description}).',
+          actionLabel: 'Ver',
+          onAction: () {
+            final sections = _sectionsFor(user);
+            final index = sections.indexOf(_ShellSection.workOrders);
+            if (index >= 0) setState(() => _selectedIndex = index);
+          },
+          soundCallback: () => getIt<NotificationSound>().play(),
+        ),
+      );
     });
   }
 
@@ -358,6 +508,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
     final preventiveVm = context.watch<PreventiveScheduleViewModel>();
 
+    final woAlertsVm = context.watch<WorkOrderAlertsViewModel>();
+    if (user.isAdmin ||
+        user.role == UserRole.jefe ||
+        user.hasPermission(AppPermissions.workOrderView) ||
+        user.hasPermission(AppPermissions.workOrderCreate)) {
+      _showWorkOrderAlert(woAlertsVm, user);
+    }
+
     final sections = _sectionsFor(user);
     final safeIndex =
         _selectedIndex >= sections.length ? 0 : _selectedIndex;
@@ -375,7 +533,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
                       ? resetAlertsVm.pendingCount
                       : section == _ShellSection.preventive
                           ? preventiveVm.urgentAndOverdueCount
-                          : 0,
+                          : section == _ShellSection.workOrders
+                              ? woAlertsVm.badgeCount
+                              : 0,
         ),
     ];
 
@@ -442,6 +602,13 @@ class _MainShellScreenState extends State<MainShellScreen> {
       }
     }
 
+    if (!_groupsInitialized && groups.isNotEmpty) {
+      for (final g in groups) {
+        _collapsedGroupIds.add(g.id);
+      }
+      _groupsInitialized = true;
+    }
+
     final isMobile = AppBreakpoints.isMobile(context);
 
     void onSectionTap(int index) {
@@ -469,6 +636,16 @@ class _MainShellScreenState extends State<MainShellScreen> {
       },
       isExpanded: isMobile ? true : _sidebarExpanded,
       onToggle: () => setState(() => _sidebarExpanded = !_sidebarExpanded),
+      collapsedGroupIds: _collapsedGroupIds,
+      onToggleGroup: (groupId) {
+        setState(() {
+          if (_collapsedGroupIds.contains(groupId)) {
+            _collapsedGroupIds.remove(groupId);
+          } else {
+            _collapsedGroupIds.add(groupId);
+          }
+        });
+      },
       userName: user.username,
       userDisplayName: user.displayName,
       onLogout: onLogout,
@@ -481,14 +658,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
           // En móvil el AppBar muestra el ícono de menú automáticamente.
         ),
         drawer: Drawer(
-          width: 240,
+          width: 285,
           backgroundColor: AppTheme.sidebarBackground,
           shape: const RoundedRectangleBorder(),
           child: sidebar,
         ),
         body: SafeArea(
           top: false,
-          child: _buildContent(sections[safeIndex]),
+          child: _buildContent(sections[safeIndex], sections),
         ),
       );
     }
@@ -502,7 +679,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         children: [
           sidebar,
           Expanded(
-            child: _buildContent(sections[safeIndex]),
+            child: _buildContent(sections[safeIndex], sections),
           ),
         ],
       ),

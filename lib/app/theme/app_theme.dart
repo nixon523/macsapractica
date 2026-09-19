@@ -15,8 +15,8 @@ import 'app_spacing.dart';
 class AppTheme {
   AppTheme._();
 
-  // Semilla principal — Blue Grey 800.
-  static const Color _seed = Color(0xFF37474F);
+  // Semilla principal — Azul corporativo profundo Grupo Macsa (Deep Royal / Cobalt Blue).
+  static const Color _seed = Color(0xFF0055A5);
 
   // Colores neutros del sidebar (los mantenemos como constantes por
   // compatibilidad con el widget actual).
@@ -36,6 +36,9 @@ class AppTheme {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: _seed,
       brightness: brightness,
+      primary: brightness == Brightness.light
+          ? const Color(0xFF0055A5)
+          : const Color(0xFF60A5FA),
     );
 
     final baseText = brightness == Brightness.light

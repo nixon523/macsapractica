@@ -106,7 +106,7 @@ class BreakdownReportRemoteDataSource {
     await _apiClient.post(
       ApiEndpoints.linkBreakdownWorkOrder(reportId),
       body: {
-        'workOrderId': int.tryParse(workOrderId) ?? workOrderId,
+        'workOrderId': workOrderId.toString(),
       },
     );
   }

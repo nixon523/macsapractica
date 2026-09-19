@@ -4,17 +4,21 @@ import '../../../../app/di/get_it.dart';
 import '../../../../core/error/failures.dart';
 import '../../../breakdown_reports/domain/entities/breakdown_report.dart';
 import '../../../breakdown_reports/domain/usecases/link_breakdown_to_work_order.dart';
+import '../../../breakdown_reports/presentation/viewmodels/breakdown_alerts_viewmodel.dart';
+import '../../../breakdown_reports/presentation/viewmodels/my_reports_notifications_viewmodel.dart';
 import '../../../preventive_schedules/domain/repositories/preventive_schedule_repository.dart';
 import '../../domain/entities/work_order.dart';
 import '../../domain/usecases/create_work_order.dart';
+import 'work_order_alerts_viewmodel.dart';
 
 /// Tipos de trabajo soportados en la plantilla oficial REG.GMC-MTN-001
 const Map<String, String> kWorkTypeLabels = {
   'electric': 'Eléctrico',
   'mechanical': 'Mecánico',
-  'urgency': 'Urgencia',
+  'welding': 'Soldadura',
   'refrigeration': 'Refrigeración',
   'plumbing': 'Plomería',
+  'urgency': 'Urgencia',
   'preventive': 'Preventivo',
   'corrective': 'Correctivo',
   'scheduled': 'Programado',
@@ -66,6 +70,20 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
   final Set<String> _requestedWorkTypes = {'corrective'};
   Set<String> get requestedWorkTypes => Set.unmodifiable(_requestedWorkTypes);
 
+  bool get isPreventive => _requestedWorkTypes.contains('preventive') || _preventiveSchedule != null;
+  bool get isCorrective => !_requestedWorkTypes.contains('preventive') && (_requestedWorkTypes.contains('corrective') || _report != null || _preventiveSchedule == null);
+
+  void setMaintenanceNature({required bool isPreventive}) {
+    if (isPreventive) {
+      _requestedWorkTypes.remove('corrective');
+      _requestedWorkTypes.add('preventive');
+    } else {
+      _requestedWorkTypes.remove('preventive');
+      _requestedWorkTypes.add('corrective');
+    }
+    notifyListeners();
+  }
+
   final List<WorkOrderMaterial> _materials = [];
   List<WorkOrderMaterial> get materials => List.unmodifiable(_materials);
 
@@ -113,11 +131,12 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
 
       final targetActs = monthActs.isNotEmpty ? monthActs : acts;
       final buffer = StringBuffer();
-      buffer.writeln('[Mantenimiento Preventivo ${schedule.id}] - ${schedule.assetName.isNotEmpty ? schedule.assetName : schedule.assetId}');
-      buffer.writeln('Actividades en componentes:');
+      final equipName = schedule.assetName.isNotEmpty ? schedule.assetName : schedule.assetId;
+      buffer.writeln('Mantenimiento Preventivo Programado (Plan ${schedule.id}) - $equipName');
+      buffer.writeln('Actividades por componente:');
 
       for (final act in targetActs) {
-        buffer.writeln(' - [${act.childAssetId} - ${act.childAssetName}]: ${act.description}');
+        buffer.writeln('- ${act.childAssetName} (${act.childAssetId}): ${act.description}');
         for (final m in act.materials) {
           _materials.add(WorkOrderMaterial(
             description: '${m.name} (para ${act.childAssetName})',
@@ -131,7 +150,7 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
       final desc = schedule.description?.isNotEmpty == true
           ? schedule.description
           : schedule.maintenanceType;
-      _description = '[Mantenimiento Preventivo ${schedule.id}]: $desc';
+      _description = 'Mantenimiento Preventivo Programado (Plan ${schedule.id}): $desc';
       if (schedule.materials != null) {
         for (final m in schedule.materials) {
           _materials.add(WorkOrderMaterial(
@@ -282,6 +301,21 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
           );
         } catch (_) {}
       }
+
+      // Refrescar inmediatamente los contadores de alertas y badges
+      try {
+        if (getIt.isRegistered<WorkOrderAlertsViewModel>()) {
+          getIt<WorkOrderAlertsViewModel>().refresh();
+        }
+        if (_report != null) {
+          if (getIt.isRegistered<BreakdownAlertsViewModel>()) {
+            getIt<BreakdownAlertsViewModel>().refresh();
+          }
+          if (getIt.isRegistered<MyReportsNotificationsViewModel>()) {
+            getIt<MyReportsNotificationsViewModel>().refresh();
+          }
+        }
+      } catch (_) {}
 
       return created;
     } catch (e) {

@@ -397,55 +397,83 @@ class _AreaPaginatedListView extends StatelessWidget {
         Container(
           color: colors.surface,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: searchCtrl,
-                  textCapitalization: TextCapitalization.characters,
-                  inputFormatters: [UpperCaseTextFormatter()],
-                  decoration: InputDecoration(
-                    hintText: 'BUSCAR ÁREA POR NOMBRE, CÓDIGO (A001) O CENTRO DE COSTO…',
-                    hintStyle: const TextStyle(fontSize: 12),
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
-                            onPressed: () => searchCtrl.clear(),
-                          )
-                        : null,
-                    isDense: true,
-                    filled: true,
-                    fillColor: colors.surfaceContainerLowest,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: colors.outlineVariant),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: colors.outlineVariant),
-                    ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 650;
+              final searchField = TextField(
+                controller: searchCtrl,
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: [UpperCaseTextFormatter()],
+                decoration: InputDecoration(
+                  hintText: isCompact
+                      ? 'BUSCAR ÁREA (NOMBRE, A001, CC)…'
+                      : 'BUSCAR ÁREA POR NOMBRE, CÓDIGO (A001) O CENTRO DE COSTO…',
+                  hintStyle: const TextStyle(fontSize: 12),
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => searchCtrl.clear(),
+                        )
+                      : null,
+                  isDense: true,
+                  filled: true,
+                  fillColor: colors.surfaceContainerLowest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: colors.outlineVariant),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: colors.outlineVariant),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                onPressed: () => AssetReportFilterDialog.showMultiAreaReport(context),
-                icon: const Icon(Icons.description_outlined, size: 18),
-                label: const Text('Reportes de Activos (PDF / Excel)'),
-              ),
-              if (canManage && onCreateArea != null) ...[
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: onCreateArea,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('Nueva Área'),
-                ),
-              ],
-            ],
+              );
+
+              final actionButtons = Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    onPressed: () => AssetReportFilterDialog.showMultiAreaReport(context),
+                    icon: const Icon(Icons.description_outlined, size: 18),
+                    label: Text(isCompact ? 'Reportes' : 'Reportes de Activos (PDF / Excel)'),
+                  ),
+                  if (canManage && onCreateArea != null)
+                    FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      onPressed: onCreateArea,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Nueva Área'),
+                    ),
+                ],
+              );
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    searchField,
+                    const SizedBox(height: 8),
+                    actionButtons,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: searchField),
+                  const SizedBox(width: 8),
+                  actionButtons,
+                ],
+              );
+            },
           ),
         ),
 
@@ -545,71 +573,88 @@ class _AreaPaginatedListView extends StatelessWidget {
         // Barra Inferior de Paginación (10 registros)
         if (totalPages > 1)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: colors.surface,
               border: Border(top: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5))),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // Botón Anterior
-                OutlinedButton.icon(
+                OutlinedButton(
                   onPressed: validPage > 0 ? () => onPageChanged(validPage - 1) : null,
-                  icon: const Icon(Icons.chevron_left, size: 18),
-                  label: const Text('Anterior'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     visualDensity: VisualDensity.compact,
                   ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.chevron_left, size: 18),
+                      SizedBox(width: 2),
+                      Text('Ant.', style: TextStyle(fontSize: 12)),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 4),
 
                 // Selector Numérico de Páginas
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: List.generate(totalPages, (idx) {
-                      final isSelected = idx == validPage;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: InkWell(
-                          onTap: () => onPageChanged(idx),
-                          borderRadius: BorderRadius.circular(6),
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: isSelected ? colors.primary : colors.surfaceContainerLow,
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(totalPages, (idx) {
+                          final isSelected = idx == validPage;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: InkWell(
+                              onTap: () => onPageChanged(idx),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: isSelected ? colors.primary : colors.outlineVariant,
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: isSelected ? colors.primary : colors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isSelected ? colors.primary : colors.outlineVariant,
+                                  ),
+                                ),
+                                child: Text(
+                                  '${idx + 1}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                    color: isSelected ? colors.onPrimary : colors.onSurface,
+                                  ),
+                                ),
                               ),
                             ),
-                            child: Text(
-                              '${idx + 1}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                color: isSelected ? colors.onPrimary : colors.onSurface,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
+                          );
+                        }),
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 4),
 
                 // Botón Siguiente
-                OutlinedButton.icon(
+                OutlinedButton(
                   onPressed: validPage < totalPages - 1 ? () => onPageChanged(validPage + 1) : null,
-                  icon: const Icon(Icons.chevron_right, size: 18),
-                  label: const Text('Siguiente'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('Sig.', style: TextStyle(fontSize: 12)),
+                      SizedBox(width: 2),
+                      Icon(Icons.chevron_right, size: 18),
+                    ],
                   ),
                 ),
               ],
@@ -682,7 +727,10 @@ class _ModernAreaCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -701,7 +749,6 @@ class _ModernAreaCard extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(

@@ -14,6 +14,7 @@ import '../../features/dashboard/presentation/viewmodels/dashboard_viewmodel.dar
 import '../../features/kardex/presentation/viewmodels/kardex_list_viewmodel.dart';
 import '../../features/preventive_schedules/presentation/viewmodels/preventive_schedule_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_list_viewmodel.dart';
+import '../../features/work_orders/presentation/viewmodels/work_order_alerts_viewmodel.dart';
 import 'get_it.dart';
 
 final List<SingleChildWidget> appProviders = [
@@ -55,5 +56,8 @@ final List<SingleChildWidget> appProviders = [
   ),
   ChangeNotifierProvider<PasswordResetAlertsViewModel>(
     create: (_) => getIt<PasswordResetAlertsViewModel>(),
+  ),
+  ChangeNotifierProvider<WorkOrderAlertsViewModel>(
+    create: (_) => getIt<WorkOrderAlertsViewModel>(),
   ),
 ];

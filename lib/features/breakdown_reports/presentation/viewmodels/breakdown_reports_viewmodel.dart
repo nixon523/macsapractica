@@ -1,10 +1,13 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../app/di/get_it.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../domain/entities/breakdown_report.dart';
 import '../../domain/usecases/get_all_breakdown_reports.dart';
 import '../../domain/usecases/reject_breakdown_report.dart';
 import '../../domain/usecases/resolve_breakdown_report.dart';
+import 'breakdown_alerts_viewmodel.dart';
+import 'my_reports_notifications_viewmodel.dart';
 
 enum BreakdownReportsViewState { initial, loading, success, error }
 
@@ -93,6 +96,17 @@ class BreakdownReportsViewModel extends ChangeNotifier {
         ),
       );
       await load();
+
+      // Refrescar inmediatamente las alertas
+      try {
+        if (getIt.isRegistered<BreakdownAlertsViewModel>()) {
+          getIt<BreakdownAlertsViewModel>().refresh();
+        }
+        if (getIt.isRegistered<MyReportsNotificationsViewModel>()) {
+          getIt<MyReportsNotificationsViewModel>().refresh();
+        }
+      } catch (_) {}
+
       return true;
     } catch (e) {
       _errorMessage = e.toString();
@@ -123,6 +137,17 @@ class BreakdownReportsViewModel extends ChangeNotifier {
         ),
       );
       await load();
+
+      // Refrescar inmediatamente las alertas
+      try {
+        if (getIt.isRegistered<BreakdownAlertsViewModel>()) {
+          getIt<BreakdownAlertsViewModel>().refresh();
+        }
+        if (getIt.isRegistered<MyReportsNotificationsViewModel>()) {
+          getIt<MyReportsNotificationsViewModel>().refresh();
+        }
+      } catch (_) {}
+
       return true;
     } catch (e) {
       _errorMessage = e.toString();

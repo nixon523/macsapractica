@@ -180,59 +180,89 @@ class _BatchGeneratePreventiveOtsDialogState
                   border: Border.all(color: Colors.grey.shade200),
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.event, size: 18, color: Color(0xFF475569)),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Seleccionar Periodo:',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 3,
-                          child: DropdownButtonFormField<int>(
-                            value: _selectedMonth,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Mes',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            ),
-                            items: List.generate(12, (index) {
-                              return DropdownMenuItem(
-                                value: index + 1,
-                                child: Text(_monthNames[index]),
-                              );
-                            }),
-                            onChanged: (m) {
-                              if (m != null) setState(() => _selectedMonth = m);
-                            },
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isCompact = constraints.maxWidth < 420;
+                        final monthField = DropdownButtonFormField<int>(
+                          value: _selectedMonth,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Mes',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 2,
-                          child: DropdownButtonFormField<int>(
-                            value: _selectedYear,
-                            isExpanded: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Año',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            ),
-                            items: years.map((y) {
-                              return DropdownMenuItem(value: y, child: Text('$y'));
-                            }).toList(),
-                            onChanged: (y) {
-                              if (y != null) setState(() => _selectedYear = y);
-                            },
+                          items: List.generate(12, (index) {
+                            return DropdownMenuItem(
+                              value: index + 1,
+                              child: Text(_monthNames[index]),
+                            );
+                          }),
+                          onChanged: (m) {
+                            if (m != null) setState(() => _selectedMonth = m);
+                          },
+                        );
+
+                        final yearField = DropdownButtonFormField<int>(
+                          value: _selectedYear,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Año',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           ),
-                        ),
-                      ],
+                          items: years.map((y) {
+                            return DropdownMenuItem(value: y, child: Text('$y'));
+                          }).toList(),
+                          onChanged: (y) {
+                            if (y != null) setState(() => _selectedYear = y);
+                          },
+                        );
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (isCompact) ...[
+                              const Row(
+                                children: [
+                                  Icon(Icons.event, size: 18, color: Color(0xFF475569)),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Seleccionar Periodo:',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(flex: 3, child: monthField),
+                                  const SizedBox(width: 8),
+                                  Expanded(flex: 2, child: yearField),
+                                ],
+                              ),
+                            ] else ...[
+                              Row(
+                                children: [
+                                  const Icon(Icons.event, size: 18, color: Color(0xFF475569)),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Seleccionar Periodo:',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(flex: 3, child: monthField),
+                                  const SizedBox(width: 8),
+                                  Expanded(flex: 2, child: yearField),
+                                ],
+                              ),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                     if (widget.areas.isNotEmpty) ...[
                       const SizedBox(height: 10),
@@ -270,10 +300,13 @@ class _BatchGeneratePreventiveOtsDialogState
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Equipos que requieren mantenimiento en ${_monthNames[_selectedMonth - 1]} ($_selectedYear):',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                  Expanded(
+                    child: Text(
+                      'Equipos que requieren mantenimiento en ${_monthNames[_selectedMonth - 1]} ($_selectedYear):',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
@@ -304,7 +337,7 @@ class _BatchGeneratePreventiveOtsDialogState
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: eligiblePlans.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    separatorBuilder: (_, _) => const Divider(height: 1),
                     itemBuilder: (ctx, idx) {
                       final plan = eligiblePlans[idx];
                       final acts = plan.activitiesDueInPeriod(

@@ -3,6 +3,8 @@ import 'package:get_it/get_it.dart';
 import '../../core/audio/notification_sound.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/session_manager.dart';
+import '../../core/notifications/local_notification_service.dart';
+import '../../core/notifications/notification_queue.dart';
 import '../../features/assets/data/datasources/area_remote_datasource.dart';
 import '../../features/assets/data/datasources/asset_local_datasource.dart';
 import '../../features/assets/data/datasources/asset_remote_datasource.dart';
@@ -93,9 +95,11 @@ import '../../features/work_orders/domain/usecases/get_all_work_orders.dart';
 import '../../features/work_orders/domain/usecases/get_work_orders.dart';
 import '../../features/work_orders/domain/usecases/update_work_order_details.dart';
 import '../../features/work_orders/domain/usecases/update_work_order_status.dart';
+import '../../features/work_orders/presentation/viewmodels/work_order_alerts_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_create_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_detail_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_list_viewmodel.dart';
+import '../../core/notifications/notification_queue.dart';
 import '../../features/operation_reports/data/datasources/operation_report_remote_datasource.dart';
 import '../../features/operation_reports/data/repositories/operation_report_repository_impl.dart';
 import '../../features/operation_reports/domain/repositories/operation_report_repository.dart';
@@ -438,6 +442,17 @@ Future<void> configureDependencies() async {
   );
   getIt.registerLazySingleton<NotificationSound>(
     () => NotificationSound(),
+  );
+  getIt.registerLazySingleton<LocalNotificationService>(
+    () => LocalNotificationService(),
+  );
+  getIt.registerLazySingleton<NotificationQueue>(
+    () => NotificationQueue(),
+  );
+  getIt.registerLazySingleton<WorkOrderAlertsViewModel>(
+    () => WorkOrderAlertsViewModel(
+      repository: getIt<WorkOrderRepository>(),
+    ),
   );
   getIt.registerLazySingleton<KardexListViewModel>(
     () => KardexListViewModel(

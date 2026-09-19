@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../app/di/get_it.dart';
 import '../../../assets/domain/entities/area.dart';
 import '../../../assets/domain/entities/asset.dart';
 import '../../../assets/domain/usecases/get_areas_usecase.dart';
@@ -7,6 +8,8 @@ import '../../../assets/domain/usecases/get_assets_by_area.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../domain/entities/breakdown_report.dart';
 import '../../domain/usecases/create_breakdown_report.dart';
+import 'breakdown_alerts_viewmodel.dart';
+import 'my_reports_notifications_viewmodel.dart';
 
 /// ViewModel del formulario "Reportar Avería": carga áreas y los activos de la
 /// área seleccionada, y envía el reporte al repositorio.
@@ -146,6 +149,17 @@ class ReportBreakdownViewModel extends ChangeNotifier {
         ),
       );
       _reset();
+
+      // Refrescar inmediatamente las alertas
+      try {
+        if (getIt.isRegistered<BreakdownAlertsViewModel>()) {
+          getIt<BreakdownAlertsViewModel>().refresh();
+        }
+        if (getIt.isRegistered<MyReportsNotificationsViewModel>()) {
+          getIt<MyReportsNotificationsViewModel>().refresh();
+        }
+      } catch (_) {}
+
       return true;
     } catch (e) {
       _errorMessage = e.toString();

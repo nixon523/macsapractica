@@ -24,9 +24,12 @@ class AppUser {
   bool get isAdmin => role == UserRole.admin;
 
   /// El Gestor del Sistema (admin) tiene acceso total por el propio rol.
-  /// Cualquier otro rol se evalúa contra su lista de permisos.
+  /// Cualquier otro rol se evalúa combinando los permisos por defecto de su rol
+  /// más cualquier permiso extra explícito asignado al usuario.
   bool hasPermission(String permission) =>
-      role == UserRole.admin || permissions.contains(permission);
+      role == UserRole.admin ||
+      role.defaultPermissions.contains(permission) ||
+      permissions.contains(permission);
 
   @override
   bool operator ==(Object other) =>

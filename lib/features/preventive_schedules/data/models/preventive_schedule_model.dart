@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../../core/utils/text_sanitizer.dart';
 import '../../domain/entities/preventive_schedule.dart';
 
 class PreventiveScheduleModel extends PreventiveSchedule {
@@ -140,7 +141,7 @@ class PreventiveScheduleModel extends PreventiveSchedule {
       frequency: frequency,
       frequencyInterval: interval,
       frequencyUnit: unit,
-      description: (map['description'] ?? map['Description'] ?? '').toString(),
+      description: TextSanitizer.cleanDescription((map['description'] ?? map['Description'] ?? '').toString()),
       materials: materialsList,
       activities: activitiesList,
       estimatedHours: (map['estimatedHours'] ?? map['EstimatedHours'] as num?)?.toDouble(),

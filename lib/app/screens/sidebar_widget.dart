@@ -58,6 +58,8 @@ class SidebarWidget extends StatefulWidget {
     required this.onTap,
     required this.isExpanded,
     required this.onToggle,
+    this.collapsedGroupIds,
+    this.onToggleGroup,
     this.userName,
     this.userDisplayName,
     this.onLogout,
@@ -69,6 +71,8 @@ class SidebarWidget extends StatefulWidget {
   final ValueChanged<int> onTap;
   final bool isExpanded;
   final VoidCallback onToggle;
+  final Set<String>? collapsedGroupIds;
+  final ValueChanged<String>? onToggleGroup;
   final String? userName;
   final String? userDisplayName;
   final VoidCallback? onLogout;
@@ -78,25 +82,32 @@ class SidebarWidget extends StatefulWidget {
 }
 
 class _SidebarWidgetState extends State<SidebarWidget> {
-  final Set<String> _collapsedGroupIds = {};
+  late final Set<String> _localCollapsedGroupIds = {};
+
+  Set<String> get _effectiveCollapsedGroupIds =>
+      widget.collapsedGroupIds ?? _localCollapsedGroupIds;
 
   @override
   void initState() {
     super.initState();
-    // Todos los grupos inician colapsados por defecto al entrar
-    if (widget.groups != null) {
+    // Si no se pasa un set persistente desde el padre, inicializar el local
+    if (widget.collapsedGroupIds == null && widget.groups != null) {
       for (final group in widget.groups!) {
-        _collapsedGroupIds.add(group.id);
+        _localCollapsedGroupIds.add(group.id);
       }
     }
   }
 
   void _toggleGroup(String groupId) {
+    if (widget.onToggleGroup != null) {
+      widget.onToggleGroup!(groupId);
+      return;
+    }
     setState(() {
-      if (_collapsedGroupIds.contains(groupId)) {
-        _collapsedGroupIds.remove(groupId);
+      if (_localCollapsedGroupIds.contains(groupId)) {
+        _localCollapsedGroupIds.remove(groupId);
       } else {
-        _collapsedGroupIds.add(groupId);
+        _localCollapsedGroupIds.add(groupId);
       }
     });
   }
@@ -104,7 +115,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: widget.isExpanded ? 240 : 72,
+      width: widget.isExpanded ? 285 : 72,
       child: ColoredBox(
         color: AppTheme.sidebarBackground,
         child: Column(
@@ -199,7 +210,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
         itemCount: widget.groups!.length,
         itemBuilder: (context, groupIdx) {
           final group = widget.groups![groupIdx];
-          final isCollapsed = _collapsedGroupIds.contains(group.id);
+          final isCollapsed = _effectiveCollapsedGroupIds.contains(group.id);
           final hasItems = group.items.isNotEmpty;
           if (!hasItems) return const SizedBox.shrink();
 
@@ -259,7 +270,7 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                                     : Colors.white,
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
+                                letterSpacing: 0.5,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),

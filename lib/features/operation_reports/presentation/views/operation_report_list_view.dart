@@ -212,57 +212,124 @@ class _AreaHeaderSelector extends StatelessWidget {
     return Container(
       color: colors.primaryContainer.withValues(alpha: 0.2),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: colors.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.factory_outlined, color: colors.primary, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 460;
+          if (isCompact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'ÁREA DE PROCESO',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: colors.primary,
-                    letterSpacing: 0.8,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.factory_outlined, color: colors.primary, size: 20),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'ÁREA DE PROCESO',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: colors.primary,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            selectedAreaId != null
+                                ? '$selectedAreaId - ${selectedAreaName ?? ''}'
+                                : 'Seleccionar Área...',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  selectedAreaId != null
-                      ? '$selectedAreaId - ${selectedAreaName ?? ''}'
-                      : 'Seleccionar Área...',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: onOpenSearch,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
+                  icon: const Icon(Icons.search, size: 16),
+                  label: const Text('Buscar y Cambiar Área'),
                 ),
               ],
-            ),
-          ),
-          OutlinedButton.icon(
-            onPressed: onOpenSearch,
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+            );
+          }
+
+          return Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.factory_outlined, color: colors.primary, size: 20),
               ),
-            ),
-            icon: const Icon(Icons.search, size: 16),
-            label: const Text('Buscar Área'),
-          ),
-        ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'ÁREA DE PROCESO',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: colors.primary,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      selectedAreaId != null
+                          ? '$selectedAreaId - ${selectedAreaName ?? ''}'
+                          : 'Seleccionar Área...',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: onOpenSearch,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                icon: const Icon(Icons.search, size: 16),
+                label: const Text('Buscar Área'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -303,11 +370,16 @@ class _AreaSearchDialogState extends State<_AreaSearchDialog> {
         children: [
           Icon(Icons.factory, color: Color(0xFF0288D1)),
           SizedBox(width: 8),
-          Text('Seleccionar Área de Proceso'),
+          Expanded(
+            child: Text(
+              'Seleccionar Área de Proceso',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
       content: SizedBox(
-        width: 420,
+        width: double.maxFinite,
         height: 400,
         child: Column(
           children: [
@@ -439,11 +511,16 @@ class _TimeNavigationControlBar extends StatelessWidget {
           ),
 
           // Navegación de período (Semana o Mes)
-          Row(
-            mainAxisSize: MainAxisSize.min,
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            runSpacing: 4,
             children: [
               IconButton(
-                icon: const Icon(Icons.chevron_left),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.chevron_left, size: 20),
                 onPressed: (isWeekly ? vm.loadingWeekly : vm.loadingMonthly)
                     ? null
                     : () {
@@ -459,27 +536,31 @@ class _TimeNavigationControlBar extends StatelessWidget {
                 onTap: onPickDate,
                 borderRadius: BorderRadius.circular(6),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.calendar_today, size: 14),
-                      const SizedBox(width: 6),
+                      const Icon(Icons.calendar_today, size: 13),
+                      const SizedBox(width: 5),
                       Text(
                         isWeekly ? vm.weekLabel : vm.monthLabel,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           color: colors.primary,
-                          fontSize: 13,
+                          fontSize: 12.5,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 2),
                       const Icon(Icons.arrow_drop_down, size: 16),
                     ],
                   ),
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.chevron_right),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.chevron_right, size: 20),
                 onPressed: (isWeekly ? vm.loadingWeekly : vm.loadingMonthly)
                     ? null
                     : () {
@@ -491,15 +572,15 @@ class _TimeNavigationControlBar extends StatelessWidget {
                       },
                 tooltip: isWeekly ? 'Semana siguiente' : 'Mes siguiente',
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 4),
               OutlinedButton.icon(
                 onPressed: () => vm.irHoy(),
                 style: OutlinedButton.styleFrom(
                   visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 ),
-                icon: const Icon(Icons.today, size: 14),
-                label: const Text('Hoy'),
+                icon: const Icon(Icons.today, size: 13),
+                label: const Text('Hoy', style: TextStyle(fontSize: 11)),
               ),
             ],
           ),

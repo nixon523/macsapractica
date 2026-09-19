@@ -1,3 +1,4 @@
+import '../../../../core/utils/text_sanitizer.dart';
 import '../../domain/entities/breakdown_report.dart';
 
 class BreakdownReportModel extends BreakdownReport {
@@ -38,18 +39,26 @@ class BreakdownReportModel extends BreakdownReport {
     }
 
     final id = docId ??
-        (map['reportId'] ?? map['ReportId'] ?? map['id'] ?? '')?.toString() ??
+        (map['reportId'] ??
+                map['ReportId'] ??
+                map['ReporteId'] ??
+                map['reporteId'] ??
+                map['id'] ??
+                '')
+            ?.toString() ??
         '';
 
     final severityStr =
-        (map['severity'] ?? map['Severity'] ?? 'medium').toString();
+        (map['severity'] ?? map['Severity'] ?? map['Severidad'] ?? 'medium')
+            .toString();
     final severity = BreakdownSeverity.values.firstWhere(
       (e) => e.name.toLowerCase() == severityStr.toLowerCase(),
       orElse: () => BreakdownSeverity.medium,
     );
 
     final statusStr =
-        (map['status'] ?? map['Status'] ?? 'reported').toString();
+        (map['status'] ?? map['Status'] ?? map['Estado'] ?? 'reported')
+            .toString();
     final status = BreakdownReportStatus.values.firstWhere(
       (e) => e.name.toLowerCase() == statusStr.toLowerCase(),
       orElse: () => BreakdownReportStatus.reported,
@@ -57,33 +66,66 @@ class BreakdownReportModel extends BreakdownReport {
 
     return BreakdownReportModel(
       id: id,
-      assetId: (map['assetId'] ?? map['AssetCode'] ?? map['assetCode'] ?? '')
+      assetId: (map['assetId'] ??
+              map['AssetCode'] ??
+              map['assetCode'] ??
+              map['CodigoActivo'] ??
+              '')
           .toString(),
-      assetName: (map['assetName'] ?? map['AssetName'] ?? '').toString(),
+      assetName: (map['assetName'] ??
+              map['AssetName'] ??
+              map['NombreActivo'] ??
+              '')
+          .toString(),
       areaId: (map['areaId'] ?? map['AreaId'] ?? '').toString(),
-      description: (map['description'] ?? map['Description'] ?? '').toString(),
+      description: TextSanitizer.cleanDescription((map['description'] ??
+              map['Description'] ??
+              map['Descripcion'] ??
+              '')
+          .toString()),
       severity: severity,
-      reportedByUserId:
-          (map['reportedByUserId'] ?? map['ReportedByUserId'] ?? '')
-              .toString(),
-      reportedByUserName:
-          (map['reportedByUserName'] ?? map['ReportedByUserName'] ?? '')
-              .toString(),
-      reportedAt: parseDate(map['reportedAt'] ?? map['ReportedAt']),
+      reportedByUserId: (map['reportedByUserId'] ??
+              map['ReportedByUserId'] ??
+              map['ReportadoPorUsuarioId'] ??
+              '')
+          .toString(),
+      reportedByUserName: (map['reportedByUserName'] ??
+              map['ReportedByUserName'] ??
+              map['ReportadoPorNombreUsuario'] ??
+              '')
+          .toString(),
+      reportedAt: parseDate(map['reportedAt'] ??
+          map['ReportedAt'] ??
+          map['ReportadoEn']),
       status: status,
-      workOrderId: (map['workOrderId'] ?? map['WorkOrderId'])?.toString(),
-      resolvedByUserId:
-          (map['resolvedByUserId'] ?? map['ResolvedByUserId'])?.toString(),
-      resolvedByUserName:
-          (map['resolvedByUserName'] ?? map['ResolvedByUserName'])?.toString(),
-      resolvedAt: parseDate(map['resolvedAt'] ?? map['ResolvedAt']),
-      rejectionReason:
-          (map['rejectionReason'] ?? map['RejectionReason'])?.toString(),
-      rejectedByUserId:
-          (map['rejectedByUserId'] ?? map['RejectedByUserId'])?.toString(),
-      rejectedByUserName:
-          (map['rejectedByUserName'] ?? map['RejectedByUserName'])?.toString(),
-      rejectedAt: parseDate(map['rejectedAt'] ?? map['RejectedAt']),
+      workOrderId: (map['workOrderId'] ??
+              map['WorkOrderId'] ??
+              map['OrdenTrabajoId'])
+          ?.toString(),
+      resolvedByUserId: (map['resolvedByUserId'] ??
+              map['ResolvedByUserId'] ??
+              map['ResueltoPorUsuarioId'])
+          ?.toString(),
+      resolvedByUserName: (map['resolvedByUserName'] ??
+              map['ResolvedByUserName'] ??
+              map['ResueltoPorNombreUsuario'])
+          ?.toString(),
+      resolvedAt: parseDate(
+          map['resolvedAt'] ?? map['ResolvedAt'] ?? map['ResueltoEn']),
+      rejectionReason: (map['rejectionReason'] ??
+              map['RejectionReason'] ??
+              map['MotivoRechazo'])
+          ?.toString(),
+      rejectedByUserId: (map['rejectedByUserId'] ??
+              map['RejectedByUserId'] ??
+              map['RechazadoPorUsuarioId'])
+          ?.toString(),
+      rejectedByUserName: (map['rejectedByUserName'] ??
+              map['RejectedByUserName'] ??
+              map['RechazadoPorNombreUsuario'])
+          ?.toString(),
+      rejectedAt: parseDate(
+          map['rejectedAt'] ?? map['RejectedAt'] ?? map['RechazadoEn']),
     );
   }
 

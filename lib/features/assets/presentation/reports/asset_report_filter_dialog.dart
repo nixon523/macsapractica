@@ -446,13 +446,20 @@ class _AssetReportFilterDialogState extends State<AssetReportFilterDialog> {
                         ? const LinearProgressIndicator()
                         : DropdownButtonFormField<String>(
                             value: _selectedAreaId,
+                            isExpanded: true,
                             decoration: InputDecoration(
                               isDense: true,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                             ),
                             items: _areas
-                                .map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.id})')))
+                                .map((a) => DropdownMenuItem(
+                                      value: a.id,
+                                      child: Text(
+                                        '${a.name} (${a.id})',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ))
                                 .toList(),
                             onChanged: (id) => setState(() => _selectedAreaId = id),
                           ),
@@ -610,35 +617,49 @@ class _AssetReportFilterDialogState extends State<AssetReportFilterDialog> {
                     ),
                   )
                 else
-                  Row(
-                    children: [
-                      // Botón Excel
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.green.shade800,
-                            side: BorderSide(color: Colors.green.shade600),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onPressed: _generateExcel,
-                          icon: const Icon(Icons.table_view_rounded, size: 18),
-                          label: const Text('Exportar Excel (.xlsx)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 420;
+                      final excelBtn = OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.green.shade800,
+                          side: BorderSide(color: Colors.green.shade600),
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      // Botón PDF
-                      Expanded(
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colors.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onPressed: _generatePdf,
-                          icon: const Icon(Icons.picture_as_pdf, size: 18),
-                          label: const Text('Ver / Imprimir PDF', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        onPressed: _generateExcel,
+                        icon: const Icon(Icons.table_view_rounded, size: 18),
+                        label: const Text('Exportar Excel (.xlsx)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      );
+
+                      final pdfBtn = FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                         ),
-                      ),
-                    ],
+                        onPressed: _generatePdf,
+                        icon: const Icon(Icons.picture_as_pdf, size: 18),
+                        label: const Text('Ver / Imprimir PDF', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            excelBtn,
+                            const SizedBox(height: 8),
+                            pdfBtn,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Expanded(child: excelBtn),
+                          const SizedBox(width: 10),
+                          Expanded(child: pdfBtn),
+                        ],
+                      );
+                    },
                   ),
               ],
             ),

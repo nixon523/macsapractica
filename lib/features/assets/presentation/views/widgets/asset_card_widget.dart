@@ -35,7 +35,7 @@ class AssetCardWidget extends StatelessWidget {
     final isMobile = screenWidth < 600;
 
     // Indentación proporcional y compacta para no saturar en móviles
-    final indentWidth = depth == 0 ? 0.0 : (isMobile ? depth * 10.0 : depth * 18.0);
+    final indentWidth = depth == 0 ? 0.0 : (isMobile ? depth * 16.0 + 2.0 : depth * 20.0);
 
     // Paleta refinada por nivel jerárquico
     final (levelColor, levelBg, levelLabel) = switch (asset.level) {
@@ -80,18 +80,14 @@ class AssetCardWidget extends StatelessWidget {
         children: [
           // Conector sutil de árbol jerárquico
           if (depth > 0) ...[
-            SizedBox(
+            Container(
               width: indentWidth,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Icon(
-                    Icons.subdirectory_arrow_right_rounded,
-                    size: isMobile ? 14 : 16,
-                    color: levelColor.withValues(alpha: 0.6),
-                  ),
-                  const SizedBox(width: 2),
-                ],
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 2),
+              child: Icon(
+                Icons.subdirectory_arrow_right_rounded,
+                size: isMobile ? 14 : 16,
+                color: levelColor.withValues(alpha: 0.6),
               ),
             ),
           ],

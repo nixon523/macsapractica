@@ -27,14 +27,14 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
   String _searchQuery = '';
   late DateTime? _startDate;
   late DateTime? _endDate;
-  String _selectedPreset = 'hoy';
+  String _selectedPreset = 'mes';
 
   @override
   void initState() {
     super.initState();
-    // Inicia SIEMPRE en el día de HOY
+    // Inicia por defecto en el MES ACTUAL para mostrar todas las órdenes del periodo
     final now = DateTime.now();
-    _startDate = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    _startDate = DateTime(now.year, now.month, 1, 0, 0, 0);
     _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
     _searchCtrl.addListener(() {
@@ -714,7 +714,10 @@ class _ModernWorkOrderCard extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -733,7 +736,6 @@ class _ModernWorkOrderCard extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                       decoration: BoxDecoration(
@@ -749,8 +751,7 @@ class _ModernWorkOrderCard extends StatelessWidget {
                                         ),
                                       ),
                                     ),
-                                    if (order.preventiveScheduleId != null && order.preventiveScheduleId!.isNotEmpty) ...[
-                                      const SizedBox(width: 8),
+                                    if (order.isPreventive) ...[
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                         decoration: BoxDecoration(
@@ -764,7 +765,9 @@ class _ModernWorkOrderCard extends StatelessWidget {
                                             Icon(Icons.event_note_outlined, size: 12, color: Colors.blue.shade800),
                                             const SizedBox(width: 4),
                                             Text(
-                                              order.preventiveScheduleId!,
+                                              order.preventiveScheduleId != null && order.preventiveScheduleId!.isNotEmpty
+                                                  ? 'Preventivo: ${order.preventiveScheduleId}'
+                                                  : 'Preventivo',
                                               style: TextStyle(
                                                 fontSize: 10.5,
                                                 fontWeight: FontWeight.bold,
@@ -774,8 +777,7 @@ class _ModernWorkOrderCard extends StatelessWidget {
                                           ],
                                         ),
                                       ),
-                                    ] else if (order.reportId != null) ...[
-                                      const SizedBox(width: 8),
+                                    ] else ...[
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                         decoration: BoxDecoration(
@@ -789,7 +791,9 @@ class _ModernWorkOrderCard extends StatelessWidget {
                                             Icon(Icons.report_problem_outlined, size: 12, color: Colors.orange.shade900),
                                             const SizedBox(width: 4),
                                             Text(
-                                              'Avería #${order.reportId}',
+                                              order.reportId != null && order.reportId!.isNotEmpty
+                                                  ? 'Avería #${order.reportId}'
+                                                  : 'Correctivo',
                                               style: TextStyle(
                                                 fontSize: 10.5,
                                                 fontWeight: FontWeight.bold,

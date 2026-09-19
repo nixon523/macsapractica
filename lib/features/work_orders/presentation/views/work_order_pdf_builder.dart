@@ -3,15 +3,15 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../../core/utils/text_sanitizer.dart';
 import '../../domain/entities/work_order.dart';
 
 class WorkOrderPdfBuilder {
-  // ─── Color palette ───
-  static const _darkGreen = PdfColor(0.18, 0.35, 0.20);
-  static const _mediumGreen = PdfColor(0.22, 0.50, 0.27);
-  static const _lightGreenBg = PdfColor(0.91, 0.96, 0.91);
-  static const _headerBg = PdfColor(0.95, 0.95, 0.95);
-
+  // ─── Color palette (Grupo Macsa Corporate Blue & Slate) ───
+  static const _primaryBlue = PdfColor(0.0, 0.33, 0.65); // #0055A5
+  static const _primaryDarkBlue = PdfColor(0.0, 0.24, 0.49); // #003E7E
+  static const _lightBlueBg = PdfColor(0.94, 0.96, 0.99); // #F0F6FC
+  static const _headerBg = PdfColor(0.96, 0.97, 0.99);
   static const _borderColor = PdfColors.black;
   static const _outerBorderWidth = 1.5;
 
@@ -24,7 +24,7 @@ class WorkOrderPdfBuilder {
   static final _correlativeStyle = pw.TextStyle(
     fontSize: 13,
     fontWeight: pw.FontWeight.bold,
-    color: PdfColors.black,
+    color: _primaryDarkBlue,
   );
   static final _sectionHeaderStyle = pw.TextStyle(
     fontSize: 10,
@@ -44,6 +44,8 @@ class WorkOrderPdfBuilder {
     fontWeight: pw.FontWeight.bold,
   );
   static const _tableCell = pw.TextStyle(fontSize: 8.5);
+
+  static String _cleanDescription(String raw) => TextSanitizer.cleanDescription(raw);
 
   static Future<Uint8List> buildPdf(WorkOrder order) async {
     final pdf = pw.Document();
@@ -65,19 +67,65 @@ class WorkOrderPdfBuilder {
                 ),
                 child: pw.Column(
                   children: [
-                    // Título + Correlativo
+                    // Título + Correlativo + Clasificación
                     pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                      color: _lightGreenBg,
+                      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 14),
+                      color: _lightBlueBg,
                       child: pw.Row(
                         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: pw.CrossAxisAlignment.center,
                         children: [
-                          pw.Text('ORDEN DE TRABAJO DE MANTENIMIENTO', style: _titleStyle),
+                          pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text('ORDEN DE TRABAJO DE MANTENIMIENTO', style: _titleStyle),
+                              pw.SizedBox(height: 3),
+                              pw.Row(
+                                children: [
+                                  pw.Container(
+                                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                    decoration: pw.BoxDecoration(
+                                      color: order.isPreventive
+                                          ? _primaryBlue
+                                          : const PdfColor(0.85, 0.40, 0.0),
+                                      borderRadius: pw.BorderRadius.circular(2),
+                                    ),
+                                    child: pw.Text(
+                                      order.isPreventive
+                                          ? 'MANTENIMIENTO PREVENTIVO'
+                                          : 'MANTENIMIENTO CORRECTIVO',
+                                      style: pw.TextStyle(
+                                        color: PdfColors.white,
+                                        fontSize: 8,
+                                        fontWeight: pw.FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  if (order.isPreventive &&
+                                      order.preventiveScheduleId != null &&
+                                      order.preventiveScheduleId!.isNotEmpty) ...[
+                                    pw.SizedBox(width: 6),
+                                    pw.Text(
+                                      'Ref: ${order.preventiveScheduleId}',
+                                      style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                                    ),
+                                  ] else if (order.reportId != null &&
+                                      order.reportId!.isNotEmpty) ...[
+                                    pw.SizedBox(width: 6),
+                                    pw.Text(
+                                      'Avería: #${order.reportId}',
+                                      style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
                           pw.Container(
                             padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: pw.BoxDecoration(
-                              border: pw.Border.all(color: _darkGreen, width: 1),
+                              color: PdfColors.white,
+                              border: pw.Border.all(color: _primaryBlue, width: 1.2),
                               borderRadius: pw.BorderRadius.circular(3),
                             ),
                             child: pw.Text(
@@ -99,7 +147,7 @@ class WorkOrderPdfBuilder {
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          // Fecha / Área / Equipos
+                          // Fecha / Área / Equipos / Prioridad
                           pw.Table(
                             border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
                             columnWidths: const {
@@ -126,9 +174,38 @@ class WorkOrderPdfBuilder {
                                     ],
                                   ),
                                 ),
-                                _fieldCell(
-                                  'Prioridad:',
-                                  order.priorityLabel,
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.all(5),
+                                  child: pw.Row(
+                                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      pw.Column(
+                                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                        children: [
+                                          pw.Text('Prioridad:', style: _labelBold),
+                                          pw.SizedBox(height: 2),
+                                          pw.Text(order.priorityLabel, style: _bodyText),
+                                        ],
+                                      ),
+                                      pw.Column(
+                                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                        children: [
+                                          pw.Text('Clasificación:', style: _labelBold),
+                                          pw.SizedBox(height: 2),
+                                          pw.Text(
+                                            order.isPreventive ? 'Preventivo' : 'Correctivo',
+                                            style: pw.TextStyle(
+                                              fontSize: 9.5,
+                                              fontWeight: pw.FontWeight.bold,
+                                              color: order.isPreventive
+                                                  ? _primaryBlue
+                                                  : const PdfColor(0.85, 0.40, 0.0),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ]),
                             ],
@@ -148,6 +225,7 @@ class WorkOrderPdfBuilder {
                               children: [
                                 _buildCheckBox('Eléctrico', order.requestedWorkTypes.contains('electric')),
                                 _buildCheckBox('Mecánico', order.requestedWorkTypes.contains('mechanical')),
+                                _buildCheckBox('Soldadura', order.requestedWorkTypes.contains('welding') || order.requestedWorkTypes.contains('soldadura')),
                                 _buildCheckBox('Refrigeración', order.requestedWorkTypes.contains('refrigeration')),
                                 _buildCheckBox('Plomería', order.requestedWorkTypes.contains('plumbing')),
                               ],
@@ -168,7 +246,7 @@ class WorkOrderPdfBuilder {
                               border: pw.Border.all(color: PdfColors.grey400, width: 0.5),
                             ),
                             padding: const pw.EdgeInsets.all(6),
-                            child: pw.Text(order.description, style: _bodyText),
+                            child: pw.Text(_cleanDescription(order.description), style: _bodyText),
                           ),
                         ],
                       ),
@@ -231,7 +309,7 @@ class WorkOrderPdfBuilder {
                             ),
                             padding: const pw.EdgeInsets.all(6),
                             child: pw.Text(
-                              order.workDoneDescription ?? '',
+                              _cleanDescription(order.workDoneDescription ?? ''),
                               style: _bodyText,
                             ),
                           ),
@@ -316,7 +394,7 @@ class WorkOrderPdfBuilder {
   static pw.Widget _buildSectionHeader(String title) {
     return pw.Container(
       width: double.infinity,
-      color: _mediumGreen,
+      color: _primaryBlue,
       padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 10),
       child: pw.Center(
         child: pw.Text(title, style: _sectionHeaderStyle),

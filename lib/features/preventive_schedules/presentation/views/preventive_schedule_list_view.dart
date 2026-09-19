@@ -650,80 +650,91 @@ class _PreventiveScheduleListViewState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
-      child: Row(
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          Icon(Icons.calendar_month_outlined, size: 16, color: colors.primary),
-          const SizedBox(width: 8),
-          Text(
-            '$count plan(es) preventivo(s)',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: colors.onSurface,
-            ),
-          ),
-          const SizedBox(width: 12),
-          if (urgent > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFEDD5),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '$urgent urgente(s)',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFC2410C)),
-              ),
-            ),
-          if (overdue > 0) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEE2E2),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '$overdue vencido(s)',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
-              ),
-            ),
-          ],
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: onTimeRatio >= 85
-                  ? const Color(0xFFDCFCE7)
-                  : (onTimeRatio >= 70 ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(
-                color: onTimeRatio >= 85
-                    ? const Color(0xFF15803D).withValues(alpha: 0.3)
-                    : const Color(0xFFDC2626).withValues(alpha: 0.3),
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  onTimeRatio >= 85 ? Icons.trending_up : Icons.trending_down,
-                  size: 13,
-                  color: onTimeRatio >= 85 ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.calendar_month_outlined, size: 16, color: colors.primary),
+              const SizedBox(width: 8),
+              Text(
+                '$count plan(es) preventivo(s)',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: colors.onSurface,
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  'Salud: $onTimeRatio% al día',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: onTimeRatio >= 85 ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+              ),
+            ],
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (urgent > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEDD5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '$urgent urgente(s)',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFC2410C)),
                   ),
                 ),
-              ],
-            ),
+              if (overdue > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '$overdue vencido(s)',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                  ),
+                ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: onTimeRatio >= 85
+                      ? const Color(0xFFDCFCE7)
+                      : (onTimeRatio >= 70 ? const Color(0xFFFEF3C7) : const Color(0xFFFEE2E2)),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(
+                    color: onTimeRatio >= 85
+                        ? const Color(0xFF15803D).withValues(alpha: 0.3)
+                        : const Color(0xFFDC2626).withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      onTimeRatio >= 85 ? Icons.trending_up : Icons.trending_down,
+                      size: 13,
+                      color: onTimeRatio >= 85 ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Salud: $onTimeRatio% al día',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: onTimeRatio >= 85 ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const Spacer(),
           Text(
             'Por fecha de ejecución',
             style: TextStyle(
@@ -815,53 +826,49 @@ class _PreventiveCardState extends State<_PreventiveCard> {
         side: BorderSide(color: Colors.grey.shade300, width: 0.8),
       ),
       clipBehavior: Clip.antiAlias,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: accentColor, width: 5),
+          ),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 5,
-              color: accentColor,
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 4,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Wrap(
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: [
-                              Text(
-                                schedule.id,
-                                style: const TextStyle(
-                                  fontFamily: 'monospace',
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              Text(
-                                '— ${schedule.assetId} (${schedule.assetName.isNotEmpty ? schedule.assetName : "Equipo"})',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                              ),
-                              Text(
-                                '· Área: ${schedule.areaName.isNotEmpty ? schedule.areaName : schedule.areaId}',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
+                    Text(
+                      schedule.id,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      '— ${schedule.assetId} (${schedule.assetName.isNotEmpty ? schedule.assetName : "Equipo"})',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    Text(
+                      '· Área: ${schedule.areaName.isNotEmpty ? schedule.areaName : schedule.areaId}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
                             if (hasActivities)
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1205,7 +1212,6 @@ class _PreventiveCardState extends State<_PreventiveCard> {
                                           child: Text(
                                             'Duplicar / Usar como Plantilla',
                                             style: TextStyle(fontSize: 13),
-                                            maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
@@ -1258,13 +1264,9 @@ class _PreventiveCardState extends State<_PreventiveCard> {
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+            );
+          }
+        }
 
 /// Representa una actividad individual dentro de un componente hijo.
 class _SingleActivityDraft {

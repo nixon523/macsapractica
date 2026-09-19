@@ -100,17 +100,24 @@ void main() {
       expect(user.hasPermission('cualquier.cosa'), isTrue);
     });
 
-    test('un rol no-admin se evalúa contra su lista de permisos', () {
+    test('un rol no-admin se evalúa contra su lista de permisos y los permisos por defecto de su rol', () {
       const user = AppUser(
         userId: 'u2',
-        username: 'lector',
-        role: UserRole.lector,
-        permissions: {'ot.edit_deadline'},
+        username: 'reportador1',
+        role: UserRole.reportador,
+        permissions: {'asset.view', 'work_order.view'},
       );
 
       expect(user.isAdmin, isFalse);
-      expect(user.hasPermission('ot.edit_deadline'), isTrue);
-      expect(user.hasPermission('asset.delete'), isFalse);
+      // Permisos propios del rol reportador
+      expect(user.hasPermission('breakdown.report'), isTrue);
+      expect(user.hasPermission('breakdown.view'), isTrue);
+      // Permisos extra asignados
+      expect(user.hasPermission('asset.view'), isTrue);
+      expect(user.hasPermission('work_order.view'), isTrue);
+      // Permisos no asignados
+      expect(user.hasPermission('asset.delete.approve'), isFalse);
+      expect(user.hasPermission('user.manage'), isFalse);
     });
   });
 }
