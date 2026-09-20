@@ -8,6 +8,7 @@ abstract final class ApiEndpoints {
   static String resolvePasswordReset(dynamic id) =>
       '/autenticacion/solicitudes-reinicio-password/$id/resolver';
   static const String androidVersion = '/app/version-android';
+  static const String downloadApk = '/app/descargar-apk';
 
   // Usuarios
   static const String users = '/usuarios';

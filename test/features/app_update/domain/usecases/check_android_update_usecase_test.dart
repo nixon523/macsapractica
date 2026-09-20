@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:macsapractica/features/app_update/domain/entities/app_version_info.dart';
@@ -36,7 +36,6 @@ void main() {
         (_) async => const AppVersionInfo(
           id: 2,
           version: '2.0.0',
-          downloadUrl: 'http://server/app.apk',
           mandatory: true,
         ),
       );
@@ -57,7 +56,6 @@ void main() {
         (_) async => const AppVersionInfo(
           id: 2,
           version: '1.9.0',
-          downloadUrl: 'http://server/app.apk',
           mandatory: false,
         ),
       );

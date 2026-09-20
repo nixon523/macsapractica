@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../app/di/get_it.dart';
 import '../../../../../core/network/api_client.dart';
+import '../../../../../core/network/api_endpoints.dart';
 import '../../../domain/entities/app_version_info.dart';
 import '../../viewmodels/app_update_viewmodel.dart';
 
@@ -19,19 +20,8 @@ class AppUpdateDialog extends StatelessWidget {
   final AppUpdateViewModel viewModel;
 
   Future<void> _launchUpdate(BuildContext context) async {
-    final rawUrl = versionInfo.downloadUrl;
-    if (rawUrl == null || rawUrl.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enlace de descarga no configurado en el servidor.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
     final apiClient = getIt<ApiClient>();
-    final fullUrl = apiClient.resolveImageUrl(rawUrl);
+    final fullUrl = apiClient.resolveImageUrl(ApiEndpoints.downloadApk);
     final uri = Uri.tryParse(fullUrl);
 
     if (uri != null) {
@@ -40,7 +30,7 @@ class AppUpdateDialog extends StatelessWidget {
       } catch (e) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('No se pudo abrir el enlace: ')),
+            const SnackBar(content: Text('No se pudo iniciar la descarga del APK.')),
           );
         }
       }
