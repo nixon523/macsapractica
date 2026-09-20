@@ -19,6 +19,7 @@ abstract final class ApiEndpoints {
 
   // Activos
   static const String assets = '/activos';
+  static const String uploadAssetImage = '/activos/upload-imagen';
   static const String assetSearch = '/activos/buscar';
   static String assetBySerial(String serial) =>
       '/activos/serie/${Uri.encodeComponent(serial)}';

@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import '../../../../core/error/failures.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../domain/entities/asset.dart';
@@ -231,5 +234,21 @@ class AssetRemoteDataSource {
         'reason': reason,
       },
     );
+  }
+
+  /// Sube los bytes de una imagen de activo y retorna la ruta relativa (/image/...)
+  Future<String> uploadAssetImage(
+    Uint8List bytes, {
+    String filename = 'asset_photo.jpg',
+  }) async {
+    final response = await _apiClient.postMultipart(
+      ApiEndpoints.uploadAssetImage,
+      fileBytes: bytes,
+      filename: filename,
+    );
+    if (response is Map<String, dynamic> && response['imageUrl'] != null) {
+      return response['imageUrl'].toString();
+    }
+    throw const ServerFailure(message: 'Respuesta inválida al subir la imagen.');
   }
 }

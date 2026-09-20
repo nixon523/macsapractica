@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../../domain/entities/asset.dart';
+import 'asset_image_widget.dart';
 
 class AssetCardWidget extends StatelessWidget {
   const AssetCardWidget({
@@ -126,38 +127,14 @@ class AssetCardWidget extends StatelessWidget {
                   child: Row(
                     children: [
                       // Ícono o Miniatura
-                      if (imageData == null)
-                        Container(
-                          width: depth == 0 ? 36 : (isMobile ? 28 : 30),
-                          height: depth == 0 ? 36 : (isMobile ? 28 : 30),
-                          decoration: BoxDecoration(
-                            color: levelBg,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: levelColor.withValues(alpha: 0.2)),
-                          ),
-                          alignment: Alignment.center,
-                          child: Icon(
-                            _getIconForLevel(asset.level),
-                            size: depth == 0 ? 18 : (isMobile ? 14 : 16),
-                            color: levelColor,
-                          ),
-                        )
-                      else
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox(
-                            width: depth == 0 ? 36 : 30,
-                            height: depth == 0 ? 36 : 30,
-                            child: Image.memory(
-                              base64Decode(imageData.split(',').last),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => Container(
-                                color: levelBg,
-                                child: Icon(Icons.broken_image_outlined, size: 16, color: levelColor),
-                              ),
-                            ),
-                          ),
-                        ),
+                      AssetImageWidget(
+                        imageData: imageData,
+                        width: depth == 0 ? 36 : (isMobile ? 28 : 30),
+                        height: depth == 0 ? 36 : (isMobile ? 28 : 30),
+                        fallbackIcon: _getIconForLevel(asset.level),
+                        fallbackColor: levelColor,
+                        fallbackBgColor: levelBg,
+                      ),
 
                       const SizedBox(width: 10),
 

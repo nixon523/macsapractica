@@ -191,6 +191,56 @@ class ApiClient {
     }
   }
 
+  /// Sube un archivo mediante multipart/form-data.
+  Future<dynamic> postMultipart(
+    String path, {
+    required List<int> fileBytes,
+    required String filename,
+    String fieldName = 'image',
+    Map<String, String>? fields,
+  }) async {
+    final uri = _buildUri(path);
+    try {
+      final request = http.MultipartRequest('POST', uri);
+      final token = _sessionManager.token;
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          fieldName,
+          fileBytes,
+          filename: filename,
+        ),
+      );
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+      final streamedResponse = await _httpClient.send(request);
+      final response = await http.Response.fromStream(streamedResponse);
+      return _handleResponse(response);
+    } on SocketException catch (_) {
+      throw const ServerFailure(
+        message: 'No se pudo establecer conexión con el servidor de la API.',
+      );
+    } on Failure {
+      rethrow;
+    } catch (e) {
+      throw ServerFailure(message: 'Error de red: ${e.toString()}');
+    }
+  }
+
+  /// Resuelve la URL absoluta de una imagen a partir de una ruta relativa (/image/...)
+  String resolveImageUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+      return path;
+    }
+    final base = _baseUrl.endsWith('/api') ? _baseUrl.substring(0, _baseUrl.length - 4) : _baseUrl;
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return '$base$cleanPath';
+  }
+
   dynamic _handleResponse(http.Response response) {
     dynamic decodedBody;
     if (response.body.isNotEmpty) {

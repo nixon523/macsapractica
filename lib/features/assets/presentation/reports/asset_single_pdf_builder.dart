@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../../../app/di/get_it.dart';
+import '../../../../core/network/api_client.dart';
 import '../../domain/entities/asset.dart';
 
 /// Generador de Ficha Técnica y Hoja de Vida Individual en PDF
@@ -28,15 +31,32 @@ class AssetSinglePdfBuilder {
     // Imagen técnica si existe
     pw.MemoryImage? assetImage;
     if (asset.imageData != null && asset.imageData!.trim().isNotEmpty) {
-      try {
-        String base64Str = asset.imageData!.trim();
-        if (base64Str.contains(',')) {
-          base64Str = base64Str.split(',').last;
+      final imgStr = asset.imageData!.trim();
+      if (imgStr.startsWith('http://') ||
+          imgStr.startsWith('https://') ||
+          imgStr.startsWith('/image') ||
+          imgStr.startsWith('image/')) {
+        try {
+          final apiClient = getIt<ApiClient>();
+          final fullUrl = apiClient.resolveImageUrl(imgStr);
+          final res = await http.get(Uri.parse(fullUrl));
+          if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+            assetImage = pw.MemoryImage(res.bodyBytes);
+          }
+        } catch (_) {
+          assetImage = null;
         }
-        final bytes = base64Decode(base64Str);
-        assetImage = pw.MemoryImage(bytes);
-      } catch (_) {
-        assetImage = null;
+      } else {
+        try {
+          String base64Str = imgStr;
+          if (base64Str.contains(',')) {
+            base64Str = base64Str.split(',').last;
+          }
+          final bytes = base64Decode(base64Str);
+          assetImage = pw.MemoryImage(bytes);
+        } catch (_) {
+          assetImage = null;
+        }
       }
     }
 

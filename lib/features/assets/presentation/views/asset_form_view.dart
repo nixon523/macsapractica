@@ -6,10 +6,13 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../app/di/get_it.dart';
 import '../../../../app/widgets/app_form_shell.dart';
+import '../../data/datasources/asset_remote_datasource.dart';
 import '../../domain/entities/asset.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../viewmodels/asset_create_edit_viewmodel.dart';
+import 'widgets/asset_image_widget.dart';
 
 const _levelLabels = {
   AssetLevel.equipment: 'Equipo',
@@ -24,12 +27,11 @@ const _statusLabels = {
   AssetStatus.transferredDeactivated: 'Transferido / Desactivado',
 };
 
-const _maxImageDimension = 1024;
-const _jpegQuality = 75;
+const _maxImageDimension = 1200;
+const _jpegQuality = 80;
 
-/// Redimensiona y re-encodea la imagen a JPEG comprimido, devolviendo un
-/// data-URL (`data:image/jpeg;base64,...`) apto para Firestore (límite 1 MiB).
-Future<String> _encodeImageData(Uint8List bytes) async {
+/// Redimensiona y optimiza la imagen antes de subirla al servidor.
+Future<Uint8List> _compressImageBytes(Uint8List bytes) async {
   img.Image? decoded = img.decodeImage(bytes);
   if (decoded == null) {
     throw const FormatException('No se pudo leer la imagen seleccionada.');
@@ -42,8 +44,7 @@ Future<String> _encodeImageData(Uint8List bytes) async {
       interpolation: img.Interpolation.cubic,
     );
   }
-  final jpeg = img.encodeJpg(decoded, quality: _jpegQuality);
-  return 'data:image/jpeg;base64,${base64Encode(jpeg)}';
+  return Uint8List.fromList(img.encodeJpg(decoded, quality: _jpegQuality));
 }
 
 AssetLevel _nextLevel(AssetLevel level) {
@@ -88,6 +89,8 @@ class _AssetFormViewState extends State<AssetFormView> {
   String? _parentAssetId;
   late Map<String, dynamic> _dynamicAttributes;
   String? _imageData;
+  Uint8List? _pendingImageBytes;
+  String? _pendingImageFilename;
   bool _imageProcessing = false;
 
   bool get _isEditing => widget.asset != null;
@@ -154,6 +157,30 @@ class _AssetFormViewState extends State<AssetFormView> {
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
+    // Si se seleccionó una imagen nueva, subirla a la API antes de guardar
+    if (_pendingImageBytes != null) {
+      setState(() => _imageProcessing = true);
+      try {
+        final datasource = getIt<AssetRemoteDataSource>();
+        final uploadedUrl = await datasource.uploadAssetImage(
+          _pendingImageBytes!,
+          filename: _pendingImageFilename ?? 'asset.jpg',
+        );
+        _imageData = uploadedUrl;
+        _pendingImageBytes = null;
+      } catch (e) {
+        if (mounted) {
+          setState(() => _imageProcessing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al subir la imagen al servidor: $e')),
+          );
+        }
+        return;
+      } finally {
+        if (mounted) setState(() => _imageProcessing = false);
+      }
+    }
+
     final ok = await vm.save(
       id: asset?.id ?? '',
       name: _nameCtrl.text,
@@ -205,14 +232,17 @@ class _AssetFormViewState extends State<AssetFormView> {
 
     setState(() => _imageProcessing = true);
     try {
-      final bytes = await file.readAsBytes();
-      final dataUrl = await _encodeImageData(bytes);
+      final rawBytes = await file.readAsBytes();
+      final compressedBytes = await _compressImageBytes(rawBytes);
       if (!mounted) return;
-      setState(() => _imageData = dataUrl);
+      setState(() {
+        _pendingImageBytes = compressedBytes;
+        _pendingImageFilename = file.name;
+      });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al cargar la imagen: $e')),
+        SnackBar(content: Text('Error al procesar la imagen: $e')),
       );
     } finally {
       if (mounted) setState(() => _imageProcessing = false);
@@ -220,7 +250,11 @@ class _AssetFormViewState extends State<AssetFormView> {
   }
 
   void _removeImage() {
-    setState(() => _imageData = null);
+    setState(() {
+      _imageData = null;
+      _pendingImageBytes = null;
+      _pendingImageFilename = null;
+    });
   }
 
   @override
@@ -344,6 +378,7 @@ class _AssetFormViewState extends State<AssetFormView> {
               const SizedBox(height: 24),
               _ImageSection(
                 imageData: _imageData,
+                pendingBytes: _pendingImageBytes,
                 processing: _imageProcessing,
                 onPick: _pickImage,
                 onRemove: _removeImage,
@@ -439,12 +474,14 @@ class _AssetFormViewState extends State<AssetFormView> {
 class _ImageSection extends StatelessWidget {
   const _ImageSection({
     required this.imageData,
+    required this.pendingBytes,
     required this.processing,
     required this.onPick,
     required this.onRemove,
   });
 
   final String? imageData;
+  final Uint8List? pendingBytes;
   final bool processing;
   final VoidCallback onPick;
   final VoidCallback onRemove;
@@ -466,18 +503,40 @@ class _ImageSection extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Center(child: CircularProgressIndicator()),
           )
-        else if (imageData != null) ...[
+        else if (pendingBytes != null) ...[
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Image.memory(
-              base64Decode(imageData!.split(',').last),
+              pendingBytes!,
               height: 180,
               width: double.infinity,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const SizedBox(
-                height: 180,
-                child: Center(child: Icon(Icons.broken_image_outlined, size: 48)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: onPick,
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: const Text('Cambiar imagen'),
               ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Quitar'),
+              ),
+            ],
+          ),
+        ] else if (imageData != null && imageData!.trim().isNotEmpty) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: AssetImageWidget(
+              imageData: imageData,
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
             ),
           ),
           const SizedBox(height: 8),
@@ -507,7 +566,7 @@ class _ImageSection extends StatelessWidget {
           ),
         const SizedBox(height: 4),
         Text(
-          'Se comprime a JPEG (máx. 1024 px) para caber en Firestore.',
+          'La imagen se almacena en el servidor y se asocia al activo de forma optimizada.',
           style: theme.textTheme.bodySmall,
         ),
       ],

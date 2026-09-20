@@ -21,6 +21,7 @@ import '../viewmodels/asset_detail_viewmodel.dart';
 import 'asset_create_view.dart';
 import 'asset_edit_view.dart';
 import 'asset_transfer_view.dart';
+import 'widgets/asset_image_widget.dart';
 
 const _statusLabels = {
   AssetStatus.active: 'Activo',
@@ -730,7 +731,7 @@ class _AssetPhoto extends StatelessWidget {
 
   final Asset asset;
 
-  void _showFullImageDialog(BuildContext context, String base64String) {
+  void _showFullImageDialog(BuildContext context, String imagePathOrBase64) {
     showDialog<void>(
       context: context,
       builder: (context) => Dialog(
@@ -743,8 +744,8 @@ class _AssetPhoto extends StatelessWidget {
               minScale: 0.5,
               maxScale: 4.0,
               child: Center(
-                child: Image.memory(
-                  base64Decode(base64String.split(',').last),
+                child: AssetImageWidget(
+                  imageData: imagePathOrBase64,
                   fit: BoxFit.contain,
                 ),
               ),
@@ -765,7 +766,7 @@ class _AssetPhoto extends StatelessWidget {
     final colors = theme.colorScheme;
     final imageData = asset.imageData;
 
-    if (imageData == null) {
+    if (imageData == null || imageData.trim().isEmpty) {
       return Container(
         height: 180,
         decoration: BoxDecoration(
@@ -795,8 +796,6 @@ class _AssetPhoto extends StatelessWidget {
       );
     }
 
-    final bytes = base64Decode(imageData.split(',').last);
-
     return Container(
       height: 250,
       width: double.infinity,
@@ -818,14 +817,9 @@ class _AssetPhoto extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 width: double.infinity,
                 height: 250,
-                child: Image.memory(
-                  bytes,
+                child: AssetImageWidget(
+                  imageData: imageData,
                   fit: BoxFit.contain,
-                  filterQuality: FilterQuality.medium,
-                  errorBuilder: (_, _, _) => Center(
-                    child: Icon(Icons.broken_image_outlined,
-                        size: 54, color: colors.error),
-                  ),
                 ),
               ),
             ),
@@ -1071,23 +1065,13 @@ class _ChildThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageData = child.imageData;
-    return ClipRRect(
+    return AssetImageWidget(
+      imageData: child.imageData,
+      width: 40,
+      height: 40,
       borderRadius: BorderRadius.circular(6),
-      child: SizedBox(
-        width: 40,
-        height: 40,
-        child: imageData == null
-            ? ColoredBox(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: const Icon(Icons.precision_manufacturing_outlined, size: 24),
-              )
-            : Image.memory(
-                base64Decode(imageData.split(',').last),
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined),
-              ),
-      ),
+      fallbackIcon: Icons.precision_manufacturing_outlined,
+      fallbackBgColor: Theme.of(context).colorScheme.surfaceContainerHighest,
     );
   }
 }
