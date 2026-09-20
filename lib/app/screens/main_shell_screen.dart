@@ -21,6 +21,8 @@ import '../../features/preventive_schedules/presentation/viewmodels/preventive_s
 import '../../features/work_orders/presentation/viewmodels/work_order_alerts_viewmodel.dart';
 import '../../features/operation_reports/presentation/views/operation_report_list_view.dart';
 import '../../features/operation_reports/presentation/viewmodels/operation_report_viewmodel.dart';
+import '../../features/app_update/presentation/viewmodels/app_update_viewmodel.dart';
+import '../../features/app_update/presentation/views/widgets/app_update_dialog.dart';
 import '../../core/audio/notification_sound.dart';
 import '../../core/notifications/local_notification_service.dart';
 import '../../core/notifications/notification_queue.dart';
@@ -87,10 +89,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
         user.hasPermission(AppPermissions.workOrderCreate)) {
       getIt<WorkOrderAlertsViewModel>().start();
     }
+
+    // Monitoreo continuo de actualizaciones en Android para todos los roles
+    getIt<AppUpdateViewModel>().start();
   }
 
   @override
   void dispose() {
+    getIt<AppUpdateViewModel>().stop();
     getIt<BreakdownAlertsViewModel>().stop();
     getIt<PasswordResetAlertsViewModel>().stop();
     getIt<MyReportsNotificationsViewModel>().stop();
@@ -488,12 +494,38 @@ class _MainShellScreenState extends State<MainShellScreen> {
     });
   }
 
+  bool _isUpdateDialogShowing = false;
+
+  /// Muestra el diálogo de actualización cuando se detecta una nueva versión en Android.
+  void _checkAppUpdateAlert(AppUpdateViewModel updateVm) {
+    if (!updateVm.shouldShowDialog || _isUpdateDialogShowing) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !updateVm.shouldShowDialog || _isUpdateDialogShowing) return;
+
+      _isUpdateDialogShowing = true;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: !updateVm.isMandatory,
+        builder: (_) => AppUpdateDialog(
+          versionInfo: updateVm.versionInfo!,
+          currentVersion: updateVm.currentVersion,
+          viewModel: updateVm,
+        ),
+      );
+      _isUpdateDialogShowing = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthViewModel>().currentUser;
     if (user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+
+    final updateVm = context.watch<AppUpdateViewModel>();
+    _checkAppUpdateAlert(updateVm);
 
     final alertsVm = context.watch<BreakdownAlertsViewModel>();
     _showNewReportAlert(alertsVm, user);

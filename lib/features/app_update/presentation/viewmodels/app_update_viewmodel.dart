@@ -1,4 +1,5 @@
-﻿import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/app_version_info.dart';
 import '../../domain/usecases/check_android_update_usecase.dart';
@@ -9,6 +10,7 @@ class AppUpdateViewModel extends ChangeNotifier {
   }) : _checkAndroidUpdateUseCase = checkAndroidUpdateUseCase;
 
   final CheckAndroidUpdateUseCase _checkAndroidUpdateUseCase;
+  Timer? _pollingTimer;
 
   bool _isChecking = false;
   bool _hasUpdate = false;
@@ -23,6 +25,20 @@ class AppUpdateViewModel extends ChangeNotifier {
   AppVersionInfo? get versionInfo => _versionInfo;
   String get currentVersion => _currentVersion;
   bool get shouldShowDialog => _hasUpdate && (_isMandatory || !_dismissedOptional);
+
+  /// Inicia el monitoreo continuo de nuevas versiones en segundo plano en Android.
+  void start({Duration interval = const Duration(seconds: 30)}) {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    _pollingTimer?.cancel();
+    checkForUpdates();
+    _pollingTimer = Timer.periodic(interval, (_) => checkForUpdates());
+  }
+
+  /// Detiene el monitoreo en segundo plano.
+  void stop() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
 
   Future<void> checkForUpdates() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
@@ -49,4 +65,11 @@ class AppUpdateViewModel extends ChangeNotifier {
     _dismissedOptional = true;
     notifyListeners();
   }
+
+  @override
+  void dispose() {
+    stop();
+    super.dispose();
+  }
 }
+
