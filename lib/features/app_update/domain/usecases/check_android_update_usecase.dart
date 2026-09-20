@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../../core/config/app_version.dart';
 import '../../../../core/utils/version_comparator.dart';
@@ -18,7 +18,7 @@ class UpdateCheckResult {
   final AppVersionInfo? versionInfo;
   final String currentVersion;
 
-  static const none = UpdateCheckResult(
+  static UpdateCheckResult get none => UpdateCheckResult(
     hasUpdate: false,
     isMandatory: false,
     currentVersion: AppVersion.current,
@@ -40,6 +40,7 @@ class CheckAndroidUpdateUseCase {
       final remoteInfo = await _repository.getLatestAndroidVersion();
       if (remoteInfo == null) return UpdateCheckResult.none;
 
+      await AppVersion.initialize();
       final currentVersion = AppVersion.current;
       final hasNewer = VersionComparator.isNewer(remoteInfo.version, currentVersion);
 

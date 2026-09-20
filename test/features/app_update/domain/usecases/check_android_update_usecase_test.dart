@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:macsapractica/core/config/app_version.dart';
 import 'package:macsapractica/features/app_update/domain/entities/app_version_info.dart';
 import 'package:macsapractica/features/app_update/domain/repositories/app_update_repository.dart';
 import 'package:macsapractica/features/app_update/domain/usecases/check_android_update_usecase.dart';
@@ -12,6 +13,7 @@ void main() {
   late CheckAndroidUpdateUseCase useCase;
 
   setUp(() {
+    AppVersion.setVersionForTesting(version: '1.0.0');
     mockRepo = MockAppUpdateRepository();
     useCase = CheckAndroidUpdateUseCase(mockRepo);
   });
