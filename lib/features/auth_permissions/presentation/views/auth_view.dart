@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../app/widgets/app_dialog.dart';
 import '../../../../core/utils/upper_case_formatter.dart';
+import '../../../app_update/presentation/viewmodels/app_update_viewmodel.dart';
+import '../../../app_update/presentation/views/widgets/app_update_dialog.dart';
 import '../viewmodels/auth_viewmodel.dart';
 
 class AuthView extends StatefulWidget {
@@ -21,6 +24,32 @@ class _AuthViewState extends State<AuthView> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndroidUpdate();
+    });
+  }
+
+  Future<void> _checkAndroidUpdate() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    final updateVm = context.read<AppUpdateViewModel>();
+    await updateVm.checkForUpdates();
+    if (!mounted) return;
+    if (updateVm.shouldShowDialog && updateVm.versionInfo != null) {
+      showDialog(
+        context: context,
+        barrierDismissible: !updateVm.isMandatory,
+        builder: (_) => AppUpdateDialog(
+          versionInfo: updateVm.versionInfo!,
+          currentVersion: updateVm.currentVersion,
+          viewModel: updateVm,
+        ),
+      );
+    }
+  }
+
+  @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
@@ -28,6 +57,12 @@ class _AuthViewState extends State<AuthView> {
   }
 
   Future<void> _submit() async {
+    final updateVm = context.read<AppUpdateViewModel>();
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android && updateVm.hasUpdate && updateVm.isMandatory) {
+      _checkAndroidUpdate();
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     final authVm = context.read<AuthViewModel>();

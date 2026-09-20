@@ -5,6 +5,11 @@ import '../../core/network/api_client.dart';
 import '../../core/network/session_manager.dart';
 import '../../core/notifications/local_notification_service.dart';
 import '../../core/notifications/notification_queue.dart';
+import '../../features/app_update/data/datasources/app_update_remote_datasource.dart';
+import '../../features/app_update/data/repositories/app_update_repository_impl.dart';
+import '../../features/app_update/domain/repositories/app_update_repository.dart';
+import '../../features/app_update/domain/usecases/check_android_update_usecase.dart';
+import '../../features/app_update/presentation/viewmodels/app_update_viewmodel.dart';
 import '../../features/assets/data/datasources/area_remote_datasource.dart';
 import '../../features/assets/data/datasources/asset_local_datasource.dart';
 import '../../features/assets/data/datasources/asset_remote_datasource.dart';
@@ -519,6 +524,22 @@ Future<void> configureDependencies() async {
       obtenerMetricas: getIt<ObtenerMetricasOperacion>(),
       listarEquipos:   getIt<ListarEquiposProceso>(),
       actualizarEquipo: getIt<ActualizarEsEquipoProceso>(),
+    ),
+  );
+
+  // --- MÓDULO: Actualizaciones Android ---
+  getIt.registerLazySingleton<AppUpdateRemoteDataSource>(
+    () => AppUpdateRemoteDataSourceImpl(getIt<ApiClient>()),
+  );
+  getIt.registerLazySingleton<AppUpdateRepository>(
+    () => AppUpdateRepositoryImpl(getIt<AppUpdateRemoteDataSource>()),
+  );
+  getIt.registerLazySingleton<CheckAndroidUpdateUseCase>(
+    () => CheckAndroidUpdateUseCase(getIt<AppUpdateRepository>()),
+  );
+  getIt.registerLazySingleton<AppUpdateViewModel>(
+    () => AppUpdateViewModel(
+      checkAndroidUpdateUseCase: getIt<CheckAndroidUpdateUseCase>(),
     ),
   );
 }
