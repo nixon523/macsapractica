@@ -3,6 +3,7 @@ import 'dart:io' show SocketException;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../error/failures.dart';
 import 'session_manager.dart';
@@ -206,11 +207,20 @@ class ApiClient {
       if (token != null && token.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $token';
       }
+      final ext = filename.contains('.') ? filename.toLowerCase().split('.').last : 'jpg';
+      final mediaType = switch (ext) {
+        'png' => MediaType('image', 'png'),
+        'webp' => MediaType('image', 'webp'),
+        'gif' => MediaType('image', 'gif'),
+        _ => MediaType('image', 'jpeg'),
+      };
+
       request.files.add(
         http.MultipartFile.fromBytes(
           fieldName,
           fileBytes,
           filename: filename,
+          contentType: mediaType,
         ),
       );
       if (fields != null) {
