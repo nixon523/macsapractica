@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -13,7 +12,6 @@ import '../../domain/entities/asset.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../viewmodels/asset_create_edit_viewmodel.dart';
 import 'widgets/asset_image_widget.dart';
-
 const _levelLabels = {
   AssetLevel.equipment: 'Equipo',
   AssetLevel.subEquipment: 'Sub-equipo',
@@ -29,23 +27,6 @@ const _statusLabels = {
 
 const _maxImageDimension = 1200;
 const _jpegQuality = 80;
-
-/// Redimensiona y optimiza la imagen antes de subirla al servidor.
-Future<Uint8List> _compressImageBytes(Uint8List bytes) async {
-  img.Image? decoded = img.decodeImage(bytes);
-  if (decoded == null) {
-    throw const FormatException('No se pudo leer la imagen seleccionada.');
-  }
-  if (decoded.width > _maxImageDimension || decoded.height > _maxImageDimension) {
-    decoded = img.copyResize(
-      decoded,
-      width: _maxImageDimension,
-      maintainAspect: true,
-      interpolation: img.Interpolation.cubic,
-    );
-  }
-  return Uint8List.fromList(img.encodeJpg(decoded, quality: _jpegQuality));
-}
 
 AssetLevel _nextLevel(AssetLevel level) {
   return switch (level) {
@@ -227,22 +208,22 @@ class _AssetFormViewState extends State<AssetFormView> {
       source: ImageSource.gallery,
       maxWidth: _maxImageDimension.toDouble(),
       maxHeight: _maxImageDimension.toDouble(),
+      imageQuality: _jpegQuality,
     );
     if (file == null) return;
 
     setState(() => _imageProcessing = true);
     try {
-      final rawBytes = await file.readAsBytes();
-      final compressedBytes = await _compressImageBytes(rawBytes);
+      final bytes = await file.readAsBytes();
       if (!mounted) return;
       setState(() {
-        _pendingImageBytes = compressedBytes;
+        _pendingImageBytes = bytes;
         _pendingImageFilename = file.name;
       });
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al procesar la imagen: $e')),
+        SnackBar(content: Text('Error al leer la imagen seleccionada: $e')),
       );
     } finally {
       if (mounted) setState(() => _imageProcessing = false);
