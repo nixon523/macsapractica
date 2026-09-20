@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/app_dialog.dart';
+import '../../core/utils/upper_case_formatter.dart';
 import '../../features/auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 
 class SidebarItem {
@@ -651,7 +652,8 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                     TextFormField(
                       controller: newPassCtrl,
                       obscureText: obscureNew,
-                      textCapitalization: TextCapitalization.none,
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [UpperCaseTextFormatter()],
                       enableSuggestions: false,
                       autocorrect: false,
                       decoration: InputDecoration(
@@ -680,7 +682,8 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                     TextFormField(
                       controller: confirmPassCtrl,
                       obscureText: obscureConfirm,
-                      textCapitalization: TextCapitalization.none,
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [UpperCaseTextFormatter()],
                       enableSuggestions: false,
                       autocorrect: false,
                       decoration: InputDecoration(
