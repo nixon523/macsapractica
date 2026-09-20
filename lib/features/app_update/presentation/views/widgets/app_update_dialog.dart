@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../app/di/get_it.dart';
@@ -138,26 +138,6 @@ class AppUpdateDialog extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (versionInfo.releaseNotes != null && versionInfo.releaseNotes!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  const Text('Novedades:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                  const SizedBox(height: 4),
-                  Container(
-                    constraints: const BoxConstraints(maxHeight: 120),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: SingleChildScrollView(
-                      child: Text(
-                        versionInfo.releaseNotes!,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
-                      ),
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 24),
                 FilledButton.icon(
                   style: FilledButton.styleFrom(
