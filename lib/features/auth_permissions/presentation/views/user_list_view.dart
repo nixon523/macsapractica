@@ -637,10 +637,10 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
 
   Future<void> _submit() async {
     final pass = _passwordController.text.trim();
-    if (pass.length < 4) {
+    if (pass.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('La contraseña debe tener al menos 4 caracteres.'),
+          content: Text('La contraseña debe tener al menos 8 caracteres.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -1005,6 +1005,9 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   validator: (value) {
                     if (!isEditing && (value == null || value.isEmpty)) {
                       return 'La contraseña es obligatoria.';
+                    }
+                    if (value != null && value.isNotEmpty && value.length < 8) {
+                      return 'La contraseña debe tener al menos 8 caracteres.';
                     }
                     return null;
                   },

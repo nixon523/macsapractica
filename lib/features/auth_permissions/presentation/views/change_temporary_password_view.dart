@@ -164,8 +164,8 @@ class _ChangeTemporaryPasswordViewState
                           if (value == null || value.isEmpty) {
                             return 'Ingresa tu nueva contraseña';
                           }
-                          if (value.length < 4) {
-                            return 'Mínimo 4 caracteres';
+                          if (value.length < 8) {
+                            return 'La contraseña debe tener al menos 8 caracteres';
                           }
                           return null;
                         },

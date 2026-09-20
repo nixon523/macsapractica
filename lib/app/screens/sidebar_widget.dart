@@ -670,8 +670,8 @@ class _SidebarWidgetState extends State<SidebarWidget> {
                         if (v == null || v.isEmpty) {
                           return 'Ingresa tu nueva contraseña';
                         }
-                        if (v.length < 4) {
-                          return 'Mínimo 4 caracteres';
+                        if (v.length < 8) {
+                          return 'La contraseña debe tener al menos 8 caracteres';
                         }
                         return null;
                       },
