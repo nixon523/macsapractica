@@ -24,7 +24,7 @@ class ApiClient {
 
   static String get defaultBaseUrl {
     if (kIsWeb) return 'http://localhost:3000/api';
-    return 'http://192.168.1.33:3000/api';
+    return 'http://192.168.50.55:3000/api';
   }
 
   String get baseUrl => _baseUrl;
@@ -207,7 +207,9 @@ class ApiClient {
       if (token != null && token.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $token';
       }
-      final ext = filename.contains('.') ? filename.toLowerCase().split('.').last : 'jpg';
+      final ext = filename.contains('.')
+          ? filename.toLowerCase().split('.').last
+          : 'jpg';
       final mediaType = switch (ext) {
         'png' => MediaType('image', 'png'),
         'webp' => MediaType('image', 'webp'),
@@ -243,10 +245,14 @@ class ApiClient {
   /// Resuelve la URL absoluta de una imagen a partir de una ruta relativa (/image/...)
   String resolveImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    if (path.startsWith('http://') ||
+        path.startsWith('https://') ||
+        path.startsWith('data:')) {
       return path;
     }
-    final base = _baseUrl.endsWith('/api') ? _baseUrl.substring(0, _baseUrl.length - 4) : _baseUrl;
+    final base = _baseUrl.endsWith('/api')
+        ? _baseUrl.substring(0, _baseUrl.length - 4)
+        : _baseUrl;
     final cleanPath = path.startsWith('/') ? path : '/$path';
     return '$base$cleanPath';
   }
