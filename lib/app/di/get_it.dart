@@ -391,6 +391,7 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<PreventiveScheduleViewModel>(
     () => PreventiveScheduleViewModel(
       repository: getIt<PreventiveScheduleRepository>(),
+      workOrderRepository: getIt<WorkOrderRepository>(),
     ),
   );
   getIt.registerLazySingleton<WorkOrderListViewModel>(
@@ -416,6 +417,7 @@ Future<void> configureDependencies() async {
       getAreasUseCase: getIt<GetAreasUseCase>(),
       getAssetsByAreaUseCase: getIt<GetAssetsByAreaUseCase>(),
       createBreakdownReportUseCase: getIt<CreateBreakdownReportUseCase>(),
+      getOpenBreakdownReportsUseCase: getIt<GetOpenBreakdownReportsUseCase>(),
     ),
   );
   getIt.registerLazySingleton<MyReportsViewModel>(

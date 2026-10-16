@@ -8,6 +8,7 @@ import '../../../assets/domain/usecases/get_assets_by_area.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../domain/entities/breakdown_report.dart';
 import '../../domain/usecases/create_breakdown_report.dart';
+import '../../domain/usecases/get_open_breakdown_reports.dart';
 import 'breakdown_alerts_viewmodel.dart';
 import 'my_reports_notifications_viewmodel.dart';
 
@@ -18,13 +19,28 @@ class ReportBreakdownViewModel extends ChangeNotifier {
     required GetAreasUseCase getAreasUseCase,
     required GetAssetsByAreaUseCase getAssetsByAreaUseCase,
     required CreateBreakdownReportUseCase createBreakdownReportUseCase,
+    GetOpenBreakdownReportsUseCase? getOpenBreakdownReportsUseCase,
   })  : _getAreasUseCase = getAreasUseCase,
         _getAssetsByAreaUseCase = getAssetsByAreaUseCase,
-        _createBreakdownReportUseCase = createBreakdownReportUseCase;
+        _createBreakdownReportUseCase = createBreakdownReportUseCase,
+        _getOpenBreakdownReportsUseCase = getOpenBreakdownReportsUseCase ??
+            (getIt.isRegistered<GetOpenBreakdownReportsUseCase>()
+                ? getIt<GetOpenBreakdownReportsUseCase>()
+                : null);
 
   final GetAreasUseCase _getAreasUseCase;
   final GetAssetsByAreaUseCase _getAssetsByAreaUseCase;
   final CreateBreakdownReportUseCase _createBreakdownReportUseCase;
+  final GetOpenBreakdownReportsUseCase? _getOpenBreakdownReportsUseCase;
+
+  List<BreakdownReport> _openReports = const [];
+  List<BreakdownReport> get openReports => _openReports;
+
+  BreakdownReport? getOpenReportForAsset(String assetId) {
+    return _openReports.where((r) => r.assetId == assetId && r.isOpen).firstOrNull;
+  }
+
+  bool isAssetPending(String assetId) => getOpenReportForAsset(assetId) != null;
 
   List<Area> _areas = const [];
   List<Area> get areas => _areas;
@@ -63,6 +79,9 @@ class ReportBreakdownViewModel extends ChangeNotifier {
 
     try {
       _areas = await _getAreasUseCase(const NoParams());
+      if (_getOpenBreakdownReportsUseCase != null) {
+        _openReports = await _getOpenBreakdownReportsUseCase(const NoParams());
+      }
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -91,6 +110,10 @@ class ReportBreakdownViewModel extends ChangeNotifier {
                 a.status != AssetStatus.deleted,
           )
           .toList();
+
+      if (_getOpenBreakdownReportsUseCase != null) {
+        _openReports = await _getOpenBreakdownReportsUseCase(const NoParams());
+      }
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -101,6 +124,13 @@ class ReportBreakdownViewModel extends ChangeNotifier {
 
   void selectAsset(String? assetId) {
     _selectedAssetId = assetId;
+    if (assetId != null && isAssetPending(assetId)) {
+      final existing = getOpenReportForAsset(assetId);
+      _errorMessage =
+          'El activo seleccionado ya cuenta con un reporte de avería pendiente de atención (Folio #${existing?.id ?? ""}).';
+    } else {
+      _errorMessage = '';
+    }
     notifyListeners();
   }
 
@@ -125,6 +155,13 @@ class ReportBreakdownViewModel extends ChangeNotifier {
         : _assets.where((a) => a.id == _selectedAssetId).firstOrNull;
     if (asset == null) {
       _errorMessage = 'Selecciona el activo con la avería.';
+      notifyListeners();
+      return false;
+    }
+    if (isAssetPending(asset.id)) {
+      final existing = getOpenReportForAsset(asset.id);
+      _errorMessage =
+          'El activo "${asset.name}" ya cuenta con un reporte de avería pendiente de atención (Folio #${existing?.id ?? ""}). No se puede generar un reporte duplicado.';
       notifyListeners();
       return false;
     }

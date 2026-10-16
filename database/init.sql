@@ -1685,6 +1685,19 @@ BEGIN
             RAISERROR(N'El activo no existe.', 16, 1);
         END;
 
+        -- Validar que no exista ya un reporte de avería pendiente o en proceso para este activo
+        DECLARE @ReporteExistenteId BIGINT;
+        SELECT TOP 1 @ReporteExistenteId = ReporteId
+          FROM dbo.ReporteAveria WITH (UPDLOCK, HOLDLOCK)
+         WHERE CodigoActivo = @AssetCode
+           AND Estado IN (N'reported', N'inWorkOrder');
+
+        IF @ReporteExistenteId IS NOT NULL
+        BEGIN
+            DECLARE @MsgError NVARCHAR(250) = CONCAT(N'El activo ', @AssetCode, N' ya cuenta con un reporte de avería pendiente o en orden de trabajo (#', @ReporteExistenteId, N').');
+            RAISERROR(@MsgError, 16, 1);
+        END;
+
         INSERT INTO dbo.ReporteAveria (CodigoActivo, NombreActivo, AreaId, Descripcion, Severidad, ReportadoPorUsuarioId, ReportadoPorNombreUsuario)
         VALUES (@AssetCode, @AssetName, @AreaId, @Description, @Severity, @ReporterUserId, @ReporterUserName);
         DECLARE @rid BIGINT = SCOPE_IDENTITY();

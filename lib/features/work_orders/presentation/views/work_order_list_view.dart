@@ -9,9 +9,9 @@ import 'work_order_detail_view.dart';
 
 enum _WorkOrderFilter { all, pending, inProgress, completed, cancelled }
 
-/// Vista profesional de Órdenes de Trabajo basada en el estándar del Kardex.
-/// Inicia SIEMPRE en el día de HOY con filtros de fecha Desde-Hasta, presets,
-/// chips de estado temáticos, búsqueda en vivo y tarjetas ejecutivas.
+/// Vista ejecutiva y formal de Órdenes de Trabajo del Grupo Macsa.
+/// Integra filtros cronológicos con menú desplegable, pestañas con subrayado limpio,
+/// búsqueda en tiempo real y tarjetas de diseño despejado y responsive.
 class WorkOrderListView extends StatefulWidget {
   const WorkOrderListView({super.key, this.assetId});
 
@@ -25,14 +25,13 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
   _WorkOrderFilter _filter = _WorkOrderFilter.all;
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  late DateTime? _startDate;
-  late DateTime? _endDate;
+  DateTime? _startDate;
+  DateTime? _endDate;
   String _selectedPreset = 'mes';
 
   @override
   void initState() {
     super.initState();
-    // Inicia por defecto en el MES ACTUAL para mostrar todas las órdenes del periodo
     final now = DateTime.now();
     _startDate = DateTime(now.year, now.month, 1, 0, 0, 0);
     _endDate = DateTime(now.year, now.month, now.day, 23, 59, 59);
@@ -106,6 +105,28 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
       }
     });
     _loadData();
+  }
+
+  String _getPresetLabel() {
+    switch (_selectedPreset) {
+      case 'hoy':
+        return 'Hoy';
+      case 'ayer':
+        return 'Ayer';
+      case '7dias':
+        return 'Últimos 7 días';
+      case 'mes':
+        return 'Este mes';
+      case 'todo':
+        return 'Histórico completo';
+      case 'personalizado':
+        if (_startDate != null && _endDate != null) {
+          return '${_startDate!.day}/${_startDate!.month} — ${_endDate!.day}/${_endDate!.month}/${_endDate!.year}';
+        }
+        return 'Personalizado';
+      default:
+        return 'Filtrar fecha';
+    }
   }
 
   Future<void> _selectDateRange() async {
@@ -183,22 +204,30 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
   Widget build(BuildContext context) {
     final canCreate = context.watch<AuthViewModel>().hasPermission('work_order.create');
     final vm = context.watch<WorkOrderListViewModel>();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final filteredOrders = _filterOrders(vm.workOrders);
     final isAssetDetail = widget.assetId != null && widget.assetId!.isNotEmpty;
 
+    final bgMain = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
     final bodyContent = LayoutBuilder(
       builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 850;
-        final isTablet = constraints.maxWidth >= 550 && constraints.maxWidth < 850;
+        final isMobile = constraints.maxWidth < 700;
 
         return Column(
           children: [
-            if (!isAssetDetail) ...[
-              _buildFilterSection(isDesktop: isDesktop, isTablet: isTablet, canCreate: canCreate),
-              const Divider(height: 1),
-            ],
+            if (!isAssetDetail)
+              _buildCleanHeader(
+                isMobile: isMobile,
+                isDark: isDark,
+                borderColor: borderColor,
+                canCreate: canCreate,
+                currentCount: filteredOrders.length,
+              ),
             Expanded(
-              child: _buildBody(vm, filteredOrders),
+              child: _buildBody(vm, filteredOrders, isDark, borderColor, isMobile),
             ),
           ],
         );
@@ -207,6 +236,7 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
 
     if (isAssetDetail) {
       return Scaffold(
+        backgroundColor: bgMain,
         appBar: AppBar(
           title: Text('Órdenes de Trabajo: ${widget.assetId}'),
           actions: [
@@ -222,239 +252,299 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
     }
 
     return Scaffold(
+      backgroundColor: bgMain,
       body: bodyContent,
       floatingActionButton: canCreate
           ? FloatingActionButton.extended(
               onPressed: _createOrder,
-              icon: const Icon(Icons.add),
-              label: const Text('Nueva OT'),
+              backgroundColor: const Color(0xFF0055A5),
+              foregroundColor: Colors.white,
+              elevation: 2,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'Nueva OT',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             )
           : null,
     );
   }
 
-  Widget _buildFilterSection({
-    required bool isDesktop,
-    required bool isTablet,
+  /// Encabezado moderno, despejado y consistente
+  Widget _buildCleanHeader({
+    required bool isMobile,
+    required bool isDark,
+    required Color borderColor,
     required bool canCreate,
+    required int currentCount,
   }) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final headerBg = isDark ? const Color(0xFF1E293B) : Colors.white;
 
     return Container(
-      color: colors.surface,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      decoration: BoxDecoration(
+        color: headerBg,
+        border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Fila 1: Selector de Fechas (Desde - Hasta) y Presets
-          if (isDesktop)
-            Row(
-              children: [
-                _buildDateRangeButton(),
-                const SizedBox(width: 12),
-                Expanded(child: _buildPresetsRow()),
-              ],
-            )
-          else ...[
-            _buildDateRangeButton(),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: _buildPresetsRow(),
+          // Fila 1: Buscador integrado + Menú de Fechas + Botón Nueva OT (Desktop)
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              isMobile ? 14 : 24,
+              14,
+              isMobile ? 14 : 24,
+              10,
             ),
-          ],
-          const SizedBox(height: 10),
+            child: isMobile
+                ? Column(
+                    children: [
+                      _buildSearchField(isDark, borderColor),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: _buildDateMenuButton(isDark, borderColor)),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: _buildSearchField(isDark, borderColor)),
+                      const SizedBox(width: 12),
+                      _buildDateMenuButton(isDark, borderColor),
+                      if (canCreate) ...[
+                        const SizedBox(width: 12),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF0055A5),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: _createOrder,
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text(
+                            'Nueva OT',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
 
-          // Fila 2: Barra de búsqueda y Filtros por Estado
-          if (isDesktop)
-            Row(
+          // Fila 2: Pestañas de Estado con subrayado limpio (Clean Underline)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 20),
+            child: Row(
               children: [
-                Expanded(flex: 3, child: _buildSearchBar()),
-                const SizedBox(width: 12),
-                Expanded(flex: 5, child: _buildStatusChips(scrollable: false)),
+                _buildCleanTab(
+                  filter: _WorkOrderFilter.all,
+                  label: 'Todas',
+                  isDark: isDark,
+                  accentColor: const Color(0xFF0055A5),
+                ),
+                _buildCleanTab(
+                  filter: _WorkOrderFilter.pending,
+                  label: 'Pendientes',
+                  isDark: isDark,
+                  accentColor: const Color(0xFFD97706),
+                ),
+                _buildCleanTab(
+                  filter: _WorkOrderFilter.inProgress,
+                  label: 'En Progreso',
+                  isDark: isDark,
+                  accentColor: const Color(0xFF0055A5),
+                ),
+                _buildCleanTab(
+                  filter: _WorkOrderFilter.completed,
+                  label: 'Completadas',
+                  isDark: isDark,
+                  accentColor: const Color(0xFF059669),
+                ),
+                _buildCleanTab(
+                  filter: _WorkOrderFilter.cancelled,
+                  label: 'Canceladas',
+                  isDark: isDark,
+                  accentColor: const Color(0xFF64748B),
+                ),
               ],
-            )
-          else ...[
-            _buildSearchBar(),
-            const SizedBox(height: 8),
-            _buildStatusChips(scrollable: true),
-          ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDateRangeButton() {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    String label;
-    if (_startDate == null && _endDate == null) {
-      label = 'Todo el historial';
-    } else if (_startDate != null && _endDate != null) {
-      final s = _startDate!;
-      final e = _endDate!;
-      if (s.year == e.year && s.month == e.month && s.day == e.day) {
-        label = 'Hoy: ${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year}';
-      } else {
-        label = '${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year} '
-            '➔ ${e.day.toString().padLeft(2, '0')}/${e.month.toString().padLeft(2, '0')}/${e.year}';
-      }
-    } else {
-      label = 'Filtrar rango';
-    }
-
-    return OutlinedButton.icon(
-      onPressed: _selectDateRange,
-      icon: Icon(Icons.calendar_today_outlined, size: 18, color: colors.primary),
-      label: Text(
-        label,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-          color: colors.onSurface,
-        ),
+  /// Campo de búsqueda despejado
+  Widget _buildSearchField(bool isDark, Color borderColor) {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor, width: 0.9),
       ),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        side: BorderSide(color: colors.outlineVariant),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        backgroundColor: colors.surfaceContainerLowest,
+      child: TextField(
+        controller: _searchCtrl,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          hintText: 'Buscar por OT, equipo, técnico o descripción…',
+          hintStyle: TextStyle(
+            fontSize: 12.5,
+            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+          ),
+          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+          suffixIcon: _searchCtrl.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 16),
+                  onPressed: () => _searchCtrl.clear(),
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        ),
       ),
     );
   }
 
-  Widget _buildPresetsRow() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildPresetChip('hoy', 'Hoy'),
-        const SizedBox(width: 6),
-        _buildPresetChip('ayer', 'Ayer'),
-        const SizedBox(width: 6),
-        _buildPresetChip('7dias', '7 días'),
-        const SizedBox(width: 6),
-        _buildPresetChip('mes', 'Este mes'),
-        const SizedBox(width: 6),
-        _buildPresetChip('todo', 'Todo'),
+  /// Menú desplegable compacto para seleccionar el periodo de tiempo
+  Widget _buildDateMenuButton(bool isDark, Color borderColor) {
+    return PopupMenuButton<String>(
+      onSelected: (val) {
+        if (val == 'personalizado') {
+          _selectDateRange();
+        } else {
+          _applyPreset(val);
+        }
+      },
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      itemBuilder: (ctx) => [
+        _buildPopupItem('hoy', 'Hoy', Icons.today_outlined),
+        _buildPopupItem('ayer', 'Ayer', Icons.history_toggle_off_outlined),
+        _buildPopupItem('7dias', 'Últimos 7 días', Icons.calendar_view_week_outlined),
+        _buildPopupItem('mes', 'Este mes', Icons.calendar_month_outlined),
+        _buildPopupItem('todo', 'Histórico completo', Icons.all_inclusive_rounded),
+        const PopupMenuDivider(),
+        _buildPopupItem('personalizado', 'Seleccionar rango personalizado...', Icons.date_range_outlined),
       ],
-    );
-  }
-
-  Widget _buildPresetChip(String key, String label) {
-    final isSelected = _selectedPreset == key;
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => _applyPreset(key),
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
-      ),
-      selectedColor: colors.primary,
-      backgroundColor: colors.surfaceContainerLow,
-      showCheckmark: false,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return TextField(
-      controller: _searchCtrl,
-      decoration: InputDecoration(
-        hintText: 'Buscar por OT, equipo, técnico o descripción…',
-        hintStyle: const TextStyle(fontSize: 12),
-        prefixIcon: const Icon(Icons.search, size: 20),
-        suffixIcon: _searchCtrl.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear, size: 18),
-                onPressed: () => _searchCtrl.clear(),
-              )
-            : null,
-        isDense: true,
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor, width: 0.9),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusChips({required bool scrollable}) {
-    final statuses = <(_WorkOrderFilter, String, IconData, Color)>[
-      (_WorkOrderFilter.all, 'Todas', Icons.all_inbox_outlined, const Color(0xFF1E293B)),
-      (_WorkOrderFilter.pending, 'Pendientes', Icons.hourglass_top_outlined, const Color(0xFFB45309)),
-      (_WorkOrderFilter.inProgress, 'En Progreso', Icons.sync_outlined, const Color(0xFF1D4ED8)),
-      (_WorkOrderFilter.completed, 'Completadas', Icons.check_circle_outline, const Color(0xFF15803D)),
-      (_WorkOrderFilter.cancelled, 'Canceladas', Icons.cancel_outlined, const Color(0xFF475569)),
-    ];
-
-    final chips = statuses.map((item) {
-      final isSelected = _filter == item.$1;
-      final theme = Theme.of(context);
-      final colors = theme.colorScheme;
-
-      return FilterChip(
-        avatar: Icon(
-          item.$3,
-          size: 16,
-          color: isSelected ? Colors.white : item.$4,
-        ),
-        label: Text(item.$2),
-        selected: isSelected,
-        onSelected: (_) => _onFilterSelected(item.$1),
-        selectedColor: item.$4,
-        backgroundColor: colors.surfaceContainerLow,
-        labelStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          color: isSelected ? Colors.white : colors.onSurface,
-        ),
-        showCheckmark: false,
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        visualDensity: VisualDensity.compact,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      );
-    }).toList();
-
-    if (scrollable) {
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
         child: Row(
-          children: chips.map((c) => Padding(padding: const EdgeInsets.only(right: 6), child: c)).toList(),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.calendar_today_outlined, size: 15, color: Color(0xFF0055A5)),
+            const SizedBox(width: 8),
+            Text(
+              _getPresetLabel(),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF94A3B8)),
+          ],
         ),
-      );
-    }
-
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      children: chips,
+      ),
     );
   }
 
-  Widget _buildBody(WorkOrderListViewModel vm, List<WorkOrder> orders) {
+  PopupMenuItem<String> _buildPopupItem(String value, String text, IconData icon) {
+    final isSelected = _selectedPreset == value;
+
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: isSelected ? const Color(0xFF0055A5) : const Color(0xFF64748B)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? const Color(0xFF0055A5) : null,
+              ),
+            ),
+          ),
+          if (isSelected)
+            const Icon(Icons.check_rounded, size: 16, color: Color(0xFF0055A5)),
+        ],
+      ),
+    );
+  }
+
+  /// Pestaña con barra inferior activa (Modern Underline Tab)
+  Widget _buildCleanTab({
+    required _WorkOrderFilter filter,
+    required String label,
+    required bool isDark,
+    required Color accentColor,
+  }) {
+    final isSelected = _filter == filter;
+
+    return InkWell(
+      onTap: () => _onFilterSelected(filter),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? const Color(0xFF0055A5) : Colors.transparent,
+              width: 2.2,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    WorkOrderListViewModel vm,
+    List<WorkOrder> orders,
+    bool isDark,
+    Color borderColor,
+    bool isMobile,
+  ) {
     if (vm.isLoading) {
       return const Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Cargando órdenes de trabajo…', style: TextStyle(fontSize: 13)),
+            CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0055A5)),
+            SizedBox(height: 14),
+            Text(
+              'Cargando órdenes de trabajo…',
+              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            ),
           ],
         ),
       );
@@ -467,22 +557,26 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+              const Icon(Icons.error_outline_rounded, size: 44, color: Color(0xFFDC2626)),
               const SizedBox(height: 12),
               Text(
                 'Error al consultar órdenes',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                ),
               ),
               const SizedBox(height: 6),
               Text(
                 vm.errorMessage,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12),
+                style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
               ),
               const SizedBox(height: 16),
-              FilledButton.icon(
+              OutlinedButton.icon(
                 onPressed: _loadData,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
                 label: const Text('Reintentar'),
               ),
             ],
@@ -498,38 +592,51 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.assignment_outlined,
-                size: 56,
-                color: Theme.of(context).colorScheme.outline,
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0055A5).withValues(alpha: 0.06),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.assignment_outlined,
+                  size: 28,
+                  color: Color(0xFF0055A5),
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               Text(
                 _searchQuery.isNotEmpty
                     ? 'Sin resultados para "$_searchQuery"'
                     : 'No hay órdenes de trabajo en este periodo.',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 _searchQuery.isNotEmpty
                     ? 'Intenta con otro término o limpia la barra de búsqueda.'
-                    : 'Prueba seleccionando otro rango de fechas o cambiando de estado.',
+                    : 'Prueba cambiando el rango de fechas en el selector superior.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                 ),
               ),
               if (_selectedPreset != 'todo') ...[
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
+                const SizedBox(height: 14),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF0055A5),
+                  ),
                   onPressed: () => _applyPreset('todo'),
-                  icon: const Icon(Icons.history, size: 18),
-                  label: const Text('Ver todas las órdenes'),
+                  icon: const Icon(Icons.history_rounded, size: 16),
+                  label: const Text('Ver todas las órdenes', style: TextStyle(fontSize: 12.5)),
                 ),
               ],
             ],
@@ -542,16 +649,22 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
       onRefresh: () async => _loadData(),
       child: Column(
         children: [
-          _buildSummaryBar(orders.length),
+          _buildSummaryBar(orders.length, isDark, borderColor),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 14 : 24,
+                vertical: 12,
+              ),
               itemCount: orders.length,
               itemBuilder: (context, index) {
                 final order = orders[index];
-                return _ModernWorkOrderCard(
+                return _CleanWorkOrderCard(
                   order: order,
                   onTap: () => _openDetail(order),
+                  isDark: isDark,
+                  borderColor: borderColor,
+                  isMobile: isMobile,
                 );
               },
             ),
@@ -561,23 +674,23 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
     );
   }
 
-  Widget _buildSummaryBar(int count) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
+  Widget _buildSummaryBar(int count, bool isDark, Color borderColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 7),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9).withValues(alpha: 0.6),
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.8)),
+      ),
       child: Row(
         children: [
-          Icon(Icons.assignment_turned_in_outlined, size: 16, color: colors.primary),
+          const Icon(Icons.assignment_turned_in_outlined, size: 15, color: Color(0xFF0055A5)),
           const SizedBox(width: 8),
           Text(
             '$count orden(es) de trabajo',
             style: TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: colors.onSurface,
+              fontWeight: FontWeight.w700,
+              color: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
           const Spacer(),
@@ -585,7 +698,7 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
             'Orden cronológico',
             style: TextStyle(
               fontSize: 11,
-              color: colors.onSurfaceVariant,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
           ),
         ],
@@ -594,22 +707,28 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
   }
 }
 
-/// Tarjeta ejecutiva para cada Orden de Trabajo con estándar visual del Kardex.
-class _ModernWorkOrderCard extends StatelessWidget {
-  const _ModernWorkOrderCard({
+/// Tarjeta ejecutiva, despejada y formal para cada Orden de Trabajo
+class _CleanWorkOrderCard extends StatelessWidget {
+  const _CleanWorkOrderCard({
     required this.order,
     required this.onTap,
+    required this.isDark,
+    required this.borderColor,
+    required this.isMobile,
   });
 
   final WorkOrder order;
   final VoidCallback onTap;
+  final bool isDark;
+  final Color borderColor;
+  final bool isMobile;
 
   static Color _getStatusColor(WorkOrderStatus status) {
     return switch (status) {
-      WorkOrderStatus.pending => const Color(0xFFB45309), // Ámbar
-      WorkOrderStatus.inProgress => const Color(0xFF1D4ED8), // Azul vibrante
-      WorkOrderStatus.completed => const Color(0xFF15803D), // Verde esmeralda
-      WorkOrderStatus.cancelled => const Color(0xFF475569), // Pizarra
+      WorkOrderStatus.pending => const Color(0xFFD97706), // Ámbar
+      WorkOrderStatus.inProgress => const Color(0xFF0055A5), // Macsa Blue
+      WorkOrderStatus.completed => const Color(0xFF059669), // Verde
+      WorkOrderStatus.cancelled => const Color(0xFF64748B), // Pizarra
     };
   }
 
@@ -622,15 +741,6 @@ class _ModernWorkOrderCard extends StatelessWidget {
     };
   }
 
-  static IconData _getStatusIcon(WorkOrderStatus status) {
-    return switch (status) {
-      WorkOrderStatus.pending => Icons.hourglass_top_outlined,
-      WorkOrderStatus.inProgress => Icons.sync_outlined,
-      WorkOrderStatus.completed => Icons.check_circle_outline,
-      WorkOrderStatus.cancelled => Icons.cancel_outlined,
-    };
-  }
-
   String _formatTimestamp(DateTime? dt) {
     if (dt == null) return '—';
     final now = DateTime.now();
@@ -638,267 +748,292 @@ class _ModernWorkOrderCard extends StatelessWidget {
     final timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
     final diff = now.difference(dt);
-    String relative;
     if (diff.inMinutes < 1) {
-      relative = 'Hace un momento';
+      return 'Hace un momento';
     } else if (diff.inMinutes < 60) {
-      relative = 'Hace ${diff.inMinutes} min';
+      return 'Hace ${diff.inMinutes} min';
     } else if (diff.inHours < 24 && dt.day == now.day) {
-      relative = 'Hoy a las $timeStr';
+      return 'Hoy a las $timeStr';
     } else if (diff.inDays == 1 || (diff.inHours < 48 && dt.day == now.subtract(const Duration(days: 1)).day)) {
-      relative = 'Ayer a las $timeStr';
-    } else {
-      relative = '$dayStr $timeStr';
+      return 'Ayer a las $timeStr';
     }
-
-    return relative;
+    return '$dayStr $timeStr';
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final statusColor = _getStatusColor(order.status);
     final statusLabel = _getStatusLabel(order.status);
-    final statusIcon = _getStatusIcon(order.status);
     final timeFormatted = _formatTimestamp(order.createdAt);
     final fullDate = order.createdAt != null
         ? '${order.createdAt!.day.toString().padLeft(2, '0')}/${order.createdAt!.month.toString().padLeft(2, '0')}/${order.createdAt!.year} ${order.createdAt!.hour.toString().padLeft(2, '0')}:${order.createdAt!.minute.toString().padLeft(2, '0')}'
         : '—';
 
     final (priorityColor, priorityBg, priorityLabel) = switch (order.priority) {
-      WorkOrderPriority.low => (Colors.grey.shade800, Colors.grey.shade200, 'Baja'),
-      WorkOrderPriority.medium => (Colors.orange.shade900, Colors.orange.shade100, 'Media'),
-      WorkOrderPriority.high => (Colors.red.shade900, Colors.red.shade100, 'Alta'),
+      WorkOrderPriority.low => (const Color(0xFF475569), const Color(0xFFF1F5F9), 'Baja'),
+      WorkOrderPriority.medium => (const Color(0xFFD97706), const Color(0xFFFFFBEB), 'Media'),
+      WorkOrderPriority.high => (const Color(0xFFDC2626), const Color(0xFFFEF2F2), 'Alta'),
     };
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      shape: RoundedRectangleBorder(
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: cardBg,
         borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Colors.grey.shade300, width: 0.8),
+        border: Border.all(color: borderColor, width: 1),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Franja lateral con acento de color de estado
-              Container(
-                width: 5,
-                color: statusColor,
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header: Icono, Título/Activo y Badges
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(statusIcon, size: 18, color: statusColor),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 4,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(5),
-                                        border: Border.all(color: theme.colorScheme.outlineVariant),
-                                      ),
-                                      child: Text(
-                                        order.id,
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 11.5,
-                                          color: theme.colorScheme.onSurface,
-                                        ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(10),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Línea de acento lateral delgada
+                Container(
+                  width: 3.5,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(10),
+                      bottomLeft: Radius.circular(10),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Fila 1: ID OT + Badges de Tipo y Prioridad + Estado
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  // Chip OT
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Text(
+                                      order.id,
+                                      style: const TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0055A5),
                                       ),
                                     ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: priorityBg,
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                      child: Text(
-                                        'Prioridad $priorityLabel',
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: priorityColor,
-                                        ),
-                                      ),
-                                    ),
-                                    if (order.isPreventive) ...[
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue.shade50,
-                                          borderRadius: BorderRadius.circular(5),
-                                          border: Border.all(color: Colors.blue.shade200),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.event_note_outlined, size: 12, color: Colors.blue.shade800),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              order.preventiveScheduleId != null && order.preventiveScheduleId!.isNotEmpty
-                                                  ? 'Preventivo: ${order.preventiveScheduleId}'
-                                                  : 'Preventivo',
-                                              style: TextStyle(
-                                                fontSize: 10.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.blue.shade800,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ] else ...[
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange.shade50,
-                                          borderRadius: BorderRadius.circular(5),
-                                          border: Border.all(color: Colors.orange.shade200),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.report_problem_outlined, size: 12, color: Colors.orange.shade900),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              order.reportId != null && order.reportId!.isNotEmpty
-                                                  ? 'Avería #${order.reportId}'
-                                                  : 'Correctivo',
-                                              style: TextStyle(
-                                                fontSize: 10.5,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.orange.shade900,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  '${order.assetId} — ${order.assetName}',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Badge de Estado
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                            ),
-                            child: Text(
-                              statusLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: statusColor,
+                                  // Tipo (Preventivo / Correctivo)
+                                  if (order.isPreventive)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEFF6FF),
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.event_note_outlined, size: 12, color: Color(0xFF2563EB)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            order.preventiveScheduleId != null && order.preventiveScheduleId!.isNotEmpty
+                                                ? 'PM: ${order.preventiveScheduleId}'
+                                                : 'Preventivo',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF2563EB),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFF7ED),
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.report_problem_outlined, size: 12, color: Color(0xFFEA580C)),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            order.reportId != null && order.reportId!.isNotEmpty
+                                                ? 'Avería #${order.reportId}'
+                                                : 'Correctivo',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFFEA580C),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  // Prioridad
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: priorityBg,
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Text(
+                                      'Prioridad $priorityLabel',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: priorityColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Descripción de la orden
-                      Text(
-                        order.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 12.5,
-                          height: 1.35,
-                          color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+                            const SizedBox(width: 8),
+                            // Badge de Estado
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+                              ),
+                              child: Text(
+                                statusLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(height: 10),
+                        const SizedBox(height: 8),
 
-                      // Footer: Asignación y Fecha
-                      Wrap(
-                        spacing: 14,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          if (order.assignedTo != null && order.assignedTo!.isNotEmpty)
+                        // Fila 2: Nombre y Código de Activo
+                        Text(
+                          '${order.assetId} — ${order.assetName}',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 5),
+
+                        // Fila 3: Descripción limpia
+                        Text(
+                          order.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.4,
+                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Fila 4: Footer con Técnico Asignado, Fecha y Botón de Ver
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Wrap(
+                                spacing: 14,
+                                runSpacing: 4,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  if (order.assignedTo != null && order.assignedTo!.isNotEmpty)
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.person_outline_rounded,
+                                          size: 14,
+                                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          order.assignedTo!,
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  Tooltip(
+                                    message: fullDate,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.access_time_rounded,
+                                          size: 13,
+                                          color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          timeFormatted,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.person_outline, size: 14, color: Colors.grey.shade600),
-                                const SizedBox(width: 4),
                                 Text(
-                                  order.assignedTo!,
+                                  'Ver detalle',
                                   style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade700,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF0055A5),
                                   ),
+                                ),
+                                const SizedBox(width: 2),
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 16,
+                                  color: Color(0xFF0055A5),
                                 ),
                               ],
                             ),
-                          Tooltip(
-                            message: fullDate,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.access_time, size: 13, color: Colors.grey.shade500),
-                                const SizedBox(width: 4),
-                                Text(
-                                  timeFormatted,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

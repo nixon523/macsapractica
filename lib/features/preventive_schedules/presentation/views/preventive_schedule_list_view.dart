@@ -9,6 +9,7 @@ import '../../../assets/domain/entities/asset.dart';
 import '../../../assets/domain/repositories/area_repository.dart';
 import '../../../assets/domain/repositories/asset_repository.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
+import '../../../work_orders/domain/entities/work_order.dart';
 import '../../domain/entities/preventive_schedule.dart';
 import '../states/preventive_schedule_state.dart';
 import '../viewmodels/preventive_schedule_viewmodel.dart';
@@ -95,6 +96,26 @@ class _PreventiveScheduleListViewState
       }
     });
     _loadData();
+  }
+
+  String _getPresetLabel() {
+    switch (_selectedPreset) {
+      case 'hoy':
+        return 'Hoy';
+      case 'proximos7dias':
+        return 'Próximos 7 días';
+      case 'mes':
+        return 'Este mes';
+      case 'todo':
+        return 'Histórico completo';
+      case 'personalizado':
+        if (_startDate != null && _endDate != null) {
+          return '${_startDate!.day}/${_startDate!.month} — ${_endDate!.day}/${_endDate!.month}/${_endDate!.year}';
+        }
+        return 'Personalizado';
+      default:
+        return 'Filtrar fecha';
+    }
   }
 
   void _loadData() {
@@ -285,371 +306,517 @@ class _PreventiveScheduleListViewState
     final authVm = context.watch<AuthViewModel>();
     final canManage = authVm.hasPermission('preventive.manage');
     final isAdmin = authVm.currentUser?.role.code == 'admin';
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     final allSchedules = vm.state.schedules;
+    final allActiveCount = allSchedules.where((s) => s.status != ScheduleStatus.paused).length;
     final urgentCount = allSchedules
         .where((s) => s.status == ScheduleStatus.active && s.alertLevel == PreventiveAlertLevel.urgent)
+        .length;
+    final upcomingCount = allSchedules
+        .where((s) => s.status == ScheduleStatus.active && s.alertLevel == PreventiveAlertLevel.upcoming)
+        .length;
+    final onScheduleCount = allSchedules
+        .where((s) => s.status == ScheduleStatus.active && s.alertLevel == PreventiveAlertLevel.onSchedule)
         .length;
     final overdueCount = allSchedules
         .where((s) => s.status == ScheduleStatus.active && s.alertLevel == PreventiveAlertLevel.overdue)
         .length;
+    final pausedCount = allSchedules
+        .where((s) => s.status == ScheduleStatus.paused)
+        .length;
 
     final filteredList = _filterSchedules(allSchedules);
 
+    final bgMain = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
     return Scaffold(
-      body: Column(
-        children: [
-          _buildFilterSection(
-            isNarrow: MediaQuery.of(context).size.width < 750,
-            urgentCount: urgentCount,
-            overdueCount: overdueCount,
-            canManage: canManage,
-          ),
+      backgroundColor: bgMain,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 750;
 
-          const Divider(height: 1),
+          return Column(
+            children: [
+              _buildCleanHeader(
+                isMobile: isMobile,
+                isDark: isDark,
+                borderColor: borderColor,
+                canManage: canManage,
+                allCount: allActiveCount,
+                urgentCount: urgentCount,
+                upcomingCount: upcomingCount,
+                onScheduleCount: onScheduleCount,
+                overdueCount: overdueCount,
+                pausedCount: pausedCount,
+              ),
 
-          _buildSummaryBar(filteredList.length, urgentCount, overdueCount),
+              _buildSummaryBar(filteredList.length, urgentCount, overdueCount, isDark, borderColor),
 
-          Expanded(
-            child: switch (vm.state.viewState) {
-              ViewState.loading =>
-                const Center(child: CircularProgressIndicator()),
-              ViewState.error =>
-                Center(child: Text('Error: ${vm.state.errorMessage}')),
-              ViewState.initial || ViewState.success => filteredList.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.calendar_month_outlined, size: 56, color: Theme.of(context).colorScheme.outline),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'Sin resultados para "$_searchQuery"'
-                                  : 'No hay planes preventivos para el filtro seleccionado.',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'Intenta con otro término o limpia la barra de búsqueda.'
-                                  : 'Prueba cambiando el rango de fechas o el estado del plan.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            ),
-                            if (_selectedPreset != 'todo') ...[
-                              const SizedBox(height: 16),
-                              OutlinedButton.icon(
-                                onPressed: () => _applyPreset('todo'),
-                                icon: const Icon(Icons.history, size: 18),
-                                label: const Text('Ver todos los planes'),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: () async => _loadData(),
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: filteredList.length,
-                        itemBuilder: (context, index) {
-                          final schedule = filteredList[index];
-                          return _PreventiveCard(
-                            schedule: schedule,
-                            canGenerateOt: canManage,
-                            isAdmin: isAdmin,
-                            onGenerateOt: () => _generateWorkOrder(schedule),
-                            onDuplicate: () => _openCreateDialog(schedule),
-                            onAmend: () => _openAmendDialog(schedule),
-                            onToggleStatus: () => _toggleStatus(schedule),
-                          );
-                        },
+              Expanded(
+                child: switch (vm.state.viewState) {
+                  ViewState.loading => const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Color(0xFF0055A5),
                       ),
                     ),
-            },
-          ),
-        ],
+                  ViewState.error => Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'Error: ${vm.state.errorMessage}',
+                          style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ViewState.initial || ViewState.success => filteredList.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0055A5).withValues(alpha: 0.06),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.calendar_month_outlined,
+                                    size: 28,
+                                    color: Color(0xFF0055A5),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  _searchQuery.isNotEmpty
+                                      ? 'Sin resultados para "$_searchQuery"'
+                                      : 'No hay planes preventivos para el filtro seleccionado.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _searchQuery.isNotEmpty
+                                      ? 'Intenta con otro término o limpia la barra de búsqueda.'
+                                      : 'Prueba cambiando el rango de fechas o el estado del plan.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                if (_selectedPreset != 'todo') ...[
+                                  const SizedBox(height: 14),
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF0055A5),
+                                    ),
+                                    onPressed: () => _applyPreset('todo'),
+                                    icon: const Icon(Icons.history_rounded, size: 16),
+                                    label: const Text('Ver todos los planes', style: TextStyle(fontSize: 12.5)),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: () async => _loadData(),
+                          child: ListView.builder(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 14 : 24,
+                              vertical: 12,
+                            ),
+                            itemCount: filteredList.length,
+                            itemBuilder: (context, index) {
+                              final schedule = filteredList[index];
+                              return _CleanPreventiveCard(
+                                schedule: schedule,
+                                activeOt: vm.getActiveWorkOrder(schedule.id),
+                                canGenerateOt: canManage,
+                                isAdmin: isAdmin,
+                                isDark: isDark,
+                                borderColor: borderColor,
+                                isMobile: isMobile,
+                                onGenerateOt: () => _generateWorkOrder(schedule),
+                                onDuplicate: () => _openCreateDialog(schedule),
+                                onAmend: () => _openAmendDialog(schedule),
+                                onToggleStatus: () => _toggleStatus(schedule),
+                              );
+                            },
+                          ),
+                        ),
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildFilterSection({
-    required bool isNarrow,
-    required int urgentCount,
-    required int overdueCount,
+  /// Encabezado moderno, despejado y consistente
+  Widget _buildCleanHeader({
+    required bool isMobile,
+    required bool isDark,
+    required Color borderColor,
     required bool canManage,
+    required int allCount,
+    required int urgentCount,
+    required int upcomingCount,
+    required int onScheduleCount,
+    required int overdueCount,
+    required int pausedCount,
   }) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final headerBg = isDark ? const Color(0xFF1E293B) : Colors.white;
 
     return Container(
-      color: colors.surface,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      decoration: BoxDecoration(
+        color: headerBg,
+        border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Fila 1: Selector de Fechas (Desde - Hasta) y Presets
-          if (!isNarrow)
-            Row(
-              children: [
-                _buildDateRangeButton(),
-                const SizedBox(width: 12),
-                Expanded(child: _buildPresetsRow()),
-                if (canManage) ...[
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: _openBatchGenerateDialog,
-                    icon: const Icon(Icons.playlist_add_check, size: 18),
-                    label: const Text('Programar OTs del Mes'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: _openCreateDialog,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Nuevo Plan PM'),
-                  ),
-                ],
-              ],
-            )
-          else ...[
-            _buildDateRangeButton(),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: _buildPresetsRow(),
+          // Fila 1: Buscador integrado + Menú de Fechas + Botones de Acción
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              isMobile ? 14 : 24,
+              14,
+              isMobile ? 14 : 24,
+              10,
             ),
-            if (canManage) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _openBatchGenerateDialog,
-                      icon: const Icon(Icons.playlist_add_check, size: 16),
-                      label: const Text('Programar OTs', style: TextStyle(fontSize: 12)),
-                    ),
+            child: isMobile
+                ? Column(
+                    children: [
+                      _buildSearchField(isDark, borderColor),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: _buildDateMenuButton(isDark, borderColor)),
+                        ],
+                      ),
+                      if (canManage) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: _openBatchGenerateDialog,
+                                icon: const Icon(Icons.playlist_add_check, size: 16),
+                                label: const Text('Programar OTs', style: TextStyle(fontSize: 12)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0055A5),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: _openCreateDialog,
+                                icon: const Icon(Icons.add_rounded, size: 16),
+                                label: const Text('Nuevo Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: _buildSearchField(isDark, borderColor)),
+                      const SizedBox(width: 12),
+                      _buildDateMenuButton(isDark, borderColor),
+                      if (canManage) ...[
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: _openBatchGenerateDialog,
+                          icon: const Icon(Icons.playlist_add_check, size: 17),
+                          label: const Text(
+                            'Programar OTs del Mes',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF0055A5),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: _openCreateDialog,
+                          icon: const Icon(Icons.add_rounded, size: 17),
+                          label: const Text(
+                            'Nuevo Plan PM',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _openCreateDialog,
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Nuevo Plan PM', style: TextStyle(fontSize: 12)),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ],
-          const SizedBox(height: 10),
+          ),
 
-          // Fila 2: Búsqueda y Chips de categoría
-          if (!isNarrow)
-            Row(
+          // Fila 2: Pestañas de Estado con subrayado limpio (Clean Underline)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 20),
+            child: Row(
               children: [
-                Expanded(flex: 3, child: _buildSearchBar()),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 5,
-                  child: _buildCategoryChips(
-                    urgentCount: urgentCount,
-                    overdueCount: overdueCount,
-                    scrollable: false,
-                  ),
+                _buildCleanTab(
+                  tab: _PreventiveFilterTab.all,
+                  label: 'Todos',
+                  count: allCount,
+                  isDark: isDark,
+                  accentColor: const Color(0xFF0055A5),
+                ),
+                _buildCleanTab(
+                  tab: _PreventiveFilterTab.urgent,
+                  label: 'Urgentes (<48h)',
+                  count: urgentCount,
+                  isDark: isDark,
+                  accentColor: const Color(0xFFC2410C),
+                ),
+                _buildCleanTab(
+                  tab: _PreventiveFilterTab.upcoming,
+                  label: 'Próximos (3-7d)',
+                  count: upcomingCount,
+                  isDark: isDark,
+                  accentColor: const Color(0xFFD97706),
+                ),
+                _buildCleanTab(
+                  tab: _PreventiveFilterTab.onSchedule,
+                  label: 'Al día',
+                  count: onScheduleCount,
+                  isDark: isDark,
+                  accentColor: const Color(0xFF059669),
+                ),
+                _buildCleanTab(
+                  tab: _PreventiveFilterTab.overdue,
+                  label: 'Vencidos',
+                  count: overdueCount,
+                  isDark: isDark,
+                  accentColor: const Color(0xFFDC2626),
+                ),
+                _buildCleanTab(
+                  tab: _PreventiveFilterTab.paused,
+                  label: 'Pausados',
+                  count: pausedCount,
+                  isDark: isDark,
+                  accentColor: const Color(0xFF64748B),
                 ),
               ],
-            )
-          else ...[
-            _buildSearchBar(),
-            const SizedBox(height: 8),
-            _buildCategoryChips(
-              urgentCount: urgentCount,
-              overdueCount: overdueCount,
-              scrollable: true,
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDateRangeButton() {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    String label;
-    if (_startDate == null && _endDate == null) {
-      label = 'Todo el historial';
-    } else if (_startDate != null && _endDate != null) {
-      final s = _startDate!;
-      final e = _endDate!;
-      if (s.year == e.year && s.month == e.month && s.day == e.day) {
-        label = 'Hoy: ${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year}';
-      } else {
-        label = '${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year} '
-            '➔ ${e.day.toString().padLeft(2, '0')}/${e.month.toString().padLeft(2, '0')}/${e.year}';
-      }
-    } else {
-      label = 'Filtrar rango';
-    }
-
-    return OutlinedButton.icon(
-      onPressed: _selectDateRange,
-      icon: Icon(Icons.calendar_today_outlined, size: 18, color: colors.primary),
-      label: Text(
-        label,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-          color: colors.onSurface,
-        ),
-      ),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        side: BorderSide(color: colors.outlineVariant),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        backgroundColor: colors.surfaceContainerLowest,
-      ),
-    );
-  }
-
-  Widget _buildPresetsRow() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildPresetChip('hoy', 'Hoy'),
-        const SizedBox(width: 6),
-        _buildPresetChip('proximos7dias', 'Próx. 7 días'),
-        const SizedBox(width: 6),
-        _buildPresetChip('mes', 'Este mes'),
-        const SizedBox(width: 6),
-        _buildPresetChip('todo', 'Todo'),
+  /// Menú desplegable para seleccionar el periodo de tiempo
+  Widget _buildDateMenuButton(bool isDark, Color borderColor) {
+    return PopupMenuButton<String>(
+      onSelected: (val) {
+        if (val == 'personalizado') {
+          _selectDateRange();
+        } else {
+          _applyPreset(val);
+        }
+      },
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      itemBuilder: (ctx) => [
+        _buildPopupItem('hoy', 'Hoy', Icons.today_outlined),
+        _buildPopupItem('proximos7dias', 'Próximos 7 días', Icons.calendar_view_week_outlined),
+        _buildPopupItem('mes', 'Este mes', Icons.calendar_month_outlined),
+        _buildPopupItem('todo', 'Histórico completo', Icons.all_inclusive_rounded),
+        const PopupMenuDivider(),
+        _buildPopupItem('personalizado', 'Seleccionar rango personalizado...', Icons.date_range_outlined),
       ],
-    );
-  }
-
-  Widget _buildPresetChip(String key, String label) {
-    final isSelected = _selectedPreset == key;
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => _applyPreset(key),
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
-      ),
-      selectedColor: colors.primary,
-      backgroundColor: colors.surfaceContainerLow,
-      showCheckmark: false,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return TextField(
-      controller: _searchCtrl,
-      decoration: InputDecoration(
-        hintText: 'Buscar por equipo, plan, tipo o tarea…',
-        hintStyle: const TextStyle(fontSize: 12),
-        prefixIcon: const Icon(Icons.search, size: 20),
-        suffixIcon: _searchCtrl.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear, size: 18),
-                onPressed: () => _searchCtrl.clear(),
-              )
-            : null,
-        isDense: true,
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor, width: 0.9),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryChips({
-    required int urgentCount,
-    required int overdueCount,
-    required bool scrollable,
-  }) {
-    final categories = <(_PreventiveFilterTab, String, IconData, Color)>[
-      (_PreventiveFilterTab.all, 'Todos', Icons.all_inbox_outlined, const Color(0xFF1E293B)),
-      (_PreventiveFilterTab.urgent, 'Urgentes ($urgentCount)', Icons.alarm_outlined, const Color(0xFFC2410C)),
-      (_PreventiveFilterTab.upcoming, 'Próximos', Icons.schedule_outlined, const Color(0xFFD97706)),
-      (_PreventiveFilterTab.onSchedule, 'Al día', Icons.check_circle_outline, const Color(0xFF15803D)),
-      (_PreventiveFilterTab.overdue, 'Vencidos ($overdueCount)', Icons.error_outline, const Color(0xFFDC2626)),
-      (_PreventiveFilterTab.paused, 'Pausados', Icons.pause_circle_outline, const Color(0xFF64748B)),
-    ];
-
-    final chips = categories.map((item) {
-      final isSelected = _tab == item.$1;
-      final theme = Theme.of(context);
-      final colors = theme.colorScheme;
-
-      return FilterChip(
-        avatar: Icon(
-          item.$3,
-          size: 16,
-          color: isSelected ? Colors.white : item.$4,
-        ),
-        label: Text(item.$2),
-        selected: isSelected,
-        onSelected: (_) => setState(() => _tab = item.$1),
-        selectedColor: item.$4,
-        backgroundColor: colors.surfaceContainerLow,
-        labelStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          color: isSelected ? Colors.white : colors.onSurface,
-        ),
-        showCheckmark: false,
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        visualDensity: VisualDensity.compact,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      );
-    }).toList();
-
-    if (scrollable) {
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
         child: Row(
-          children: chips.map((c) => Padding(padding: const EdgeInsets.only(right: 6), child: c)).toList(),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.calendar_today_outlined, size: 15, color: Color(0xFF0055A5)),
+            const SizedBox(width: 8),
+            Text(
+              _getPresetLabel(),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF94A3B8)),
+          ],
         ),
-      );
-    }
-
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      children: chips,
+      ),
     );
   }
 
-  Widget _buildSummaryBar(int count, int urgent, int overdue) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+  PopupMenuItem<String> _buildPopupItem(String value, String text, IconData icon) {
+    final isSelected = _selectedPreset == value;
+
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: isSelected ? const Color(0xFF0055A5) : const Color(0xFF64748B)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? const Color(0xFF0055A5) : null,
+              ),
+            ),
+          ),
+          if (isSelected)
+            const Icon(Icons.check_rounded, size: 16, color: Color(0xFF0055A5)),
+        ],
+      ),
+    );
+  }
+
+  /// Campo de búsqueda despejado
+  Widget _buildSearchField(bool isDark, Color borderColor) {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor, width: 0.9),
+      ),
+      child: TextField(
+        controller: _searchCtrl,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          hintText: 'Buscar por equipo, plan, tipo o tarea…',
+          hintStyle: TextStyle(
+            fontSize: 12.5,
+            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+          ),
+          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+          suffixIcon: _searchCtrl.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 16),
+                  onPressed: () => _searchCtrl.clear(),
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        ),
+      ),
+    );
+  }
+
+  /// Pestaña con subrayado activo estilo Modern SaaS
+  Widget _buildCleanTab({
+    required _PreventiveFilterTab tab,
+    required String label,
+    required int count,
+    required bool isDark,
+    required Color accentColor,
+  }) {
+    final isSelected = _tab == tab;
+
+    return InkWell(
+      onTap: () => setState(() => _tab = tab),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? const Color(0xFF0055A5) : Colors.transparent,
+              width: 2.2,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? const Color(0xFF0055A5).withValues(alpha: 0.1)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected
+                      ? const Color(0xFF0055A5)
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryBar(
+    int count,
+    int urgent,
+    int overdue,
+    bool isDark,
+    Color borderColor,
+  ) {
     final onTimeRatio = count > 0 ? (((count - overdue) / count) * 100).clamp(0, 100).toInt() : 100;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 7),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9).withValues(alpha: 0.6),
+        border: Border(bottom: BorderSide(color: borderColor, width: 0.8)),
+      ),
       child: Wrap(
         spacing: 8,
         runSpacing: 4,
@@ -659,14 +826,14 @@ class _PreventiveScheduleListViewState
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.calendar_month_outlined, size: 16, color: colors.primary),
+              const Icon(Icons.calendar_month_outlined, size: 15, color: Color(0xFF0055A5)),
               const SizedBox(width: 8),
               Text(
                 '$count plan(es) preventivo(s)',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: colors.onSurface,
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
                 ),
               ),
             ],
@@ -739,7 +906,7 @@ class _PreventiveScheduleListViewState
             'Por fecha de ejecución',
             style: TextStyle(
               fontSize: 11,
-              color: colors.onSurfaceVariant,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
             ),
           ),
         ],
@@ -761,11 +928,15 @@ String _assetLevelLabel(AssetLevel level) {
   }
 }
 
-class _PreventiveCard extends StatefulWidget {
-  const _PreventiveCard({
+class _CleanPreventiveCard extends StatefulWidget {
+  const _CleanPreventiveCard({
     required this.schedule,
+    this.activeOt,
     required this.canGenerateOt,
     required this.isAdmin,
+    required this.isDark,
+    required this.borderColor,
+    required this.isMobile,
     required this.onGenerateOt,
     required this.onDuplicate,
     required this.onAmend,
@@ -773,18 +944,22 @@ class _PreventiveCard extends StatefulWidget {
   });
 
   final PreventiveSchedule schedule;
+  final WorkOrder? activeOt;
   final bool canGenerateOt;
   final bool isAdmin;
+  final bool isDark;
+  final Color borderColor;
+  final bool isMobile;
   final VoidCallback onGenerateOt;
   final VoidCallback onDuplicate;
   final VoidCallback onAmend;
   final VoidCallback onToggleStatus;
 
   @override
-  State<_PreventiveCard> createState() => _PreventiveCardState();
+  State<_CleanPreventiveCard> createState() => _CleanPreventiveCardState();
 }
 
-class _PreventiveCardState extends State<_PreventiveCard> {
+class _CleanPreventiveCardState extends State<_CleanPreventiveCard> {
   bool _expanded = false;
 
   @override
@@ -818,455 +993,540 @@ class _PreventiveCardState extends State<_PreventiveCard> {
     final accentColor = isPaused ? Colors.grey.shade400 : alertTextColor;
     final hasActivities = schedule.activities.isNotEmpty;
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      shape: RoundedRectangleBorder(
+    final cardBg = widget.isDark ? const Color(0xFF1E293B) : Colors.white;
+    final textPrimary = widget.isDark ? Colors.white : const Color(0xFF0F172A);
+    final textSecondary = widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final innerBg = widget.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: cardBg,
         borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Colors.grey.shade300, width: 0.8),
+        border: Border.all(color: widget.borderColor, width: 1),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            left: BorderSide(color: accentColor, width: 5),
-          ),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      schedule.id,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    Text(
-                      '— ${schedule.assetId} (${schedule.assetName.isNotEmpty ? schedule.assetName : "Equipo"})',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                    Text(
-                      '· Área: ${schedule.areaName.isNotEmpty ? schedule.areaName : schedule.areaId}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                  ],
-                ),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                            if (hasActivities)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F5F9),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.account_tree_outlined, size: 12, color: Color(0xFF475569)),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      '${schedule.activities.length} componentes',
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Línea de acento lateral delgada
+              Container(
+                width: 3.5,
+                color: accentColor,
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Fila 1: ID Monospace + Frecuencia + Componentes + Alert Level / Pausado
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                // Chip ID Plan
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text(
+                                    schedule.id,
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0055A5),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
+                                // Frecuencia
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(5),
+                                  ),
+                                  child: Text(
+                                    schedule.frequency.label,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF2563EB),
+                                    ),
+                                  ),
+                                ),
+                                if (hasActivities)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: widget.isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(5),
+                                      border: Border.all(
+                                        color: widget.isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.account_tree_outlined, size: 12, color: textSecondary),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '${schedule.activities.length} componentes',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: textPrimary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (isPaused)
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
-                                borderRadius: BorderRadius.circular(4),
+                                color: widget.isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(5),
                               ),
                               child: Text(
-                                schedule.frequency.label,
-                                style: const TextStyle(
+                                'Pausado',
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2563EB),
+                                  color: textSecondary,
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: alertBg,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              child: Text(
+                                alertLabel,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: alertTextColor,
                                 ),
                               ),
                             ),
-                            if (isPaused)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade200,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'Pausado',
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54),
-                                ),
-                              )
-                            else
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: alertBg,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  alertLabel,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: alertTextColor,
-                                  ),
-                                ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Equipo y Área
+                      Row(
+                        children: [
+                          Icon(Icons.precision_manufacturing_outlined, size: 14, color: textSecondary),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              '${schedule.assetId} · ${schedule.assetName.isNotEmpty ? schedule.assetName : "Equipo principal"}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: textPrimary,
                               ),
-                          ],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            'Área: ${schedule.areaName.isNotEmpty ? schedule.areaName : schedule.areaId}',
+                            style: TextStyle(fontSize: 12, color: textSecondary),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+
+                      // Título / Tipo de Mantenimiento
+                      Text(
+                        schedule.title.isNotEmpty ? schedule.title : schedule.maintenanceType,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        ),
+                      ),
+                      if (schedule.description.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          schedule.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, color: textSecondary),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      schedule.title.isNotEmpty ? schedule.title : schedule.maintenanceType,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
-                    ),
-                    if (schedule.description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        schedule.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                      ),
-                    ],
-                    if (schedule.materials.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: schedule.materials.map((m) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.grey.shade300),
-                            ),
-                            child: Text(
-                              '${m.quantity} ${m.unit} - ${m.name}',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF334155)),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                    if (hasActivities) ...[
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () => setState(() => _expanded = !_expanded),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                size: 18,
-                                color: const Color(0xFF0284C7),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  _expanded
-                                      ? 'Ocultar actividades por componente (${schedule.activities.length})'
-                                      : 'Ver desglose por componente (${schedule.activities.length}) y frecuencias',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF0284C7),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (_expanded) ...[
-                        const SizedBox(height: 8),
-                        Column(
-                          children: schedule.activities.map((act) {
-                            final actNextStr = '${act.nextDate.day}/${act.nextDate.month}/${act.nextDate.year}';
-                            final (actBg, actFg, actStatus) = switch (act.alertLevel) {
-                              PreventiveAlertLevel.overdue => (
-                                  const Color(0xFFFEE2E2),
-                                  const Color(0xFFDC2626),
-                                  'Vencido (${act.daysRemaining.abs()}d)'
-                                ),
-                              PreventiveAlertLevel.urgent => (
-                                  const Color(0xFFFFEDD5),
-                                  const Color(0xFFC2410C),
-                                  'Urgente (${act.daysRemaining}d)'
-                                ),
-                              PreventiveAlertLevel.upcoming => (
-                                  const Color(0xFFFEF3C7),
-                                  const Color(0xFFB45309),
-                                  'Próximo (${act.daysRemaining}d)'
-                                ),
-                              PreventiveAlertLevel.onSchedule => (
-                                  const Color(0xFFDCFCE7),
-                                  const Color(0xFF15803D),
-                                  'Al día (${act.daysRemaining}d)'
-                                ),
-                            };
+                      if (schedule.materials.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: schedule.materials.map((m) {
                             return Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: Colors.grey.shade200),
+                                color: innerBg,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: widget.borderColor),
                               ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.settings_suggest_outlined, size: 14, color: Color(0xFF475569)),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          '${act.childAssetId} - ${act.childAssetName}',
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFF1F5F9),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          act.frequencyLabel,
-                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: actBg,
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          actStatus,
-                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: actFg),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Actividad: ${act.description}',
-                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
-                                  ),
-                                  Text(
-                                    'Próxima fecha: $actNextStr',
-                                    style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                                  ),
-                                  if (act.materials.isNotEmpty) ...[
-                                    const SizedBox(height: 4),
-                                    Wrap(
-                                      spacing: 4,
-                                      runSpacing: 2,
-                                      children: act.materials.map((m) {
-                                        return Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF8FAFC),
-                                            borderRadius: BorderRadius.circular(3),
-                                            border: Border.all(color: Colors.grey.shade300),
-                                          ),
-                                          child: Text(
-                                            '${m.quantity} ${m.unit} - ${m.name}',
-                                            style: const TextStyle(fontSize: 10, color: Color(0xFF334155)),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ],
-                                ],
+                              child: Text(
+                                '${m.quantity} ${m.unit} - ${m.name}',
+                                style: TextStyle(fontSize: 11, color: textSecondary),
                               ),
                             );
                           }).toList(),
                         ),
                       ],
-                    ],
-                    if (schedule.amendmentDocNumber != null && schedule.amendmentDocNumber!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.amber.shade50,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: Colors.amber.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.verified_user_outlined, size: 14, color: Colors.orange),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                'Modificado con Autorización Gerencial: Doc. ${schedule.amendmentDocNumber} '
-                                '(${schedule.amendedBy ?? ""})',
-                                style: TextStyle(fontSize: 11, color: Colors.amber.shade900, fontWeight: FontWeight.w500),
-                              ),
+                      if (hasActivities) ...[
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: () => setState(() => _expanded = !_expanded),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: innerBg,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: widget.borderColor),
                             ),
-                          ],
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                  size: 18,
+                                  color: const Color(0xFF0055A5),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _expanded
+                                        ? 'Ocultar actividades por componente (${schedule.activities.length})'
+                                        : 'Ver desglose por componente (${schedule.activities.length}) y frecuencias',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF0055A5),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        Text(
-                          'Próxima fecha: $nextDateStr'
-                          '${schedule.estimatedHours != null ? " · Est: ${schedule.estimatedHours}h" : ""}'
-                          '${schedule.lastWorkOrderId != null ? " · Última OT: ${schedule.lastWorkOrderId}" : ""}',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        if (_expanded) ...[
+                          const SizedBox(height: 8),
+                          Column(
+                            children: schedule.activities.map((act) {
+                              final actNextStr = '${act.nextDate.day}/${act.nextDate.month}/${act.nextDate.year}';
+                              final (actBg, actFg, actStatus) = switch (act.alertLevel) {
+                                PreventiveAlertLevel.overdue => (
+                                    const Color(0xFFFEE2E2),
+                                    const Color(0xFFDC2626),
+                                    'Vencido (${act.daysRemaining.abs()}d)',
+                                  ),
+                                PreventiveAlertLevel.urgent => (
+                                    const Color(0xFFFFEDD5),
+                                    const Color(0xFFC2410C),
+                                    'Urgente (${act.daysRemaining}d)',
+                                  ),
+                                PreventiveAlertLevel.upcoming => (
+                                    const Color(0xFFFEF3C7),
+                                    const Color(0xFFB45309),
+                                    'Próximo (${act.daysRemaining}d)',
+                                  ),
+                                PreventiveAlertLevel.onSchedule => (
+                                    const Color(0xFFDCFCE7),
+                                    const Color(0xFF15803D),
+                                    'Al día (${act.daysRemaining}d)',
+                                  ),
+                              };
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: innerBg,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: widget.borderColor),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.settings_suggest_outlined, size: 14, color: textSecondary),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            '${act.childAssetId} - ${act.childAssetName}',
+                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textPrimary),
+                                          ),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            act.frequencyLabel,
+                                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0055A5)),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: actBg,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            actStatus,
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: actFg),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Actividad: ${act.description}',
+                                      style: TextStyle(fontSize: 11, color: textPrimary),
+                                    ),
+                                    Text(
+                                      'Próxima fecha: $actNextStr',
+                                      style: TextStyle(fontSize: 10, color: textSecondary),
+                                    ),
+                                    if (act.materials.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 4,
+                                        runSpacing: 2,
+                                        children: act.materials.map((m) {
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: cardBg,
+                                              borderRadius: BorderRadius.circular(3),
+                                              border: Border.all(color: widget.borderColor),
+                                            ),
+                                            child: Text(
+                                              '${m.quantity} ${m.unit} - ${m.name}',
+                                              style: TextStyle(fontSize: 10, color: textSecondary),
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ],
+                      if (schedule.amendmentDocNumber != null && schedule.amendmentDocNumber!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(color: Colors.amber.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.verified_user_outlined, size: 14, color: Colors.orange),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Modificado con Autorización Gerencial: Doc. ${schedule.amendmentDocNumber} '
+                                  '(${schedule.amendedBy ?? ""})',
+                                  style: TextStyle(fontSize: 11, color: Colors.amber.shade900, fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (widget.canGenerateOt && !isPaused)
-                              if (schedule.canGenerateWorkOrder)
-                                FilledButton.icon(
-                                  style: FilledButton.styleFrom(
-                                    visualDensity: VisualDensity.compact,
-                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                      ],
+                      const SizedBox(height: 10),
+                      Divider(height: 1, thickness: 0.8, color: widget.borderColor),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined, size: 13, color: textSecondary),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              'Próx: $nextDateStr'
+                              '${schedule.estimatedHours != null ? " · Est: ${schedule.estimatedHours}h" : ""}'
+                              '${schedule.lastWorkOrderId != null ? " · OT: ${schedule.lastWorkOrderId}" : ""}',
+                              style: TextStyle(fontSize: 11.5, color: textSecondary),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (widget.canGenerateOt && !isPaused)
+                            if (widget.activeOt != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: const Color(0xFF0055A5).withValues(alpha: 0.3),
+                                    width: 0.8,
                                   ),
-                                  onPressed: widget.onGenerateOt,
-                                  icon: const Icon(Icons.assignment_add, size: 16),
-                                  label: Text(
-                                    hasActivities ? 'Generar OT Consolidada' : 'Generar OT',
-                                    style: const TextStyle(fontSize: 12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.pending_actions_rounded, size: 14, color: Color(0xFF0055A5)),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'OT activa: ${widget.activeOt!.id}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0055A5),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else if (schedule.canGenerateWorkOrder)
+                              FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0055A5),
+                                  foregroundColor: Colors.white,
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
-                                )
-                              else
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: Colors.grey.shade300),
-                                  ),
+                                ),
+                                onPressed: widget.onGenerateOt,
+                                icon: const Icon(Icons.assignment_add, size: 15),
+                                label: Text(
+                                  hasActivities ? 'Generar OT Consolidada' : 'Generar OT',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: innerBg,
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(color: widget.borderColor),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.lock_clock_outlined, size: 13, color: textSecondary),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Habilita en ${schedule.daysRemaining - 7}d',
+                                      style: TextStyle(fontSize: 11, color: textSecondary, fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          if (widget.canGenerateOt || widget.isAdmin) ...[
+                            const SizedBox(width: 4),
+                            PopupMenuButton<String>(
+                              icon: Icon(Icons.more_vert_rounded, size: 18, color: textSecondary),
+                              tooltip: 'Opciones del Plan',
+                              onSelected: (value) {
+                                if (value == 'duplicate') widget.onDuplicate();
+                                if (value == 'amend') widget.onAmend();
+                                if (value == 'toggle') widget.onToggleStatus();
+                              },
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'duplicate',
                                   child: Row(
-                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.lock_clock, size: 14, color: Colors.grey.shade600),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Habilita en ${schedule.daysRemaining - 7}d ($nextDateStr)',
-                                        style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                                      Icon(Icons.copy_all, size: 16, color: Color(0xFF0055A5)),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Duplicar / Usar como Plantilla',
+                                          style: TextStyle(fontSize: 13),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                            if (widget.canGenerateOt || widget.isAdmin) ...[
-                              const SizedBox(width: 4),
-                              PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert, size: 18),
-                                tooltip: 'Opciones del Plan',
-                                onSelected: (value) {
-                                  if (value == 'duplicate') widget.onDuplicate();
-                                  if (value == 'amend') widget.onAmend();
-                                  if (value == 'toggle') widget.onToggleStatus();
-                                },
-                                itemBuilder: (_) => [
+                                if (widget.isAdmin) ...[
                                   const PopupMenuItem(
-                                    value: 'duplicate',
+                                    value: 'amend',
                                     child: Row(
                                       children: [
-                                        Icon(Icons.copy_all, size: 16, color: Color(0xFF0284C7)),
+                                        Icon(Icons.security_update_good, size: 16, color: Colors.blue),
                                         SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
-                                            'Duplicar / Usar como Plantilla',
+                                            'Modificar con Autorización Gerencial',
                                             style: TextStyle(fontSize: 13),
+                                            maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  if (widget.isAdmin) ...[
-                                    const PopupMenuItem(
-                                      value: 'amend',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.security_update_good, size: 16, color: Colors.blue),
-                                          SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              'Modificar con Autorización Gerencial',
-                                              style: TextStyle(fontSize: 13),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
+                                  PopupMenuItem(
+                                    value: 'toggle',
+                                    child: Row(
+                                      children: [
+                                        Icon(isPaused ? Icons.play_arrow : Icons.pause, size: 16),
+                                        SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            isPaused ? 'Reactivar Plan' : 'Pausar Plan',
+                                            style: const TextStyle(fontSize: 13),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
-                                    PopupMenuItem(
-                                      value: 'toggle',
-                                      child: Row(
-                                        children: [
-                                          Icon(isPaused ? Icons.play_arrow : Icons.pause, size: 16),
-                                          SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              isPaused ? 'Reactivar Plan' : 'Pausar Plan',
-                                              style: const TextStyle(fontSize: 13),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ],
-                              ),
-                            ],
+                              ],
+                            ),
                           ],
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            );
-          }
-        }
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 /// Representa una actividad individual dentro de un componente hijo.
 class _SingleActivityDraft {
@@ -3177,4 +3437,3 @@ class _AuthorizeStatusChangeDialogState
     );
   }
 }
-

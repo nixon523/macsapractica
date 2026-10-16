@@ -30,13 +30,29 @@ class CreateBreakdownReportUseCase
   final BreakdownReportRepository _repository;
 
   @override
-  Future<BreakdownReport> call(CreateBreakdownReportParams params) {
+  Future<BreakdownReport> call(CreateBreakdownReportParams params) async {
     if (params.description.trim().isEmpty) {
       throw const ValidationFailure(message: 'Describe la avería.');
     }
     if (params.assetId.trim().isEmpty) {
       throw const ValidationFailure(message: 'Selecciona el activo afectado.');
     }
+
+    try {
+      final openReports = await _repository.getOpenReports();
+      final existing = openReports
+          .where((r) => r.assetId == params.assetId && r.isOpen)
+          .firstOrNull;
+      if (existing != null) {
+        throw ValidationFailure(
+          message:
+              'El activo "${params.assetName}" ya cuenta con un reporte de avería pendiente de atención (Folio #${existing.id}). Debe ser atendido antes de reportar una nueva avería.',
+        );
+      }
+    } catch (e) {
+      if (e is ValidationFailure) rethrow;
+    }
+
     return _repository.createReport(
       assetId: params.assetId,
       assetName: params.assetName,

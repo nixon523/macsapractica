@@ -1,3 +1,4 @@
+import '../../../../core/error/failures.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../domain/entities/preventive_schedule.dart';
@@ -198,7 +199,19 @@ class PreventiveScheduleRemoteDataSource {
       },
     );
     if (response is Map<String, dynamic>) {
-      return (response['workOrderId'] ?? response['NewWorkOrderId'] ?? '').toString();
+      final otId = (response['workOrderId'] ?? response['NewWorkOrderId'] ?? '').toString();
+      final wasExisting = response['YaExistia'] == true ||
+          response['yaExistia'] == true ||
+          response['WasExisting'] == 1 ||
+          response['wasExisting'] == 1 ||
+          response['WasExisting'] == true ||
+          response['wasExisting'] == true;
+      if (wasExisting) {
+        throw ValidationFailure(
+          message: 'Ya existe una Orden de Trabajo activa ($otId) para este plan preventivo.',
+        );
+      }
+      return otId;
     }
     return '';
   }

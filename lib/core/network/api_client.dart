@@ -23,8 +23,21 @@ class ApiClient {
   final SessionManager _sessionManager;
 
   static String get defaultBaseUrl {
-    if (kIsWeb) return 'http://localhost:3000/api';
-    return 'http://192.168.50.55:3000/api';
+    const fromEnv = String.fromEnvironment('API_URL');
+    if (fromEnv.isNotEmpty) return fromEnv;
+
+    // Producción Web (en IIS detrás del Reverse Proxy):
+    if (kIsWeb && kReleaseMode) {
+      return 'http://192.168.1.15/api';
+    }
+
+    // Desarrollo Local en tu PC (Debug Web, Windows o Emulador):
+    if (kDebugMode) {
+      return 'http://localhost:3000/api';
+    }
+
+    // Producción Release (APK Android / Build de Producción):
+    return 'http://192.168.1.15/api';
   }
 
   String get baseUrl => _baseUrl;

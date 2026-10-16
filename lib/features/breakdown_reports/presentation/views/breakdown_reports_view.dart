@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../work_orders/presentation/views/work_order_create_view.dart';
 import '../../domain/entities/breakdown_report.dart';
@@ -7,7 +8,9 @@ import '../viewmodels/breakdown_reports_viewmodel.dart';
 
 enum _ReportTab { open, resolved, rejected, all }
 
-/// Vista ejecutiva y profesional de Reportes de Averías basada en el estándar del Kardex.
+/// Vista ejecutiva, ultra-limpia y responsive de la Bandeja de Averías.
+/// Diseñada bajo principios de diseño minimalista industrial (SaaS moderno)
+/// con alta legibilidad, soporte para pantallas móviles (Android) y web.
 class BreakdownReportsView extends StatefulWidget {
   const BreakdownReportsView({super.key});
 
@@ -19,8 +22,8 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
   _ReportTab _tab = _ReportTab.open;
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
-  late DateTime? _startDate;
-  late DateTime? _endDate;
+  DateTime? _startDate;
+  DateTime? _endDate;
   String _selectedPreset = 'hoy';
 
   @override
@@ -99,9 +102,9 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
               start: DateTime(now.year, now.month, now.day),
               end: DateTime(now.year, now.month, now.day),
             ),
-      helpText: 'Seleccionar Rango de Fechas (Desde - Hasta)',
+      helpText: 'Filtrar por Rango de Fechas',
       cancelText: 'Cancelar',
-      confirmText: 'Aplicar Filtro',
+      confirmText: 'Aplicar',
     );
     if (picked != null) {
       setState(() {
@@ -149,8 +152,12 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        backgroundColor: ok ? const Color(0xFF0F766E) : const Color(0xFFB91C1C),
         content: Text(
-          ok ? 'Reporte rechazado.' : 'Error: ${viewModel.errorMessage}',
+          ok ? 'Reporte desestimado y archivado correctamente.' : 'Error: ${viewModel.errorMessage}',
+          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -185,381 +192,446 @@ class _BreakdownReportsViewState extends State<BreakdownReportsView> {
     return filtered;
   }
 
+  String _getPresetLabel() {
+    switch (_selectedPreset) {
+      case 'hoy':
+        return 'Hoy';
+      case 'ayer':
+        return 'Ayer';
+      case '7dias':
+        return 'Últimos 7 días';
+      case 'mes':
+        return 'Este mes';
+      case 'todo':
+        return 'Histórico completo';
+      case 'personalizado':
+        if (_startDate != null && _endDate != null) {
+          return '${_startDate!.day}/${_startDate!.month} — ${_endDate!.day}/${_endDate!.month}/${_endDate!.year}';
+        }
+        return 'Personalizado';
+      default:
+        return 'Filtrar fecha';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<BreakdownReportsViewModel>();
     final authVm = context.watch<AuthViewModel>();
     final canManage = authVm.hasPermission('breakdown.manage');
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     final allReports = [...vm.openReports, ...vm.resolvedReports, ...vm.rejectedReports];
     final filteredReports = _filterReports(allReports);
 
+    final bgMain = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+
     return Scaffold(
-      body: Column(
-        children: [
-          _buildFilterSection(
-            isNarrow: MediaQuery.of(context).size.width < 750,
-            openCount: vm.openReports.length,
-            resolvedCount: vm.resolvedReports.length,
-            rejectedCount: vm.rejectedReports.length,
-          ),
-          const Divider(height: 1),
-          _buildSummaryBar(filteredReports.length, vm.openReports.length),
-          Expanded(
-            child: switch (vm.viewState) {
-              BreakdownReportsViewState.initial ||
-              BreakdownReportsViewState.loading =>
-                const Center(child: CircularProgressIndicator()),
-              BreakdownReportsViewState.error => Center(
-                  child: Text('Error: ${vm.errorMessage}'),
-                ),
-              BreakdownReportsViewState.success => filteredReports.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.bug_report_outlined, size: 56, color: Theme.of(context).colorScheme.outline),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'Sin resultados para "$_searchQuery"'
-                                  : 'No hay averías registradas en este periodo.',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'Intenta con otro término o limpia la barra de búsqueda.'
-                                  : 'Prueba cambiando el rango de fechas o el filtro de estado.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            ),
-                            if (_selectedPreset != 'todo') ...[
-                              const SizedBox(height: 16),
-                              OutlinedButton.icon(
-                                onPressed: () => _applyPreset('todo'),
-                                icon: const Icon(Icons.history, size: 18),
-                                label: const Text('Ver todas las averías'),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: () async => _loadData(),
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: filteredReports.length,
-                        itemBuilder: (context, index) {
-                          final report = filteredReports[index];
-                          return _ModernReportCard(
-                            report: report,
-                            isProcessing: vm.isProcessing,
-                            canGenerateOt: canManage,
-                            canReject: canManage,
-                            onGenerateOt: () => _generateWorkOrder(report),
-                            onReject: () => _confirmReject(report),
-                          );
-                        },
+      backgroundColor: bgMain,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 680;
+
+          return Column(
+            children: [
+              // Barra de Control Superior Limpia
+              _buildCleanHeader(
+                isMobile: isMobile,
+                isDark: isDark,
+                borderColor: borderColor,
+                openCount: vm.openReports.length,
+                resolvedCount: vm.resolvedReports.length,
+                rejectedCount: vm.rejectedReports.length,
+                totalCount: allReports.length,
+              ),
+
+              // Lista de Incidencias con diseño despejado
+              Expanded(
+                child: switch (vm.viewState) {
+                  BreakdownReportsViewState.initial ||
+                  BreakdownReportsViewState.loading =>
+                    const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Color(0xFF0055A5),
                       ),
                     ),
-            },
-          ),
-        ],
+                  BreakdownReportsViewState.error => Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          'Error al cargar las incidencias: ${vm.errorMessage}',
+                          style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  BreakdownReportsViewState.success => filteredReports.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0055A5).withValues(alpha: 0.06),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.inbox_outlined,
+                                    size: 28,
+                                    color: Color(0xFF0055A5),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  _searchQuery.isNotEmpty
+                                      ? 'Sin incidencias para "$_searchQuery"'
+                                      : 'No hay averías registradas en este periodo.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _searchQuery.isNotEmpty
+                                      ? 'Verifica los términos o limpia la barra de búsqueda.'
+                                      : 'Prueba cambiando el rango de fechas en el selector superior.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                                if (_selectedPreset != 'todo') ...[
+                                  const SizedBox(height: 14),
+                                  TextButton.icon(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: const Color(0xFF0055A5),
+                                    ),
+                                    onPressed: () => _applyPreset('todo'),
+                                    icon: const Icon(Icons.history_rounded, size: 16),
+                                    label: const Text('Ver todo el historial', style: TextStyle(fontSize: 12.5)),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: () async => _loadData(),
+                          child: ListView.builder(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isMobile ? 14 : 24,
+                              vertical: 14,
+                            ),
+                            itemCount: filteredReports.length,
+                            itemBuilder: (context, index) {
+                              final report = filteredReports[index];
+                              return _CleanReportCard(
+                                report: report,
+                                isProcessing: vm.isProcessing,
+                                canGenerateOt: canManage,
+                                canReject: canManage,
+                                onGenerateOt: () => _generateWorkOrder(report),
+                                onReject: () => _confirmReject(report),
+                                isDark: isDark,
+                                borderColor: borderColor,
+                                isMobile: isMobile,
+                              );
+                            },
+                          ),
+                        ),
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildFilterSection({
-    required bool isNarrow,
+  /// Encabezado Ultra-Limpio con Tabs Modernas y Barra de Herramientas Compacta
+  Widget _buildCleanHeader({
+    required bool isMobile,
+    required bool isDark,
+    required Color borderColor,
     required int openCount,
     required int resolvedCount,
     required int rejectedCount,
+    required int totalCount,
   }) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final headerBg = isDark ? const Color(0xFF1E293B) : Colors.white;
 
     return Container(
-      color: colors.surface,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      decoration: BoxDecoration(
+        color: headerBg,
+        border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Fila 1: Selector de Fechas (Desde - Hasta) y Presets
-          if (!isNarrow)
-            Row(
-              children: [
-                _buildDateRangeButton(),
-                const SizedBox(width: 12),
-                Expanded(child: _buildPresetsRow()),
-              ],
-            )
-          else ...[
-            _buildDateRangeButton(),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: _buildPresetsRow(),
+          // Fila 1: Buscador integrado + Botón de Fechas Compacto
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              isMobile ? 14 : 24,
+              14,
+              isMobile ? 14 : 24,
+              10,
             ),
-          ],
-          const SizedBox(height: 10),
-
-          // Fila 2: Búsqueda y Chips de Estado
-          if (!isNarrow)
-            Row(
-              children: [
-                Expanded(flex: 3, child: _buildSearchBar()),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 5,
-                  child: _buildStatusChips(
-                    openCount: openCount,
-                    resolvedCount: resolvedCount,
-                    rejectedCount: rejectedCount,
-                    scrollable: false,
+            child: isMobile
+                ? Column(
+                    children: [
+                      _buildSearchField(isDark, borderColor),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(child: _buildDateMenuButton(isDark, borderColor)),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: _buildSearchField(isDark, borderColor)),
+                      const SizedBox(width: 12),
+                      _buildDateMenuButton(isDark, borderColor),
+                    ],
                   ),
+          ),
+
+          // Fila 2: Pestañas de Estado Estilo Clean Underline
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 20),
+            child: Row(
+              children: [
+                _buildCleanTab(
+                  tab: _ReportTab.open,
+                  label: 'Pendientes',
+                  count: openCount,
+                  accentColor: const Color(0xFFD97706),
+                  isDark: isDark,
+                ),
+                _buildCleanTab(
+                  tab: _ReportTab.resolved,
+                  label: 'Resueltas',
+                  count: resolvedCount,
+                  accentColor: const Color(0xFF059669),
+                  isDark: isDark,
+                ),
+                _buildCleanTab(
+                  tab: _ReportTab.rejected,
+                  label: 'Rechazadas',
+                  count: rejectedCount,
+                  accentColor: const Color(0xFF64748B),
+                  isDark: isDark,
+                ),
+                _buildCleanTab(
+                  tab: _ReportTab.all,
+                  label: 'Todas',
+                  count: totalCount,
+                  accentColor: const Color(0xFF0055A5),
+                  isDark: isDark,
                 ),
               ],
-            )
-          else ...[
-            _buildSearchBar(),
-            const SizedBox(height: 8),
-            _buildStatusChips(
-              openCount: openCount,
-              resolvedCount: resolvedCount,
-              rejectedCount: rejectedCount,
-              scrollable: true,
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildDateRangeButton() {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    String label;
-    if (_startDate == null && _endDate == null) {
-      label = 'Todo el historial';
-    } else if (_startDate != null && _endDate != null) {
-      final s = _startDate!;
-      final e = _endDate!;
-      if (s.year == e.year && s.month == e.month && s.day == e.day) {
-        label = 'Hoy: ${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year}';
-      } else {
-        label = '${s.day.toString().padLeft(2, '0')}/${s.month.toString().padLeft(2, '0')}/${s.year} '
-            '➔ ${e.day.toString().padLeft(2, '0')}/${e.month.toString().padLeft(2, '0')}/${e.year}';
-      }
-    } else {
-      label = 'Filtrar rango';
-    }
-
-    return OutlinedButton.icon(
-      onPressed: _selectDateRange,
-      icon: Icon(Icons.calendar_today_outlined, size: 18, color: colors.primary),
-      label: Text(
-        label,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
-          color: colors.onSurface,
-        ),
-      ),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        side: BorderSide(color: colors.outlineVariant),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        backgroundColor: colors.surfaceContainerLowest,
-      ),
-    );
-  }
-
-  Widget _buildPresetsRow() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _buildPresetChip('hoy', 'Hoy'),
-        const SizedBox(width: 6),
-        _buildPresetChip('ayer', 'Ayer'),
-        const SizedBox(width: 6),
-        _buildPresetChip('7dias', '7 días'),
-        const SizedBox(width: 6),
-        _buildPresetChip('mes', 'Este mes'),
-        const SizedBox(width: 6),
-        _buildPresetChip('todo', 'Todo'),
-      ],
-    );
-  }
-
-  Widget _buildPresetChip(String key, String label) {
-    final isSelected = _selectedPreset == key;
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => _applyPreset(key),
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
-      ),
-      selectedColor: colors.primary,
-      backgroundColor: colors.surfaceContainerLow,
-      showCheckmark: false,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return TextField(
-      controller: _searchCtrl,
-      decoration: InputDecoration(
-        hintText: 'Buscar por equipo, código, motivo o reportero…',
-        hintStyle: const TextStyle(fontSize: 12),
-        prefixIcon: const Icon(Icons.search, size: 20),
-        suffixIcon: _searchCtrl.text.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.clear, size: 18),
-                onPressed: () => _searchCtrl.clear(),
-              )
-            : null,
-        isDense: true,
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusChips({
-    required int openCount,
-    required int resolvedCount,
-    required int rejectedCount,
-    required bool scrollable,
-  }) {
-    final categories = <(_ReportTab, String, IconData, Color)>[
-      (_ReportTab.open, 'Abiertas ($openCount)', Icons.report_problem_outlined, const Color(0xFFC2410C)),
-      (_ReportTab.resolved, 'Resueltas ($resolvedCount)', Icons.check_circle_outline, const Color(0xFF15803D)),
-      (_ReportTab.rejected, 'Rechazadas ($rejectedCount)', Icons.cancel_outlined, const Color(0xFFDC2626)),
-      (_ReportTab.all, 'Todas', Icons.all_inbox_outlined, const Color(0xFF1E293B)),
-    ];
-
-    final chips = categories.map((item) {
-      final isSelected = _tab == item.$1;
-      final theme = Theme.of(context);
-      final colors = theme.colorScheme;
-
-      return FilterChip(
-        avatar: Icon(
-          item.$3,
-          size: 16,
-          color: isSelected ? Colors.white : item.$4,
-        ),
-        label: Text(item.$2),
-        selected: isSelected,
-        onSelected: (_) => setState(() => _tab = item.$1),
-        selectedColor: item.$4,
-        backgroundColor: colors.surfaceContainerLow,
-        labelStyle: TextStyle(
-          fontSize: 12,
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          color: isSelected ? Colors.white : colors.onSurface,
-        ),
-        showCheckmark: false,
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        visualDensity: VisualDensity.compact,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      );
-    }).toList();
-
-    if (scrollable) {
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: chips.map((c) => Padding(padding: const EdgeInsets.only(right: 6), child: c)).toList(),
-        ),
-      );
-    }
-
-    return Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      children: chips,
-    );
-  }
-
-  Widget _buildSummaryBar(int count, int openCount) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-
+  /// Campo de Búsqueda Despejado y Elegante
+  Widget _buildSearchField(bool isDark, Color borderColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
+      height: 40,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor, width: 0.9),
+      ),
+      child: TextField(
+        controller: _searchCtrl,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          hintText: 'Buscar por equipo, código (ej. A003), motivo...',
+          hintStyle: TextStyle(
+            fontSize: 12.5,
+            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+          ),
+          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+          suffixIcon: _searchCtrl.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear_rounded, size: 16),
+                  onPressed: () => _searchCtrl.clear(),
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        ),
+      ),
+    );
+  }
+
+  /// Selector de Fecha Compacto con Menú Desplegable
+  Widget _buildDateMenuButton(bool isDark, Color borderColor) {
+    return PopupMenuButton<String>(
+      onSelected: (val) {
+        if (val == 'personalizado') {
+          _selectDateRange();
+        } else {
+          _applyPreset(val);
+        }
+      },
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      itemBuilder: (ctx) => [
+        _buildPopupItem('hoy', 'Hoy', Icons.today_outlined),
+        _buildPopupItem('ayer', 'Ayer', Icons.history_toggle_off_outlined),
+        _buildPopupItem('7dias', 'Últimos 7 días', Icons.calendar_view_week_outlined),
+        _buildPopupItem('mes', 'Este mes', Icons.calendar_month_outlined),
+        _buildPopupItem('todo', 'Histórico completo', Icons.all_inclusive_rounded),
+        const PopupMenuDivider(),
+        _buildPopupItem('personalizado', 'Seleccionar rango personalizado...', Icons.date_range_outlined),
+      ],
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor, width: 0.9),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.calendar_today_outlined, size: 15, color: Color(0xFF0055A5)),
+            const SizedBox(width: 8),
+            Text(
+              _getPresetLabel(),
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildPopupItem(String value, String text, IconData icon) {
+    final isSelected = _selectedPreset == value;
+
+    return PopupMenuItem<String>(
+      value: value,
       child: Row(
         children: [
-          Icon(Icons.bug_report_outlined, size: 16, color: colors.primary),
-          const SizedBox(width: 8),
-          Text(
-            '$count reporte(s) de avería',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: colors.onSurface,
+          Icon(icon, size: 16, color: isSelected ? const Color(0xFF0055A5) : const Color(0xFF64748B)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? const Color(0xFF0055A5) : null,
+              ),
             ),
           ),
-          const SizedBox(width: 10),
-          if (openCount > 0)
+          if (isSelected)
+            const Icon(Icons.check_rounded, size: 16, color: Color(0xFF0055A5)),
+        ],
+      ),
+    );
+  }
+
+  /// Pestaña Limpia con Subrayado Activo (Estilo Modern SaaS)
+  Widget _buildCleanTab({
+    required _ReportTab tab,
+    required String label,
+    required int count,
+    required Color accentColor,
+    required bool isDark,
+  }) {
+    final isSelected = _tab == tab;
+
+    return InkWell(
+      onTap: () => setState(() => _tab = tab),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: isSelected ? const Color(0xFF0055A5) : Colors.transparent,
+              width: 2.2,
+            ),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+              ),
+            ),
+            const SizedBox(width: 6),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFEDD5),
-                borderRadius: BorderRadius.circular(4),
+                color: isSelected
+                    ? const Color(0xFF0055A5).withValues(alpha: 0.1)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                '$openCount pendiente(s)',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFC2410C)),
+                '$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: isSelected
+                      ? const Color(0xFF0055A5)
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                ),
               ),
             ),
-          const Spacer(),
-          Text(
-            'Orden cronológico',
-            style: TextStyle(
-              fontSize: 11,
-              color: colors.onSurfaceVariant,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Tarjeta ejecutiva para cada Reporte de Avería con franja lateral de severidad.
-class _ModernReportCard extends StatelessWidget {
-  const _ModernReportCard({
+/// Tarjeta Limpia, Espaciosa y Responsiva para cada Incidencia
+class _CleanReportCard extends StatelessWidget {
+  const _CleanReportCard({
     required this.report,
     required this.isProcessing,
     required this.canGenerateOt,
     required this.canReject,
     required this.onGenerateOt,
     required this.onReject,
+    required this.isDark,
+    required this.borderColor,
+    required this.isMobile,
   });
 
   final BreakdownReport report;
@@ -568,6 +640,9 @@ class _ModernReportCard extends StatelessWidget {
   final bool canReject;
   final VoidCallback onGenerateOt;
   final VoidCallback onReject;
+  final bool isDark;
+  final Color borderColor;
+  final bool isMobile;
 
   String _formatTimestamp(DateTime? dt) {
     if (dt == null) return '—';
@@ -576,269 +651,245 @@ class _ModernReportCard extends StatelessWidget {
     final timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
 
     final diff = now.difference(dt);
-    String relative;
     if (diff.inMinutes < 1) {
-      relative = 'Hace un momento';
+      return 'Hace un momento';
     } else if (diff.inMinutes < 60) {
-      relative = 'Hace ${diff.inMinutes} min';
+      return 'Hace ${diff.inMinutes} min';
     } else if (diff.inHours < 24 && dt.day == now.day) {
-      relative = 'Hoy a las $timeStr';
+      return 'Hoy a las $timeStr';
     } else if (diff.inDays == 1 || (diff.inHours < 48 && dt.day == now.subtract(const Duration(days: 1)).day)) {
-      relative = 'Ayer a las $timeStr';
-    } else {
-      relative = '$dayStr $timeStr';
+      return 'Ayer a las $timeStr';
     }
-
-    return relative;
+    return '$dayStr $timeStr';
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final (sevColor, sevBg, sevLabel) = switch (report.severity) {
-      BreakdownSeverity.low => (const Color(0xFF15803D), const Color(0xFFDCFCE7), 'Severidad Baja'),
-      BreakdownSeverity.medium => (const Color(0xFFB45309), const Color(0xFFFEF3C7), 'Severidad Media'),
-      BreakdownSeverity.high => (const Color(0xFFDC2626), const Color(0xFFFEE2E2), 'Severidad Alta'),
+    // Criticidad limpia
+    final (sevColor, sevText) = switch (report.severity) {
+      BreakdownSeverity.low => (const Color(0xFF059669), 'Baja'),
+      BreakdownSeverity.medium => (const Color(0xFFD97706), 'Media'),
+      BreakdownSeverity.high => (const Color(0xFFDC2626), 'Alta / Urgente'),
     };
 
-    final (statusColor, statusBg, statusLabel, statusIcon) = switch (report.status) {
+    // Estado formal limpio
+    final (statusText, statusColor, statusBg) = switch (report.status) {
       BreakdownReportStatus.reported => (
-          const Color(0xFFC2410C),
-          const Color(0xFFFFEDD5),
           'En Revisión',
-          Icons.error_outline,
+          const Color(0xFFC2410C),
+          const Color(0xFFFFF7ED),
         ),
       BreakdownReportStatus.inWorkOrder => (
-          const Color(0xFF1D4ED8),
-          const Color(0xFFDBEAFE),
-          report.workOrderId != null ? 'En ${report.workOrderId}' : 'En OT',
-          Icons.engineering_outlined,
+          report.workOrderId != null ? 'En OT ${report.workOrderId}' : 'En OT',
+          const Color(0xFF0055A5),
+          const Color(0xFFEFF6FF),
         ),
       BreakdownReportStatus.resolved => (
-          const Color(0xFF15803D),
-          const Color(0xFFDCFCE7),
           'Resuelta',
-          Icons.check_circle_outline,
+          const Color(0xFF059669),
+          const Color(0xFFF0FDF4),
         ),
       BreakdownReportStatus.rejected => (
-          const Color(0xFF475569),
-          const Color(0xFFF1F5F9),
           'Rechazada',
-          Icons.cancel_outlined,
+          const Color(0xFF64748B),
+          const Color(0xFFF8FAFC),
         ),
     };
 
-    final reportedDateStr = _formatTimestamp(report.reportedAt);
-    final fullDate = report.reportedAt != null
-        ? '${report.reportedAt!.day.toString().padLeft(2, '0')}/${report.reportedAt!.month.toString().padLeft(2, '0')}/${report.reportedAt!.year} ${report.reportedAt!.hour.toString().padLeft(2, '0')}:${report.reportedAt!.minute.toString().padLeft(2, '0')}'
-        : '—';
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
 
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      shape: RoundedRectangleBorder(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: cardBg,
         borderRadius: BorderRadius.circular(10),
-        side: BorderSide(color: Colors.grey.shade300, width: 0.8),
+        border: Border.all(color: borderColor, width: 1),
       ),
-      clipBehavior: Clip.antiAlias,
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Franja lateral con acento de color de severidad
+            // Borde lateral ultra-fino de severidad
             Container(
-              width: 5,
-              color: sevColor,
+              width: 3.5,
+              decoration: BoxDecoration(
+                color: sevColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(10),
+                  bottomLeft: Radius.circular(10),
+                ),
+              ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header: Código, Equipo, Badges
+                    // Fila 1: Código de Equipo, Nombre y Badges
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: sevColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(statusIcon, size: 18, color: sevColor),
-                        ),
-                        const SizedBox(width: 10),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              Wrap(
-                                spacing: 6,
-                                runSpacing: 4,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(5),
-                                      border: Border.all(color: theme.colorScheme.outlineVariant),
-                                    ),
-                                    child: Text(
-                                      report.assetId,
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 11.5,
-                                        color: theme.colorScheme.onSurface,
-                                      ),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: sevBg,
-                                      borderRadius: BorderRadius.circular(5),
-                                    ),
-                                    child: Text(
-                                      sevLabel,
-                                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: sevColor),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '${report.assetName} · Área: ${report.areaId}',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
+                              // Chip de código de activo
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0055A5).withValues(alpha: 0.07),
+                                  borderRadius: BorderRadius.circular(4),
                                 ),
-                                overflow: TextOverflow.ellipsis,
+                                child: Text(
+                                  report.assetId,
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11.5,
+                                    color: Color(0xFF0055A5),
+                                  ),
+                                ),
+                              ),
+                              // Nombre del equipo
+                              Text(
+                                report.assetName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13.5,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                              // Área
+                              Text(
+                                '· Área: ${report.areaId}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF64748B),
+                                ),
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: statusBg,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                          ),
-                          child: Text(
-                            statusLabel,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: statusColor,
+
+                        // Severidad + Estado
+                        Wrap(
+                          spacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            // Indicador de severidad
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6.5,
+                                  height: 6.5,
+                                  decoration: BoxDecoration(
+                                    color: sevColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4.5),
+                                Text(
+                                  sevText,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: sevColor,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
+                            // Badge de estado
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                              decoration: BoxDecoration(
+                                color: isDark ? statusColor.withValues(alpha: 0.15) : statusBg,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                statusText,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: statusColor,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
 
-                    // Descripción de la avería
+                    // Fila 2: Descripción limpia (directa, sin cajas excesivas)
                     Text(
                       report.description,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 12.5,
-                        height: 1.35,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.9),
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
                       ),
                     ),
 
+                    // Motivo de rechazo si aplica
                     if (report.rejectionReason != null && report.rejectionReason!.isNotEmpty) ...[
                       const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Motivo del rechazo: ${report.rejectionReason}',
-                          style: TextStyle(fontSize: 11.5, color: Colors.red.shade900, fontStyle: FontStyle.italic),
+                      Text(
+                        'Motivo de rechazo: ${report.rejectionReason}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFDC2626),
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
                     ],
 
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
 
-                    // Footer: Usuario y fecha
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Wrap(
-                          spacing: 14,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
+                    // Fila 3: Metadatos y Acciones
+                    if (isMobile)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildMetadata(isDark),
+                          if (report.status == BreakdownReportStatus.reported) ...[
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                if (canReject) ...[
+                                  _buildRejectButton(),
+                                  const SizedBox(width: 8),
+                                ],
+                                if (canGenerateOt)
+                                  _buildGenerateOtButton(),
+                              ],
+                            ),
+                          ],
+                        ],
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(child: _buildMetadata(isDark)),
+                          if (report.status == BreakdownReportStatus.reported)
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.person_outline, size: 14, color: Colors.grey.shade600),
-                                const SizedBox(width: 4),
-                                Text(
-                                  report.reportedByUserName,
-                                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade700, fontWeight: FontWeight.w600),
-                                ),
+                                if (canReject) ...[
+                                  _buildRejectButton(),
+                                  const SizedBox(width: 8),
+                                ],
+                                if (canGenerateOt)
+                                  _buildGenerateOtButton(),
                               ],
                             ),
-                            Tooltip(
-                              message: fullDate,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.access_time, size: 13, color: Colors.grey.shade500),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    reportedDateStr,
-                                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (report.status == BreakdownReportStatus.reported)
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: [
-                              if (canReject)
-                                OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFFDC2626),
-                                    side: const BorderSide(color: Color(0xFFFCA5A5)),
-                                    visualDensity: VisualDensity.compact,
-                                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                                  ),
-                                  onPressed: isProcessing ? null : onReject,
-                                  icon: const Icon(Icons.close, size: 15),
-                                  label: const Text('Rechazar', style: TextStyle(fontSize: 11.5)),
-                                ),
-                              if (canGenerateOt)
-                                FilledButton.icon(
-                                  style: FilledButton.styleFrom(
-                                    visualDensity: VisualDensity.compact,
-                                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                                  ),
-                                  onPressed: isProcessing ? null : onGenerateOt,
-                                  icon: const Icon(Icons.assignment_add, size: 15),
-                                  label: const Text('Generar OT', style: TextStyle(fontSize: 11.5)),
-                                ),
-                            ],
-                          ),
-                      ],
-                    ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -848,8 +899,77 @@ class _ModernReportCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildMetadata(bool isDark) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.person_outline_rounded,
+          size: 14,
+          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          report.reportedByUserName,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '·',
+          style: TextStyle(
+            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          _formatTimestamp(report.reportedAt),
+          style: TextStyle(
+            fontSize: 11.5,
+            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRejectButton() {
+    return TextButton.icon(
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFFDC2626),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        visualDensity: VisualDensity.compact,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      onPressed: isProcessing ? null : onReject,
+      icon: const Icon(Icons.close_rounded, size: 14),
+      label: const Text('Rechazar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Widget _buildGenerateOtButton() {
+    return FilledButton.icon(
+      style: FilledButton.styleFrom(
+        backgroundColor: const Color(0xFF0055A5),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        visualDensity: VisualDensity.compact,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      onPressed: isProcessing ? null : onGenerateOt,
+      icon: const Icon(Icons.assignment_add, size: 14),
+      label: const Text('Generar OT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+    );
+  }
 }
 
+/// Diálogo Modal Limpio y Formal de Rechazo
 class _RejectReportDialog extends StatefulWidget {
   const _RejectReportDialog({required this.report});
 
@@ -871,32 +991,44 @@ class _RejectReportDialogState extends State<_RejectReportDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return AlertDialog(
-      title: const Text('Rechazar reporte de avería'),
-      content: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Equipo: ${widget.report.assetId} — ${widget.report.assetName}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _reasonCtrl,
-              maxLines: 3,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Motivo del rechazo *',
-                hintText: 'Explica por qué no procede esta avería...',
-                border: OutlineInputBorder(),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      title: const Text(
+        'Desestimar Reporte de Avería',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${widget.report.assetId} — ${widget.report.assetName}',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'El motivo es obligatorio' : null,
-            ),
-          ],
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _reasonCtrl,
+                maxLines: 3,
+                autofocus: true,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Indica el motivo técnico por el cual no procede...',
+                  hintStyle: const TextStyle(fontSize: 12.5),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'El motivo es obligatorio para auditoría.' : null,
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -905,13 +1037,18 @@ class _RejectReportDialogState extends State<_RejectReportDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFDC2626),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+          ),
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               Navigator.of(context).pop(_reasonCtrl.text.trim());
             }
           },
-          child: const Text('Rechazar reporte'),
+          child: const Text('Confirmar Rechazo'),
         ),
       ],
     );

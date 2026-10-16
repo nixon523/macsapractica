@@ -118,11 +118,12 @@ class _BatchGeneratePreventiveOtsDialogState
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<PreventiveScheduleViewModel>();
     final currentYear = DateTime.now().year;
     final years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
 
-    // Filtrar planes elegibles para el mes/año seleccionado
-    final eligiblePlans = widget.schedules.where((schedule) {
+    // Filtrar planes con tareas que tocan en el periodo
+    final dueInPeriod = widget.schedules.where((schedule) {
       if (schedule.status != ScheduleStatus.active) return false;
       if (_selectedAreaFilter != null && schedule.areaId != _selectedAreaFilter!.id) {
         return false;
@@ -132,6 +133,10 @@ class _BatchGeneratePreventiveOtsDialogState
         month: _selectedMonth,
       );
     }).toList();
+
+    // Separar los que ya tienen OT activa de los elegibles
+    final alreadyActivePlans = dueInPeriod.where((s) => vm.hasActiveWorkOrder(s.id)).toList();
+    final eligiblePlans = dueInPeriod.where((s) => !vm.hasActiveWorkOrder(s.id)).toList();
 
     return AlertDialog(
       title: Row(
@@ -384,6 +389,29 @@ class _BatchGeneratePreventiveOtsDialogState
                     },
                   ),
                 ),
+                if (alreadyActivePlans.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 16, color: Color(0xFFB45309)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Se omitieron ${alreadyActivePlans.length} equipo(s) que ya cuentan con una Orden de Trabajo preventiva activa en proceso.',
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF92400E)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(10),
@@ -415,11 +443,17 @@ class _BatchGeneratePreventiveOtsDialogState
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle, size: 24, color: Colors.amber.shade800),
+                      Icon(
+                        alreadyActivePlans.isNotEmpty ? Icons.info_outline : Icons.check_circle,
+                        size: 24,
+                        color: Colors.amber.shade800,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'No hay planes preventivos con tareas pendientes para ${_monthNames[_selectedMonth - 1]} de $_selectedYear. Todos los equipos están al día para este período.',
+                          alreadyActivePlans.isNotEmpty
+                              ? 'Todos los planes preventivos de este período (${alreadyActivePlans.length} equipo(s)) ya cuentan con una Orden de Trabajo activa en proceso. No se generarán órdenes duplicadas.'
+                              : 'No hay planes preventivos con tareas pendientes para ${_monthNames[_selectedMonth - 1]} de $_selectedYear. Todos los equipos están al día para este período.',
                           style: TextStyle(fontSize: 12, color: Colors.amber.shade900, fontWeight: FontWeight.w600),
                         ),
                       ),

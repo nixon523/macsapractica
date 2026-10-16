@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/error/failures.dart';
+import '../../../work_orders/domain/entities/work_order.dart';
+import '../../../work_orders/domain/repositories/work_order_repository.dart';
 import '../../domain/entities/preventive_schedule.dart';
 import '../../domain/repositories/preventive_schedule_repository.dart';
 import '../states/preventive_schedule_state.dart';
@@ -8,13 +10,31 @@ import '../states/preventive_schedule_state.dart';
 class PreventiveScheduleViewModel extends ChangeNotifier {
   PreventiveScheduleViewModel({
     required PreventiveScheduleRepository repository,
-  }) : _repository = repository;
+    WorkOrderRepository? workOrderRepository,
+  })  : _repository = repository,
+        _workOrderRepository = workOrderRepository;
 
   final PreventiveScheduleRepository _repository;
+  final WorkOrderRepository? _workOrderRepository;
 
   PreventiveScheduleState _state = const PreventiveScheduleState();
   PreventiveScheduleState get state => _state;
   List<PreventiveSchedule> get schedules => _state.schedules;
+
+  List<WorkOrder> _openWorkOrders = const [];
+  List<WorkOrder> get openWorkOrders => _openWorkOrders;
+
+  WorkOrder? getActiveWorkOrder(String scheduleId) {
+    return _openWorkOrders.where((wo) {
+      final matchesPlan = wo.preventiveScheduleId == scheduleId;
+      final isOpen = wo.status == WorkOrderStatus.pending ||
+          wo.status == WorkOrderStatus.inProgress;
+      return matchesPlan && isOpen;
+    }).firstOrNull;
+  }
+
+  bool hasActiveWorkOrder(String scheduleId) =>
+      getActiveWorkOrder(scheduleId) != null;
 
   bool _isSaving = false;
   bool get isSaving => _isSaving;
@@ -48,6 +68,11 @@ class PreventiveScheduleViewModel extends ChangeNotifier {
         startDate: startDate,
         endDate: endDate,
       );
+      if (_workOrderRepository != null) {
+        try {
+          _openWorkOrders = await _workOrderRepository.getOpenWorkOrders();
+        } catch (_) {}
+      }
       _state = PreventiveScheduleState(
         viewState: ViewState.success,
         schedules: schedules,
@@ -174,6 +199,14 @@ class PreventiveScheduleViewModel extends ChangeNotifier {
     int? year,
     int? month,
   }) async {
+    final activeOt = getActiveWorkOrder(scheduleId);
+    if (activeOt != null) {
+      _errorMessage =
+          'Ya existe la Orden de Trabajo activa ${activeOt.id} para este plan preventivo.';
+      notifyListeners();
+      return null;
+    }
+
     _isSaving = true;
     _errorMessage = '';
     _successMessage = '';

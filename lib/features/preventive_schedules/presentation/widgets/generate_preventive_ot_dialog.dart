@@ -54,8 +54,21 @@ class _GeneratePreventiveOtDialogState
   }
 
   Future<void> _handleGenerate() async {
-    setState(() => _isGenerating = true);
     final vm = context.read<PreventiveScheduleViewModel>();
+    final activeOt = vm.getActiveWorkOrder(widget.schedule.id);
+    if (activeOt != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'El plan preventivo ya tiene la orden ${activeOt.id} activa (${activeOt.statusLabel}).',
+          ),
+          backgroundColor: Colors.amber.shade900,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isGenerating = true);
 
     try {
       final otId = await vm.generateMonthlyWorkOrder(
@@ -108,6 +121,8 @@ class _GeneratePreventiveOtDialogState
   @override
   Widget build(BuildContext context) {
     final schedule = widget.schedule;
+    final vm = context.watch<PreventiveScheduleViewModel>();
+    final activeOt = vm.getActiveWorkOrder(schedule.id);
 
     final includedActs = schedule.activitiesDueInPeriod(
       year: _selectedYear,
@@ -182,6 +197,47 @@ class _GeneratePreventiveOtDialogState
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (activeOt != null) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFF59E0B), width: 1.5),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Orden activa existente: ${activeOt.id}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: Color(0xFF78350F),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Este plan preventivo ya tiene la orden ${activeOt.id} en estado "${activeOt.statusLabel}". No se puede generar otra OT mientras la actual continúe abierta.',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF92400E),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               // Selector de Periodo (Mes y Año)
               Container(
                 padding: const EdgeInsets.all(12),
@@ -521,15 +577,32 @@ class _GeneratePreventiveOtDialogState
           child: const Text('Cancelar'),
         ),
         FilledButton.icon(
-          onPressed: (canGenerate && !_isGenerating) ? _handleGenerate : null,
+          onPressed: (canGenerate && !_isGenerating && activeOt == null)
+              ? _handleGenerate
+              : null,
           icon: _isGenerating
               ? const SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                 )
-              : const Icon(Icons.bolt, size: 18),
-          label: Text(_isGenerating ? 'Generando OT...' : 'Generar Orden de Trabajo (OT)'),
+              : Icon(
+                  activeOt != null ? Icons.lock : Icons.bolt,
+                  size: 18,
+                ),
+          label: Text(
+            activeOt != null
+                ? 'OT Ya Activa (${activeOt.id})'
+                : (_isGenerating
+                    ? 'Generando OT...'
+                    : 'Generar Orden de Trabajo (OT)'),
+          ),
+          style: activeOt != null
+              ? FilledButton.styleFrom(
+                  backgroundColor: Colors.grey.shade400,
+                  foregroundColor: Colors.white,
+                )
+              : null,
         ),
       ],
     );

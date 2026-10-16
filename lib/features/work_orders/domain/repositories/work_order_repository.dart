@@ -7,6 +7,7 @@ abstract class WorkOrderRepository {
     DateTime? endDate,
   });
   Future<List<WorkOrder>> getWorkOrdersForAsset(String assetId);
+  Future<List<WorkOrder>> getOpenWorkOrders();
 
   /// Crea una OT con ID secuencial (`OT-2026-0001`...) vía transacción
   /// sobre `counters/work_orders`.

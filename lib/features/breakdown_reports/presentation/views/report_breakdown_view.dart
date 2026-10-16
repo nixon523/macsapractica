@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
-import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
+import '../../../assets/domain/entities/area.dart';
 import '../../../assets/domain/entities/asset.dart';
+import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../domain/entities/breakdown_report.dart';
 import '../viewmodels/report_breakdown_viewmodel.dart';
 
-/// Formulario ejecutivo moderno para reportar averías e incidencias de equipos.
+/// Formulario ejecutivo y sofisticado para reportar averías e incidencias operativas.
+/// Incluye buscador modal de áreas y equipos, diseño corporativo sobrio y trazabilidad.
 class ReportBreakdownView extends StatefulWidget {
   const ReportBreakdownView({super.key});
 
@@ -51,16 +53,16 @@ class _ReportBreakdownViewState extends State<ReportBreakdownView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          backgroundColor: const Color(0xFF16A34A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          backgroundColor: const Color(0xFF0F766E),
           content: const Row(
             children: [
-              Icon(Icons.check_circle_outline, color: Colors.white),
+              Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
               SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Avería reportada exitosamente. Registrada en el Kardex.',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  'Avería registrada exitosamente. Notificación enviada al panel de mantenimiento.',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
                 ),
               ),
             ],
@@ -71,16 +73,16 @@ class _ReportBreakdownViewState extends State<ReportBreakdownView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          backgroundColor: const Color(0xFFDC2626),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          backgroundColor: const Color(0xFFB91C1C),
           content: Row(
             children: [
-              const Icon(Icons.error_outline, color: Colors.white),
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   _viewModel.errorMessage,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
                 ),
               ),
             ],
@@ -111,98 +113,156 @@ class _ReportForm extends StatelessWidget {
   final Future<void> Function() onSubmit;
   final TextEditingController descController;
 
+  void _openAreaSearchModal(BuildContext context, ReportBreakdownViewModel vm) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => _AreaSearchDialog(
+        areas: vm.areas,
+        selectedAreaId: vm.selectedAreaId,
+        onAreaSelected: (selectedArea) {
+          vm.selectArea(selectedArea.id);
+        },
+      ),
+    );
+  }
+
+  void _openAssetSearchModal(BuildContext context, ReportBreakdownViewModel vm) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogCtx) => _AssetSearchDialog(
+        assets: vm.assets,
+        selectedAssetId: vm.selectedAssetId,
+        getOpenReport: vm.getOpenReportForAsset,
+        onAssetSelected: (selectedAsset) {
+          vm.selectAsset(selectedAsset.id);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final vm = context.watch<ReportBreakdownViewModel>();
+    final isDark = theme.brightness == Brightness.dark;
+
+    final selectedArea = vm.selectedAreaId != null
+        ? vm.areas.where((a) => a.id == vm.selectedAreaId).firstOrNull
+        : null;
+
+    final selectedAsset = vm.selectedAssetId != null
+        ? vm.assets.where((a) => a.id == vm.selectedAssetId).firstOrNull
+        : null;
+
+    final isAssetBlocked = selectedAsset != null && vm.isAssetPending(selectedAsset.id);
+
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final secondaryText = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
+          constraints: const BoxConstraints(maxWidth: 800),
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
             children: [
-              // Header Banner Principal
+              // Encabezado Corporativo Formal (Estilo Ficha Ejecutiva)
               Container(
-                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      theme.colorScheme.primary.withValues(alpha: 0.08),
-                      theme.colorScheme.surface,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                    width: 1,
-                  ),
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: borderColor, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: Row(
+                clipBehavior: Clip.antiAlias,
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.warning_amber_rounded,
-                        color: theme.colorScheme.primary,
-                        size: 28,
-                      ),
+                      height: 4,
+                      color: theme.colorScheme.primary,
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              Text(
-                                'Reportar Avería o Incidencia',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  letterSpacing: -0.2,
-                                ),
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: theme.colorScheme.primary.withValues(alpha: 0.2),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
+                            ),
+                            child: Icon(
+                              Icons.assignment_late_outlined,
+                              color: theme.colorScheme.primary,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Reporte de Avería o Incidencia Técnica',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: -0.3,
+                                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF0284C7).withValues(alpha: 0.09),
+                                        borderRadius: BorderRadius.circular(5),
+                                        border: Border.all(
+                                          color: const Color(0xFF0284C7).withValues(alpha: 0.3),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Mantenimiento Correctivo',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF0369A1),
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  'Mantenimiento Correctivo',
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Formulario oficial de notificación de fallas operativas. Las incidencias reportadas alertan de inmediato a la jefatura de mantenimiento y quedan registradas con trazabilidad en la bitácora Kardex.',
                                   style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: theme.colorScheme.primary,
+                                    fontSize: 12.5,
+                                    height: 1.4,
+                                    color: secondaryText,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Selecciona el área de ubicación, el equipo afectado y especifica la severidad. '
-                            'El reporte quedará disponible de inmediato para los supervisores y el equipo de mantenimiento.',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.75),
-                              height: 1.35,
+                              ],
                             ),
                           ),
                         ],
@@ -214,328 +274,379 @@ class _ReportForm extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // Tarjeta Formulario Unificado
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(color: Colors.grey.shade300, width: 0.8),
+              // Contenedor Principal del Formulario
+              Container(
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: borderColor, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                clipBehavior: Clip.antiAlias,
-                child: Padding(
-                  padding: const EdgeInsets.all(22),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Bloque 1: Ubicación y Equipo
-                      _buildSectionTitle(
-                        icon: Icons.precision_manufacturing_outlined,
-                        title: '1. Ubicación y Equipo Afectado',
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 14),
+                padding: const EdgeInsets.all(26),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ==========================================
+                    // SECCIÓN 1: UBICACIÓN Y EQUIPO
+                    // ==========================================
+                    _buildSectionHeader(
+                      stepNumber: '01',
+                      title: 'Ubicación y Equipo Afectado',
+                      subtitle: 'Selecciona o busca el área operativa y el activo que presenta la anomalía.',
+                      theme: theme,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 18),
 
-                      // Selector de Área
-                      DropdownButtonFormField<String>(
-                        key: const Key('breakdown-area'),
-                        value: vm.selectedAreaId,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: 'Área de Ubicación *',
-                          hintText: vm.isLoadingAreas
-                              ? 'Cargando áreas disponibles...'
-                              : 'Selecciona el área operativa',
-                          prefixIcon: const Icon(Icons.business_outlined, size: 20),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    // Campo de Área con Buscador Integrado
+                    const Text(
+                      'ÁREA OPERATIVA DE UBICACIÓN *',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    _buildAreaSelectorCard(
+                      context: context,
+                      theme: theme,
+                      vm: vm,
+                      selectedArea: selectedArea,
+                      isDark: isDark,
+                      borderColor: borderColor,
+                      onTapSearch: () => _openAreaSearchModal(context, vm),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Campo de Activo / Equipo Afectado
+                    const Text(
+                      'ACTIVO O EQUIPO AFECTADO *',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                        color: Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    if (vm.selectedAreaId == null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: borderColor),
                         ),
-                        items: [
-                          for (final area in vm.areas)
-                            DropdownMenuItem(
-                              value: area.id,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      area.id,
-                                      style: TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: theme.colorScheme.primary,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      area.name,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                  ),
-                                ],
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 17, color: secondaryText),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Selecciona primero un área operativa para desplegar los equipos y maquinarias correspondientes.',
+                                style: TextStyle(fontSize: 12, color: secondaryText),
                               ),
                             ),
-                        ],
-                        onChanged: vm.isLoadingAreas
-                            ? null
-                            : (value) {
-                                if (value != null) vm.selectArea(value);
-                              },
+                          ],
+                        ),
+                      )
+                    else if (vm.isLoadingAssets)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: theme.colorScheme.primary.withValues(alpha: 0.18),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Consultando catálogo de equipos del área ${selectedArea?.name ?? ''}...',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (vm.assets.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFD97706)),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'No se encontraron equipos o activos operativos registrados en esta área.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF92400E),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      _buildAssetSelectorCard(
+                        context: context,
+                        theme: theme,
+                        vm: vm,
+                        selectedAsset: selectedAsset,
+                        isDark: isDark,
+                        borderColor: borderColor,
+                        onTapSearch: () => _openAssetSearchModal(context, vm),
                       ),
 
-                      const SizedBox(height: 16),
-
-                      // Selector de Activo
-                      if (vm.selectedAreaId == null)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.info_outline, size: 18, color: Colors.grey.shade600),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Selecciona un área para listar sus equipos y componentes.',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (vm.isLoadingAssets)
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.primary.withValues(alpha: 0.04),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.15)),
-                          ),
-                          child: const Row(
-                            children: [
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Cargando activos y equipos del área...',
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (vm.assets.isEmpty)
-                        Container(
+                    if (selectedAsset != null && vm.isAssetPending(selectedAsset.id)) ...[
+                      const SizedBox(height: 10),
+                      Builder(builder: (context) {
+                        final pendingReport = vm.getOpenReportForAsset(selectedAsset.id);
+                        return Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFFBEB),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFFDE68A)),
+                            border: Border.all(color: const Color(0xFFF59E0B)),
                           ),
-                          child: const Row(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.warning_amber_outlined, size: 18, color: Color(0xFFD97706)),
-                              SizedBox(width: 10),
+                              const Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 22),
+                              const SizedBox(width: 10),
                               Expanded(
-                                child: Text(
-                                  'Esta área no tiene equipos activos registrados.',
-                                  style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        DropdownButtonFormField<String>(
-                          key: ValueKey('breakdown-asset-${vm.selectedAreaId}'),
-                          value: vm.selectedAssetId,
-                          isExpanded: true,
-                          decoration: InputDecoration(
-                            labelText: 'Activo / Equipo Afectado *',
-                            hintText: 'Selecciona el equipo que presenta la falla',
-                            prefixIcon: const Icon(Icons.settings_suggest_outlined, size: 20),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          ),
-                          items: [
-                            for (final Asset asset in vm.assets)
-                              DropdownMenuItem(
-                                value: asset.id,
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blueGrey.shade50,
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: Colors.blueGrey.shade200),
-                                      ),
-                                      child: Text(
-                                        asset.id,
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.blueGrey.shade800,
-                                        ),
+                                    Text(
+                                      'Avería activa en este activo (Folio #${pendingReport?.id ?? ""})',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Color(0xFF92400E),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        asset.name,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 13),
-                                      ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      'Este equipo ya cuenta con un reporte de avería en estado "${pendingReport?.statusLabel ?? "Reportada"}". '
+                                      'Por norma operativa, no se puede generar un reporte duplicado del mismo equipo hasta que el actual sea resuelto o rechazado.',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF78350F), height: 1.3),
                                     ),
                                   ],
                                 ),
                               ),
-                          ],
-                          onChanged: (value) => vm.selectAsset(value),
-                        ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
 
-                      const SizedBox(height: 24),
-                      const Divider(height: 1),
-                      const SizedBox(height: 20),
+                    const SizedBox(height: 28),
+                    Divider(height: 1, color: borderColor),
+                    const SizedBox(height: 24),
 
-                      // Bloque 2: Severidad de la Avería
-                      _buildSectionTitle(
-                        icon: Icons.speed_outlined,
-                        title: '2. Nivel de Severidad / Urgencia',
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 12),
+                    // ==========================================
+                    // SECCIÓN 2: SEVERIDAD Y CRITICIDAD
+                    // ==========================================
+                    _buildSectionHeader(
+                      stepNumber: '02',
+                      title: 'Criticidad y Nivel de Severidad',
+                      subtitle: 'Evalúa el impacto inmediato de la falla sobre la producción o seguridad.',
+                      theme: theme,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 16),
 
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final isCompact = constraints.maxWidth < 420;
-                          final cards = [
-                            _SeverityCard(
-                              severity: BreakdownSeverity.low,
-                              label: 'Baja',
-                              desc: 'Falla leve / Operación normal',
-                              icon: Icons.info_outline,
-                              color: const Color(0xFF16A34A),
-                              isSelected: vm.severity == BreakdownSeverity.low,
-                              onTap: () => vm.setSeverity(BreakdownSeverity.low),
-                            ),
-                            _SeverityCard(
-                              severity: BreakdownSeverity.medium,
-                              label: 'Media',
-                              desc: 'Afecta rendimiento parcial',
-                              icon: Icons.warning_amber_rounded,
-                              color: const Color(0xFFD97706),
-                              isSelected: vm.severity == BreakdownSeverity.medium,
-                              onTap: () => vm.setSeverity(BreakdownSeverity.medium),
-                            ),
-                            _SeverityCard(
-                              severity: BreakdownSeverity.high,
-                              label: 'Alta',
-                              desc: 'Paro de equipo / Urgente',
-                              icon: Icons.error_outline,
-                              color: const Color(0xFFDC2626),
-                              isSelected: vm.severity == BreakdownSeverity.high,
-                              onTap: () => vm.setSeverity(BreakdownSeverity.high),
-                            ),
-                          ];
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isCompact = constraints.maxWidth < 560;
+                        final cards = [
+                          _SeverityExecutiveCard(
+                            severity: BreakdownSeverity.low,
+                            badgeText: 'Nivel 1',
+                            label: 'Baja Prioridad',
+                            desc: 'Falla leve o ajuste menor. No detiene la operación ni compromete inocuidad.',
+                            icon: Icons.check_circle_outline,
+                            accentColor: const Color(0xFF059669),
+                            isSelected: vm.severity == BreakdownSeverity.low,
+                            onTap: () => vm.setSeverity(BreakdownSeverity.low),
+                            isDark: isDark,
+                          ),
+                          _SeverityExecutiveCard(
+                            severity: BreakdownSeverity.medium,
+                            badgeText: 'Nivel 2',
+                            label: 'Media / Atención',
+                            desc: 'Rendimiento degradado o riesgo potencial. Requiere atención técnica pronta.',
+                            icon: Icons.warning_amber_rounded,
+                            accentColor: const Color(0xFFD97706),
+                            isSelected: vm.severity == BreakdownSeverity.medium,
+                            onTap: () => vm.setSeverity(BreakdownSeverity.medium),
+                            isDark: isDark,
+                          ),
+                          _SeverityExecutiveCard(
+                            severity: BreakdownSeverity.high,
+                            badgeText: 'Nivel 3',
+                            label: 'Alta / Urgente',
+                            desc: 'Paro total de equipo o línea de producción. Riesgo operativo inminente.',
+                            icon: Icons.error_outline_rounded,
+                            accentColor: const Color(0xFFDC2626),
+                            isSelected: vm.severity == BreakdownSeverity.high,
+                            onTap: () => vm.setSeverity(BreakdownSeverity.high),
+                            isDark: isDark,
+                          ),
+                        ];
 
-                          if (isCompact) {
-                            return Column(
-                              children: [
-                                for (int i = 0; i < cards.length; i++) ...[
-                                  if (i > 0) const SizedBox(height: 8),
-                                  cards[i],
-                                ],
-                              ],
-                            );
-                          }
-
-                          return Row(
+                        if (isCompact) {
+                          return Column(
                             children: [
                               for (int i = 0; i < cards.length; i++) ...[
-                                if (i > 0) const SizedBox(width: 10),
-                                Expanded(child: cards[i]),
+                                if (i > 0) const SizedBox(height: 10),
+                                cards[i],
                               ],
                             ],
                           );
-                        },
-                      ),
+                        }
 
-                      const SizedBox(height: 24),
-                      const Divider(height: 1),
-                      const SizedBox(height: 20),
+                        return Row(
+                          children: [
+                            for (int i = 0; i < cards.length; i++) ...[
+                              if (i > 0) const SizedBox(width: 12),
+                              Expanded(child: cards[i]),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
 
-                      // Bloque 3: Detalle y Descripción
-                      _buildSectionTitle(
-                        icon: Icons.description_outlined,
-                        title: '3. Descripción del Problema',
-                        theme: theme,
-                      ),
-                      const SizedBox(height: 12),
+                    const SizedBox(height: 28),
+                    Divider(height: 1, color: borderColor),
+                    const SizedBox(height: 24),
 
-                      TextField(
-                        key: const Key('breakdown-description'),
-                        controller: descController,
-                        maxLines: 4,
-                        minLines: 3,
-                        onChanged: vm.setDescription,
-                        decoration: InputDecoration(
-                          labelText: 'Detalles de la avería *',
-                          hintText: 'Describe el problema: ruidos anómalos, fugas de aceite, recalentamiento, fallas eléctricas...',
-                          alignLabelWithHint: true,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          contentPadding: const EdgeInsets.all(14),
+                    // ==========================================
+                    // SECCIÓN 3: DESCRIPCIÓN DEL PROBLEMA
+                    // ==========================================
+                    _buildSectionHeader(
+                      stepNumber: '03',
+                      title: 'Descripción del Evento o Anomalía',
+                      subtitle: 'Detalla las observaciones y comportamiento anómalo detectado en la máquina.',
+                      theme: theme,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextField(
+                      key: const Key('breakdown-description'),
+                      controller: descController,
+                      maxLines: 4,
+                      minLines: 3,
+                      onChanged: vm.setDescription,
+                      style: const TextStyle(fontSize: 13.5),
+                      decoration: InputDecoration(
+                        hintText: 'Describe la falla con el mayor detalle posible: ruidos atípicos, vibraciones, mensajes o alarmas en pantalla, fugas de aceite o agua, componentes trabados, humo...',
+                        hintStyle: TextStyle(fontSize: 12.5, color: secondaryText.withValues(alpha: 0.8)),
+                        alignLabelWithHint: true,
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFFAFAFA),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: borderColor),
                         ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: borderColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.all(16),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Proporciona la mayor cantidad de detalles posible para facilitar el diagnóstico del personal técnico.',
-                        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
-                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.shield_outlined, size: 14, color: secondaryText),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Esta información servirá como diagnóstico inicial para que el Jefe de Mantenimiento emita y asigne la Orden de Trabajo correspondiente.',
+                            style: TextStyle(fontSize: 11.5, color: secondaryText),
+                          ),
+                        ),
+                      ],
+                    ),
 
-                      const SizedBox(height: 28),
+                    const SizedBox(height: 32),
 
-                      // Botón de Envío
-                      SizedBox(
-                        width: double.infinity,
-                        height: 46,
-                        child: FilledButton.icon(
-                          key: const Key('breakdown-submit'),
-                          onPressed: vm.isSubmitting ? null : onSubmit,
-                          icon: vm.isSubmitting
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.send_rounded, size: 18),
-                          label: Text(
-                            vm.isSubmitting ? 'Enviando reporte...' : 'Enviar Reporte de Avería',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    // Botón de Envío Oficial
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: FilledButton.icon(
+                        key: const Key('breakdown-submit'),
+                        onPressed: (vm.isSubmitting || isAssetBlocked) ? null : onSubmit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF0055A5),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        icon: vm.isSubmitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.send_rounded, size: 18),
+                        label: Text(
+                          vm.isSubmitting
+                              ? 'Registrando en bitácora...'
+                              : 'Registrar Reporte de Avería',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.3,
                           ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -545,102 +656,953 @@ class _ReportForm extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionTitle({
-    required IconData icon,
+  /// Encabezado de paso formal y numerado
+  Widget _buildSectionHeader({
+    required String stepNumber,
     required String title,
+    required String subtitle,
     required ThemeData theme,
+    required bool isDark,
   }) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 18, color: theme.colorScheme.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              letterSpacing: -0.2,
+        Container(
+          width: 28,
+          height: 28,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: const Color(0xFF0055A5).withValues(alpha: 0.25),
+              width: 0.8,
             ),
+          ),
+          child: Text(
+            stepNumber,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0055A5),
+              letterSpacing: -0.5,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
+
+  /// Selector de Área sofisticado con visualización y botón de búsqueda
+  Widget _buildAreaSelectorCard({
+    required BuildContext context,
+    required ThemeData theme,
+    required ReportBreakdownViewModel vm,
+    required Area? selectedArea,
+    required bool isDark,
+    required Color borderColor,
+    required VoidCallback onTapSearch,
+  }) {
+    final hasArea = selectedArea != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: hasArea ? const Color(0xFF0055A5).withValues(alpha: 0.6) : borderColor,
+          width: hasArea ? 1.2 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: vm.isLoadingAreas ? null : onTapSearch,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.business_outlined,
+                  size: 20,
+                  color: hasArea ? const Color(0xFF0055A5) : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 12),
+                if (!hasArea) ...[
+                  Expanded(
+                    child: Text(
+                      vm.isLoadingAreas
+                          ? 'Cargando catálogo de áreas...'
+                          : 'Buscar o seleccionar área operativa...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: const Color(0xFF64748B).withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: const Color(0xFF0055A5).withValues(alpha: 0.25),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      selectedArea.id,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0055A5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          selectedArea.name,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (selectedArea.costCenter.isNotEmpty)
+                          Text(
+                            'Centro de Costos: ${selectedArea.costCenter}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: vm.isLoadingAreas ? null : onTapSearch,
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: const Color(0xFF0055A5),
+                    side: BorderSide(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.3),
+                      width: 0.9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                  icon: const Icon(Icons.search_rounded, size: 16),
+                  label: Text(
+                    hasArea ? 'Cambiar' : 'Buscar Área',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Selector de Activo / Equipo sofisticado
+  Widget _buildAssetSelectorCard({
+    required BuildContext context,
+    required ThemeData theme,
+    required ReportBreakdownViewModel vm,
+    required Asset? selectedAsset,
+    required bool isDark,
+    required Color borderColor,
+    required VoidCallback onTapSearch,
+  }) {
+    final hasAsset = selectedAsset != null;
+    final hasSerial = hasAsset && selectedAsset.serial != null && selectedAsset.serial!.isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: hasAsset ? const Color(0xFF0055A5).withValues(alpha: 0.6) : borderColor,
+          width: hasAsset ? 1.2 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTapSearch,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.settings_suggest_outlined,
+                  size: 20,
+                  color: hasAsset ? const Color(0xFF0055A5) : const Color(0xFF64748B),
+                ),
+                const SizedBox(width: 12),
+                if (!hasAsset) ...[
+                  Expanded(
+                    child: Text(
+                      'Buscar o seleccionar equipo (${vm.assets.length} disponibles)...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: const Color(0xFF64748B).withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: const Color(0xFF0055A5).withValues(alpha: 0.25),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      selectedAsset.id,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0055A5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          selectedAsset.name,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (hasSerial)
+                          Text(
+                            'Serie: ${selectedAsset.serial!}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: onTapSearch,
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: const Color(0xFF0055A5),
+                    side: BorderSide(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.3),
+                      width: 0.9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                  icon: const Icon(Icons.search_rounded, size: 16),
+                  label: Text(
+                    hasAsset ? 'Cambiar' : 'Buscar Equipo',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-/// Tarjeta interactiva de severidad con estilo moderno y badges de color.
-class _SeverityCard extends StatelessWidget {
-  const _SeverityCard({
-    required this.severity,
-    required this.label,
-    required this.desc,
-    required this.icon,
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
+/// Diálogo Modal Ejecutivo para Búsqueda en Tiempo Real de Áreas Operativas
+class _AreaSearchDialog extends StatefulWidget {
+  const _AreaSearchDialog({
+    required this.areas,
+    required this.selectedAreaId,
+    required this.onAreaSelected,
   });
 
-  final BreakdownSeverity severity;
-  final String label;
-  final String desc;
-  final IconData icon;
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final List<Area> areas;
+  final String? selectedAreaId;
+  final ValueChanged<Area> onAreaSelected;
+
+  @override
+  State<_AreaSearchDialog> createState() => _AreaSearchDialogState();
+}
+
+class _AreaSearchDialogState extends State<_AreaSearchDialog> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  String _clean(String input) {
+    return input
+        .toLowerCase()
+        .trim()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+  }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.08) : Colors.grey.shade50,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? color : Colors.grey.shade300,
-            width: isSelected ? 1.8 : 0.8,
-          ),
-        ),
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cleanQuery = _clean(_query);
+
+    final filtered = widget.areas.where((a) {
+      if (cleanQuery.isEmpty) return true;
+      final idClean = _clean(a.id);
+      final nameClean = _clean(a.name);
+      final ccClean = _clean(a.costCenter);
+      return idClean.contains(cleanQuery) ||
+          nameClean.contains(cleanQuery) ||
+          ccClean.contains(cleanQuery);
+    }).toList();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 600),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(icon, size: 18, color: color),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: color,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    overflow: TextOverflow.ellipsis,
+                    child: const Icon(
+                      Icons.business_outlined,
+                      color: Color(0xFF0055A5),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Seleccionar Área Operativa',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        Text(
+                          'Filtra por código (ej. A003) o por nombre de área',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (val) => setState(() => _query = val),
+                decoration: InputDecoration(
+                  hintText: 'Escribe el código o nombre del área...',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF0055A5), width: 1.5),
                   ),
                 ),
-                if (isSelected) ...[
-                  const SizedBox(width: 4),
-                  Icon(Icons.check_circle_rounded, size: 16, color: color),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Mostrando ${filtered.length} de ${widget.areas.length} áreas operativas',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
                 ],
-              ],
+              ),
             ),
             const SizedBox(height: 6),
-            Text(
-              desc,
-              style: TextStyle(
-                fontSize: 10.5,
-                color: Colors.grey.shade700,
-                height: 1.25,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off_rounded, size: 40, color: Colors.grey.shade400),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No se encontraron áreas coincidentes con "$_query"',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1, indent: 56),
+                      itemBuilder: (context, idx) {
+                        final area = filtered[idx];
+                        final isSelected = area.id == widget.selectedAreaId;
+
+                        return Material(
+                          color: isSelected
+                              ? const Color(0xFF0055A5).withValues(alpha: 0.07)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            leading: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF0055A5)
+                                    : const Color(0xFF0055A5).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                area.id,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? Colors.white : const Color(0xFF0055A5),
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              area.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: area.costCenter.isNotEmpty
+                                ? Text(
+                                    'CC: ${area.costCenter}',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                  )
+                                : null,
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle_rounded,
+                                    color: Color(0xFF0055A5), size: 18)
+                                : const Icon(Icons.chevron_right_rounded,
+                                    color: Color(0xFFCBD5E1), size: 18),
+                            onTap: () {
+                              widget.onAreaSelected(area);
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Diálogo Modal Ejecutivo para Búsqueda en Tiempo Real de Equipos / Activos
+class _AssetSearchDialog extends StatefulWidget {
+  const _AssetSearchDialog({
+    required this.assets,
+    required this.selectedAssetId,
+    required this.onAssetSelected,
+    this.getOpenReport,
+  });
+
+  final List<Asset> assets;
+  final String? selectedAssetId;
+  final ValueChanged<Asset> onAssetSelected;
+  final BreakdownReport? Function(String assetId)? getOpenReport;
+
+  @override
+  State<_AssetSearchDialog> createState() => _AssetSearchDialogState();
+}
+
+class _AssetSearchDialogState extends State<_AssetSearchDialog> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  String _clean(String input) {
+    return input
+        .toLowerCase()
+        .trim()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cleanQuery = _clean(_query);
+
+    final filtered = widget.assets.where((a) {
+      if (cleanQuery.isEmpty) return true;
+      final idClean = _clean(a.id);
+      final nameClean = _clean(a.name);
+      final serialClean = _clean(a.serial ?? '');
+      return idClean.contains(cleanQuery) ||
+          nameClean.contains(cleanQuery) ||
+          serialClean.contains(cleanQuery);
+    }).toList();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 600),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.settings_suggest_outlined,
+                      color: Color(0xFF0055A5),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Seleccionar Equipo Afectado',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        Text(
+                          'Filtra por código de activo, nombre de equipo o serie',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (val) => setState(() => _query = val),
+                decoration: InputDecoration(
+                  hintText: 'Escribe el código o nombre del equipo...',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF0055A5), width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Mostrando ${filtered.length} de ${widget.assets.length} equipos disponibles',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off_rounded, size: 40, color: Colors.grey.shade400),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No se encontraron equipos coincidentes con "$_query"',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1, indent: 56),
+                      itemBuilder: (context, idx) {
+                        final asset = filtered[idx];
+                        final isSelected = asset.id == widget.selectedAssetId;
+                        final hasSerial = asset.serial != null && asset.serial!.isNotEmpty;
+
+                        return Material(
+                          color: isSelected
+                              ? const Color(0xFF0055A5).withValues(alpha: 0.07)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            leading: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF0055A5)
+                                    : const Color(0xFF0055A5).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                asset.id,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? Colors.white : const Color(0xFF0055A5),
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              asset.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: hasSerial
+                                ? Text(
+                                    'Serie: ${asset.serial!}',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                  )
+                                : null,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Builder(builder: (context) {
+                                  final openReport = widget.getOpenReport?.call(asset.id);
+                                  if (openReport == null) return const SizedBox.shrink();
+                                  return Container(
+                                    margin: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: const Color(0xFFF59E0B)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.warning_amber_rounded, size: 12, color: Color(0xFFB45309)),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          'Avería #${openReport.id}',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF92400E),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                                if (isSelected)
+                                  const Icon(Icons.check_circle_rounded,
+                                      color: Color(0xFF0055A5), size: 18)
+                                else
+                                  const Icon(Icons.chevron_right_rounded,
+                                      color: Color(0xFFCBD5E1), size: 18),
+                              ],
+                            ),
+                            onTap: () {
+                              widget.onAssetSelected(asset);
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tarjeta Ejecutiva y Formal de Severidad / Criticidad
+class _SeverityExecutiveCard extends StatelessWidget {
+  const _SeverityExecutiveCard({
+    required this.severity,
+    required this.badgeText,
+    required this.label,
+    required this.desc,
+    required this.icon,
+    required this.accentColor,
+    required this.isSelected,
+    required this.onTap,
+    required this.isDark,
+  });
+
+  final BreakdownSeverity severity;
+  final String badgeText;
+  final String label;
+  final String desc;
+  final IconData icon;
+  final Color accentColor;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? accentColor.withValues(alpha: isDark ? 0.12 : 0.05)
+                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFFAFAFA)),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected
+                  ? accentColor
+                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: accentColor,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                    size: 16,
+                    color: isSelected ? accentColor : const Color(0xFF94A3B8),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(icon, size: 16, color: accentColor),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                desc,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );

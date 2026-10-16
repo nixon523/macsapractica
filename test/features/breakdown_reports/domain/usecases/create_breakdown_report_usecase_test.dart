@@ -28,6 +28,7 @@ void main() {
 
   setUp(() {
     repository = MockBreakdownReportRepository();
+    when(() => repository.getOpenReports()).thenAnswer((_) async => []);
     useCase = CreateBreakdownReportUseCase(repository);
   });
 
@@ -82,6 +83,33 @@ void main() {
         ),
       ),
       throwsA(isA<ValidationFailure>()),
+    );
+  });
+
+  test('no permite crear reporte si el activo ya cuenta con una averia abierta', () async {
+    const existing = BreakdownReport(
+      id: 'REP-001',
+      assetId: 'A1-001',
+      assetName: 'Bomba centrífuga',
+      areaId: 'A1',
+      description: 'Falla anterior',
+      severity: BreakdownSeverity.medium,
+      reportedByUserId: 'u1',
+      reportedByUserName: 'Usuario',
+      reportedAt: null,
+      status: BreakdownReportStatus.reported,
+    );
+    when(() => repository.getOpenReports()).thenAnswer((_) async => [existing]);
+
+    expect(
+      () => useCase(params),
+      throwsA(
+        isA<ValidationFailure>().having(
+          (f) => f.message,
+          'message',
+          contains('ya cuenta con un reporte de avería pendiente'),
+        ),
+      ),
     );
   });
 }

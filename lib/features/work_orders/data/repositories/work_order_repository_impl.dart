@@ -26,6 +26,11 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
   }
 
   @override
+  Future<List<WorkOrder>> getOpenWorkOrders() {
+    return _remoteDataSource.getOpenWorkOrders();
+  }
+
+  @override
   Future<WorkOrder> createWorkOrder({
     required String assetId,
     required String assetName,
