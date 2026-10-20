@@ -194,75 +194,51 @@ class _ReportForm extends StatelessWidget {
                     ),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-                      child: Row(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.assignment_late_outlined,
-                              color: theme.colorScheme.primary,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Reporte de Avería o Incidencia Técnica',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: -0.3,
-                                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                        ),
-                                      ),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF0284C7).withValues(alpha: 0.09),
-                                        borderRadius: BorderRadius.circular(5),
-                                        border: Border.all(
-                                          color: const Color(0xFF0284C7).withValues(alpha: 0.3),
-                                          width: 0.8,
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'Mantenimiento Correctivo',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF0369A1),
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Formulario oficial de notificación de fallas operativas. Las incidencias reportadas alertan de inmediato a la jefatura de mantenimiento y quedan registradas con trazabilidad en la bitácora Kardex.',
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Reporte de Avería o Incidencia Técnica',
                                   style: TextStyle(
-                                    fontSize: 12.5,
-                                    height: 1.4,
-                                    color: secondaryText,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.3,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                                   ),
                                 ),
-                              ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0284C7).withValues(alpha: 0.09),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(
+                                    color: const Color(0xFF0284C7).withValues(alpha: 0.3),
+                                    width: 0.8,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Mantenimiento Correctivo',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0369A1),
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Formulario oficial de notificación de fallas operativas. Las incidencias reportadas alertan de inmediato a la jefatura de mantenimiento y quedan registradas con trazabilidad en la bitácora Kardex.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              height: 1.4,
+                              color: secondaryText,
                             ),
                           ),
                         ],
@@ -348,17 +324,9 @@ class _ReportForm extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: borderColor),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline, size: 17, color: secondaryText),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Selecciona primero un área operativa para desplegar los equipos y maquinarias correspondientes.',
-                                style: TextStyle(fontSize: 12, color: secondaryText),
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'Selecciona primero un área operativa para desplegar los equipos y maquinarias correspondientes.',
+                          style: TextStyle(fontSize: 12, color: secondaryText),
                         ),
                       )
                     else if (vm.isLoadingAssets)
@@ -401,21 +369,13 @@ class _ReportForm extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(color: const Color(0xFFFDE68A)),
                         ),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFD97706)),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'No se encontraron equipos o activos operativos registrados en esta área.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF92400E),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: const Text(
+                          'No se encontraron equipos o activos operativos registrados en esta área.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF92400E),
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       )
                     else
@@ -440,31 +400,22 @@ class _ReportForm extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: const Color(0xFFF59E0B)),
                           ),
-                          child: Row(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.warning_amber_rounded, color: Color(0xFFB45309), size: 22),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Avería activa en este activo (Folio #${pendingReport?.id ?? ""})',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
-                                        color: Color(0xFF92400E),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Text(
-                                      'Este equipo ya cuenta con un reporte de avería en estado "${pendingReport?.statusLabel ?? "Reportada"}". '
-                                      'Por norma operativa, no se puede generar un reporte duplicado del mismo equipo hasta que el actual sea resuelto o rechazado.',
-                                      style: const TextStyle(fontSize: 12, color: Color(0xFF78350F), height: 1.3),
-                                    ),
-                                  ],
+                              Text(
+                                'Avería activa en este activo (Folio #${pendingReport?.id ?? ""})',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Color(0xFF92400E),
                                 ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Este equipo ya cuenta con un reporte de avería en estado "${pendingReport?.statusLabel ?? "Reportada"}". '
+                                'Por norma operativa, no se puede generar un reporte duplicado del mismo equipo hasta que el actual sea resuelto o rechazado.',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF78350F), height: 1.3),
                               ),
                             ],
                           ),
@@ -497,7 +448,6 @@ class _ReportForm extends StatelessWidget {
                             badgeText: 'Nivel 1',
                             label: 'Baja Prioridad',
                             desc: 'Falla leve o ajuste menor. No detiene la operación ni compromete inocuidad.',
-                            icon: Icons.check_circle_outline,
                             accentColor: const Color(0xFF059669),
                             isSelected: vm.severity == BreakdownSeverity.low,
                             onTap: () => vm.setSeverity(BreakdownSeverity.low),
@@ -508,7 +458,6 @@ class _ReportForm extends StatelessWidget {
                             badgeText: 'Nivel 2',
                             label: 'Media / Atención',
                             desc: 'Rendimiento degradado o riesgo potencial. Requiere atención técnica pronta.',
-                            icon: Icons.warning_amber_rounded,
                             accentColor: const Color(0xFFD97706),
                             isSelected: vm.severity == BreakdownSeverity.medium,
                             onTap: () => vm.setSeverity(BreakdownSeverity.medium),
@@ -519,7 +468,6 @@ class _ReportForm extends StatelessWidget {
                             badgeText: 'Nivel 3',
                             label: 'Alta / Urgente',
                             desc: 'Paro total de equipo o línea de producción. Riesgo operativo inminente.',
-                            icon: Icons.error_outline_rounded,
                             accentColor: const Color(0xFFDC2626),
                             isSelected: vm.severity == BreakdownSeverity.high,
                             onTap: () => vm.setSeverity(BreakdownSeverity.high),
@@ -594,17 +542,9 @@ class _ReportForm extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.shield_outlined, size: 14, color: secondaryText),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Esta información servirá como diagnóstico inicial para que el Jefe de Mantenimiento emita y asigne la Orden de Trabajo correspondiente.',
-                            style: TextStyle(fontSize: 11.5, color: secondaryText),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      'Esta información servirá como diagnóstico inicial para que el Jefe de Mantenimiento emita y asigne la Orden de Trabajo correspondiente.',
+                      style: TextStyle(fontSize: 11.5, color: secondaryText),
                     ),
 
                     const SizedBox(height: 32),
@@ -613,7 +553,7 @@ class _ReportForm extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       height: 48,
-                      child: FilledButton.icon(
+                      child: FilledButton(
                         key: const Key('breakdown-submit'),
                         onPressed: (vm.isSubmitting || isAssetBlocked) ? null : onSubmit,
                         style: FilledButton.styleFrom(
@@ -624,7 +564,7 @@ class _ReportForm extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        icon: vm.isSubmitting
+                        child: vm.isSubmitting
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
@@ -633,17 +573,14 @@ class _ReportForm extends StatelessWidget {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Icon(Icons.send_rounded, size: 18),
-                        label: Text(
-                          vm.isSubmitting
-                              ? 'Registrando en bitácora...'
-                              : 'Registrar Reporte de Avería',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
+                            : const Text(
+                                'Registrar Reporte de Avería',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -748,12 +685,6 @@ class _ReportForm extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Icon(
-                  Icons.business_outlined,
-                  size: 20,
-                  color: hasArea ? const Color(0xFF0055A5) : const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 12),
                 if (!hasArea) ...[
                   Expanded(
                     child: Text(
@@ -813,7 +744,7 @@ class _ReportForm extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(width: 8),
-                OutlinedButton.icon(
+                OutlinedButton(
                   onPressed: vm.isLoadingAreas ? null : onTapSearch,
                   style: OutlinedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
@@ -827,8 +758,7 @@ class _ReportForm extends StatelessWidget {
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   ),
-                  icon: const Icon(Icons.search_rounded, size: 16),
-                  label: Text(
+                  child: Text(
                     hasArea ? 'Cambiar' : 'Buscar Área',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                   ),
@@ -872,12 +802,6 @@ class _ReportForm extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Icon(
-                  Icons.settings_suggest_outlined,
-                  size: 20,
-                  color: hasAsset ? const Color(0xFF0055A5) : const Color(0xFF64748B),
-                ),
-                const SizedBox(width: 12),
                 if (!hasAsset) ...[
                   Expanded(
                     child: Text(
@@ -935,7 +859,7 @@ class _ReportForm extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(width: 8),
-                OutlinedButton.icon(
+                OutlinedButton(
                   onPressed: onTapSearch,
                   style: OutlinedButton.styleFrom(
                     visualDensity: VisualDensity.compact,
@@ -949,8 +873,7 @@ class _ReportForm extends StatelessWidget {
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   ),
-                  icon: const Icon(Icons.search_rounded, size: 16),
-                  label: Text(
+                  child: Text(
                     hasAsset ? 'Cambiar' : 'Buscar Equipo',
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                   ),
@@ -1504,7 +1427,6 @@ class _SeverityExecutiveCard extends StatelessWidget {
     required this.badgeText,
     required this.label,
     required this.desc,
-    required this.icon,
     required this.accentColor,
     required this.isSelected,
     required this.onTap,
@@ -1515,7 +1437,6 @@ class _SeverityExecutiveCard extends StatelessWidget {
   final String badgeText;
   final String label;
   final String desc;
-  final IconData icon;
   final Color accentColor;
   final bool isSelected;
   final VoidCallback onTap;
@@ -1573,22 +1494,14 @@ class _SeverityExecutiveCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(icon, size: 16, color: accentColor),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : const Color(0xFF1E293B),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : const Color(0xFF1E293B),
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 6),
               Text(

@@ -990,7 +990,6 @@ class _CleanPreventiveCardState extends State<_CleanPreventiveCard> {
 
     final isPaused = schedule.status == ScheduleStatus.paused;
     final nextDateStr = '${schedule.nextDate.day}/${schedule.nextDate.month}/${schedule.nextDate.year}';
-    final accentColor = isPaused ? Colors.grey.shade400 : alertTextColor;
     final hasActivities = schedule.activities.isNotEmpty;
 
     final cardBg = widget.isDark ? const Color(0xFF1E293B) : Colors.white;
@@ -1005,23 +1004,11 @@ class _CleanPreventiveCardState extends State<_CleanPreventiveCard> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: widget.borderColor, width: 1),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Línea de acento lateral delgada
-              Container(
-                width: 3.5,
-                color: accentColor,
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
                       // Fila 1: ID Monospace + Frecuencia + Componentes + Alert Level / Pausado
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1518,12 +1505,7 @@ class _CleanPreventiveCardState extends State<_CleanPreventiveCard> {
                     ],
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+              );
   }
 }
 

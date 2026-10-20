@@ -133,7 +133,6 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
     final hoursCtrl = TextEditingController(
       text: _currentOrder.estimatedHours != null ? _currentOrder.estimatedHours.toString() : '',
     );
-    final accCtrl = TextEditingController(text: _currentOrder.accHaccpResponsible);
     final mtnCtrl = TextEditingController(text: _currentOrder.maintenanceResponsible);
     final areaHeadCtrl = TextEditingController(text: _currentOrder.areaHeadResponsible);
     final mtnHeadCtrl = TextEditingController(text: _currentOrder.maintenanceHeadResponsible);
@@ -243,19 +242,9 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
                   const Text('Firmas y Responsables:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
                   const SizedBox(height: 8),
                   TextField(
-                    controller: accCtrl,
-                    decoration: InputDecoration(
-                      labelText: '1. Responsable Calidad / HACCP',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      isDense: true,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
                     controller: mtnCtrl,
                     decoration: InputDecoration(
-                      labelText: '2. Responsable Mantenimiento (Ejecutor)',
+                      labelText: '1. Responsable Mantenimiento (Ejecutor)',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       isDense: true,
@@ -265,7 +254,7 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
                   TextField(
                     controller: areaHeadCtrl,
                     decoration: InputDecoration(
-                      labelText: '3. Jefe de Área (Recepción)',
+                      labelText: '2. Jefe de Área (Recepción)',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       isDense: true,
@@ -275,7 +264,7 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
                   TextField(
                     controller: mtnHeadCtrl,
                     decoration: InputDecoration(
-                      labelText: '4. Jefe de Mantenimiento (Aprobación)',
+                      labelText: '3. Jefe de Mantenimiento (Aprobación)',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       isDense: true,
@@ -306,7 +295,6 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
         workDoneDescription: workDoneCtrl.text.trim(),
         isCompleted: isCompleted,
         unfulfillmentReason: !isCompleted ? unfulfillmentCtrl.text.trim() : null,
-        accHaccpResponsible: accCtrl.text.trim(),
         maintenanceResponsible: mtnCtrl.text.trim(),
         areaHeadResponsible: areaHeadCtrl.text.trim(),
         maintenanceHeadResponsible: mtnHeadCtrl.text.trim(),
@@ -656,14 +644,12 @@ class _WorkOrderDetail extends StatelessWidget {
                     ),
                   if (order.unfulfillmentReason != null)
                     _InfoTile(icon: Icons.warning_amber_outlined, label: 'Motivo No Cumplimiento', value: order.unfulfillmentReason!),
-                  if (order.accHaccpResponsible != null && order.accHaccpResponsible!.isNotEmpty)
-                    _InfoTile(icon: Icons.verified_user_outlined, label: '1. Calidad / HACCP', value: order.accHaccpResponsible!),
                   if (order.maintenanceResponsible != null && order.maintenanceResponsible!.isNotEmpty)
-                    _InfoTile(icon: Icons.engineering_outlined, label: '2. Ejecutor Mantenimiento', value: order.maintenanceResponsible!),
+                    _InfoTile(icon: Icons.engineering_outlined, label: '1. Ejecutor Mantenimiento', value: order.maintenanceResponsible!),
                   if (order.areaHeadResponsible != null && order.areaHeadResponsible!.isNotEmpty)
-                    _InfoTile(icon: Icons.person_pin_outlined, label: '3. Jefe de Área', value: order.areaHeadResponsible!),
+                    _InfoTile(icon: Icons.person_pin_outlined, label: '2. Jefe de Área', value: order.areaHeadResponsible!),
                   if (order.maintenanceHeadResponsible != null && order.maintenanceHeadResponsible!.isNotEmpty)
-                    _InfoTile(icon: Icons.admin_panel_settings_outlined, label: '4. Jefe Mantenimiento', value: order.maintenanceHeadResponsible!),
+                    _InfoTile(icon: Icons.admin_panel_settings_outlined, label: '3. Jefe Mantenimiento', value: order.maintenanceHeadResponsible!),
                 ],
               ),
             ),

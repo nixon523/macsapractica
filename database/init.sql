@@ -1537,6 +1537,23 @@ BEGIN
     SET XACT_ABORT ON;
     BEGIN TRY
         BEGIN TRANSACTION;
+
+        -- Validar si el activo ya cuenta con una orden de trabajo pendiente o en progreso
+        IF NULLIF(@AssetCode, '') IS NOT NULL
+        BEGIN
+            DECLARE @OTExistenteId NVARCHAR(20);
+            SELECT TOP 1 @OTExistenteId = OrdenTrabajoId
+              FROM dbo.OrdenTrabajo WITH (UPDLOCK, HOLDLOCK)
+             WHERE CodigoActivo = @AssetCode
+               AND Estado IN (N'pending', N'inProgress', N'in_progress', N'paused');
+
+            IF @OTExistenteId IS NOT NULL
+            BEGIN
+                DECLARE @MsgOT NVARCHAR(250) = CONCAT(N'El activo ', @AssetCode, N' ya cuenta con una orden de trabajo abierta (', @OTExistenteId, N'). Debe concluirse o cancelarse antes de emitir una nueva.');
+                RAISERROR(@MsgOT, 16, 1);
+            END;
+        END;
+
         DECLARE @cCount TABLE (v INT NOT NULL);
         UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
            SET SiguienteNumero += 1

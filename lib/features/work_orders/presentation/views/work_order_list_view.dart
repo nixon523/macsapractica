@@ -9,6 +9,8 @@ import 'work_order_detail_view.dart';
 
 enum _WorkOrderFilter { all, pending, inProgress, completed, cancelled }
 
+enum _WorkOrderTypeFilter { all, preventive, corrective }
+
 /// Vista ejecutiva y formal de Órdenes de Trabajo del Grupo Macsa.
 /// Integra filtros cronológicos con menú desplegable, pestañas con subrayado limpio,
 /// búsqueda en tiempo real y tarjetas de diseño despejado y responsive.
@@ -23,6 +25,7 @@ class WorkOrderListView extends StatefulWidget {
 
 class _WorkOrderListViewState extends State<WorkOrderListView> {
   _WorkOrderFilter _filter = _WorkOrderFilter.all;
+  _WorkOrderTypeFilter _typeFilter = _WorkOrderTypeFilter.all;
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = '';
   DateTime? _startDate;
@@ -183,9 +186,17 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
   }
 
   List<WorkOrder> _filterOrders(List<WorkOrder> orders) {
-    if (_searchQuery.isEmpty) return orders;
+    var result = orders;
 
-    return orders.where((order) {
+    if (_typeFilter == _WorkOrderTypeFilter.preventive) {
+      result = result.where((order) => order.isPreventive).toList();
+    } else if (_typeFilter == _WorkOrderTypeFilter.corrective) {
+      result = result.where((order) => order.isCorrective).toList();
+    }
+
+    if (_searchQuery.isEmpty) return result;
+
+    return result.where((order) {
       final id = order.id.toLowerCase();
       final assetName = order.assetName.toLowerCase();
       final assetId = order.assetId.toLowerCase();
@@ -304,6 +315,8 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
                       Row(
                         children: [
                           Expanded(child: _buildDateMenuButton(isDark, borderColor)),
+                          const SizedBox(width: 8),
+                          Expanded(child: _buildTypeMenuButton(isDark, borderColor)),
                         ],
                       ),
                     ],
@@ -311,8 +324,10 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
                 : Row(
                     children: [
                       Expanded(child: _buildSearchField(isDark, borderColor)),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       _buildDateMenuButton(isDark, borderColor),
+                      const SizedBox(width: 8),
+                      _buildTypeMenuButton(isDark, borderColor),
                       if (canCreate) ...[
                         const SizedBox(width: 12),
                         FilledButton.icon(
@@ -486,6 +501,123 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
     );
   }
 
+  /// Menú desplegable para filtrar por Tipo de Orden de Trabajo (Preventiva vs Correctiva)
+  Widget _buildTypeMenuButton(bool isDark, Color borderColor) {
+    final isFiltered = _typeFilter != _WorkOrderTypeFilter.all;
+
+    return PopupMenuButton<_WorkOrderTypeFilter>(
+      initialValue: _typeFilter,
+      onSelected: (val) {
+        if (_typeFilter == val) return;
+        setState(() => _typeFilter = val);
+      },
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      itemBuilder: (ctx) => [
+        _buildTypePopupItem(
+          _WorkOrderTypeFilter.all,
+          'Todos los tipos',
+          Icons.layers_outlined,
+          const Color(0xFF0055A5),
+        ),
+        _buildTypePopupItem(
+          _WorkOrderTypeFilter.preventive,
+          'Preventivas (PM)',
+          Icons.event_note_outlined,
+          const Color(0xFF2563EB),
+        ),
+        _buildTypePopupItem(
+          _WorkOrderTypeFilter.corrective,
+          'Correctivas (Averías)',
+          Icons.report_problem_outlined,
+          const Color(0xFFEA580C),
+        ),
+      ],
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: BoxDecoration(
+          color: isFiltered
+              ? (isDark
+                  ? const Color(0xFF0055A5).withValues(alpha: 0.2)
+                  : const Color(0xFF0055A5).withValues(alpha: 0.08))
+              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isFiltered ? const Color(0xFF0055A5) : borderColor,
+            width: isFiltered ? 1.2 : 0.9,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              switch (_typeFilter) {
+                _WorkOrderTypeFilter.all => Icons.filter_alt_outlined,
+                _WorkOrderTypeFilter.preventive => Icons.event_note_outlined,
+                _WorkOrderTypeFilter.corrective => Icons.report_problem_outlined,
+              },
+              size: 15,
+              color: switch (_typeFilter) {
+                _WorkOrderTypeFilter.all => const Color(0xFF0055A5),
+                _WorkOrderTypeFilter.preventive => const Color(0xFF2563EB),
+                _WorkOrderTypeFilter.corrective => const Color(0xFFEA580C),
+              },
+            ),
+            const SizedBox(width: 8),
+            Text(
+              switch (_typeFilter) {
+                _WorkOrderTypeFilter.all => 'Tipo de OT',
+                _WorkOrderTypeFilter.preventive => 'Preventivas',
+                _WorkOrderTypeFilter.corrective => 'Correctivas',
+              },
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isFiltered ? FontWeight.w700 : FontWeight.w600,
+                color: isFiltered
+                    ? const Color(0xFF0055A5)
+                    : (isDark ? Colors.white : const Color(0xFF1E293B)),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF94A3B8)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<_WorkOrderTypeFilter> _buildTypePopupItem(
+    _WorkOrderTypeFilter value,
+    String text,
+    IconData icon,
+    Color activeColor,
+  ) {
+    final isSelected = _typeFilter == value;
+
+    return PopupMenuItem<_WorkOrderTypeFilter>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: isSelected ? activeColor : const Color(0xFF64748B)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? activeColor : null,
+              ),
+            ),
+          ),
+          if (isSelected)
+            Icon(Icons.check_rounded, size: 16, color: activeColor),
+        ],
+      ),
+    );
+  }
+
   /// Pestaña con barra inferior activa (Modern Underline Tab)
   Widget _buildCleanTab({
     required _WorkOrderFilter filter,
@@ -609,7 +741,9 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
               Text(
                 _searchQuery.isNotEmpty
                     ? 'Sin resultados para "$_searchQuery"'
-                    : 'No hay órdenes de trabajo en este periodo.',
+                    : (_typeFilter != _WorkOrderTypeFilter.all
+                        ? 'No hay órdenes ${_typeFilter == _WorkOrderTypeFilter.preventive ? "preventivas" : "correctivas"} en este periodo.'
+                        : 'No hay órdenes de trabajo en este periodo.'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14.5,
@@ -621,14 +755,24 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
               Text(
                 _searchQuery.isNotEmpty
                     ? 'Intenta con otro término o limpia la barra de búsqueda.'
-                    : 'Prueba cambiando el rango de fechas en el selector superior.',
+                    : (_typeFilter != _WorkOrderTypeFilter.all
+                        ? 'Prueba cambiando el tipo de OT o el rango de fechas.'
+                        : 'Prueba cambiando el rango de fechas en el selector superior.'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12,
                   color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                 ),
               ),
-              if (_selectedPreset != 'todo') ...[
+              if (_typeFilter != _WorkOrderTypeFilter.all) ...[
+                const SizedBox(height: 14),
+                TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF0055A5)),
+                  onPressed: () => setState(() => _typeFilter = _WorkOrderTypeFilter.all),
+                  icon: const Icon(Icons.layers_clear_outlined, size: 16),
+                  label: const Text('Ver todos los tipos', style: TextStyle(fontSize: 12.5)),
+                ),
+              ] else if (_selectedPreset != 'todo') ...[
                 const SizedBox(height: 14),
                 TextButton.icon(
                   style: TextButton.styleFrom(
@@ -693,6 +837,52 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
               color: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
           ),
+          if (_typeFilter != _WorkOrderTypeFilter.all) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: _typeFilter == _WorkOrderTypeFilter.preventive
+                    ? const Color(0xFFEFF6FF)
+                    : const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: _typeFilter == _WorkOrderTypeFilter.preventive
+                      ? const Color(0xFF2563EB).withValues(alpha: 0.3)
+                      : const Color(0xFFEA580C).withValues(alpha: 0.3),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _typeFilter == _WorkOrderTypeFilter.preventive
+                        ? 'Preventivas'
+                        : 'Correctivas',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: _typeFilter == _WorkOrderTypeFilter.preventive
+                          ? const Color(0xFF2563EB)
+                          : const Color(0xFFEA580C),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  InkWell(
+                    onTap: () => setState(() => _typeFilter = _WorkOrderTypeFilter.all),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 12,
+                      color: _typeFilter == _WorkOrderTypeFilter.preventive
+                          ? const Color(0xFF2563EB)
+                          : const Color(0xFFEA580C),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const Spacer(),
           Text(
             'Orden cronológico',
@@ -789,27 +979,11 @@ class _CleanWorkOrderCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(10),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Línea de acento lateral delgada
-                Container(
-                  width: 3.5,
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(10),
-                      bottomLeft: Radius.circular(10),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
                         // Fila 1: ID OT + Badges de Tipo y Prioridad + Estado
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1032,11 +1206,7 @@ class _CleanWorkOrderCard extends StatelessWidget {
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+              ),
+            );
   }
 }

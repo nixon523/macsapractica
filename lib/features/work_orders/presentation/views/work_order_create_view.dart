@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
+import '../../../assets/domain/entities/area.dart';
+import '../../../assets/domain/entities/asset.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../breakdown_reports/domain/entities/breakdown_report.dart';
 import '../../domain/entities/work_order.dart';
@@ -36,8 +38,12 @@ class _WorkOrderCreateViewState extends State<WorkOrderCreateView> {
     super.initState();
     if (widget.preventiveSchedule != null) {
       _viewModel.initFromPreventiveSchedule(widget.preventiveSchedule);
-    } else {
+      _viewModel.loadOpenWorkOrders();
+    } else if (widget.report != null) {
       _viewModel.initFromReport(widget.report);
+      _viewModel.loadOpenWorkOrders();
+    } else {
+      _viewModel.loadAreas();
     }
   }
 
@@ -161,9 +167,6 @@ class _WorkOrderCreateForm extends StatefulWidget {
 }
 
 class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
-  late final TextEditingController _assetIdCtrl;
-  late final TextEditingController _assetNameCtrl;
-  late final TextEditingController _areaIdCtrl;
   late final TextEditingController _descriptionCtrl;
   late final TextEditingController _assignedToCtrl;
   late final TextEditingController _assignedStaffCountCtrl;
@@ -177,9 +180,6 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
   void initState() {
     super.initState();
     final vm = widget.viewModel;
-    _assetIdCtrl = TextEditingController(text: vm.assetId);
-    _assetNameCtrl = TextEditingController(text: vm.assetName);
-    _areaIdCtrl = TextEditingController(text: vm.areaId);
     _descriptionCtrl = TextEditingController(text: vm.description);
     _assignedToCtrl = TextEditingController(text: vm.assignedTo);
     _assignedStaffCountCtrl = TextEditingController(
@@ -192,9 +192,6 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
 
   @override
   void dispose() {
-    _assetIdCtrl.dispose();
-    _assetNameCtrl.dispose();
-    _areaIdCtrl.dispose();
     _descriptionCtrl.dispose();
     _assignedToCtrl.dispose();
     _assignedStaffCountCtrl.dispose();
@@ -376,84 +373,173 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
               ),
               const SizedBox(height: 16),
 
-              // Fila de Activo (ID y Nombre)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isCompact = constraints.maxWidth < 500;
-                  final assetIdField = TextField(
-                    key: const Key('ot-asset-id'),
-                    enabled: !isFromReport && !isFromPreventive,
-                    controller: _assetIdCtrl,
-                    onChanged: vm.setAssetId,
-                    style: const TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w600),
-                    decoration: InputDecoration(
-                      labelText: 'ID DEL ACTIVO *',
-                      labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5),
-                      hintText: 'Ej: A003-001',
-                      prefixIcon: const Icon(Icons.tag_rounded, size: 18),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    ),
-                  );
-
-                  final assetNameField = TextField(
-                    key: const Key('ot-asset-name'),
-                    enabled: !isFromReport && !isFromPreventive,
-                    controller: _assetNameCtrl,
-                    onChanged: vm.setAssetName,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      labelText: 'NOMBRE DEL EQUIPO',
-                      labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5),
-                      hintText: 'Nombre de máquina o componente',
-                      prefixIcon: const Icon(Icons.precision_manufacturing_outlined, size: 18),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    ),
-                  );
-
-                  if (isCompact) {
-                    return Column(
-                      children: [
-                        assetIdField,
-                        const SizedBox(height: 10),
-                        assetNameField,
-                      ],
-                    );
-                  }
-
-                  return Row(
-                    children: [
-                      Expanded(flex: 2, child: assetIdField),
-                      const SizedBox(width: 12),
-                      Expanded(flex: 3, child: assetNameField),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // Campo de Área
-              TextField(
-                controller: _areaIdCtrl,
-                enabled: !isFromReport && !isFromPreventive,
-                onChanged: vm.setAreaId,
-                style: const TextStyle(fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'ÁREA DE UBICACIÓN OPERATIVA',
-                  labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5),
-                  hintText: 'Ej: A003 o CLASIFICADO',
-                  prefixIcon: const Icon(Icons.business_outlined, size: 18),
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              // 1. Selector de Área Operativa
+              const Text(
+                'ÁREA OPERATIVA DE UBICACIÓN *',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: Color(0xFF475569),
                 ),
               ),
+              const SizedBox(height: 8),
+
+              if (isFromReport || isFromPreventive)
+                _buildReadOnlyAreaCard(
+                  areaId: vm.areaId,
+                  areaName: vm.areaName,
+                  isDark: isDark,
+                  borderColor: borderColor,
+                )
+              else
+                _buildAreaSelectorCard(
+                  context: context,
+                  theme: theme,
+                  vm: vm,
+                  isDark: isDark,
+                  borderColor: borderColor,
+                  onTapSearch: () => _openAreaSearchModal(context, vm),
+                ),
+
+              const SizedBox(height: 18),
+
+              // 2. Selector de Activo / Equipo Afectado
+              const Text(
+                'ACTIVO O EQUIPO AFECTADO *',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                  color: Color(0xFF475569),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              if (isFromReport || isFromPreventive)
+                _buildReadOnlyAssetCard(
+                  assetId: vm.assetId,
+                  assetName: vm.assetName,
+                  isDark: isDark,
+                  borderColor: borderColor,
+                )
+              else if (vm.areaId.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: Text(
+                    'Selecciona primero un área operativa para desplegar los equipos correspondientes.',
+                    style: TextStyle(fontSize: 12, color: secondaryText),
+                  ),
+                )
+              else if (vm.isLoadingAssets)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Consultando catálogo de equipos del área ${vm.areaName.isNotEmpty ? vm.areaName : vm.areaId}...',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (vm.assets.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: const Text(
+                    'No se encontraron equipos registrados en esta área.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF92400E),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )
+              else
+                _buildAssetSelectorCard(
+                  context: context,
+                  theme: theme,
+                  vm: vm,
+                  isDark: isDark,
+                  borderColor: borderColor,
+                  onTapSearch: () => _openAssetSearchModal(context, vm),
+                ),
+
+              if (vm.isAssetPending(vm.assetId)) ...[
+                const SizedBox(height: 10),
+                Builder(builder: (context) {
+                  final pendingWo = vm.getOpenWorkOrderForAsset(vm.assetId);
+                  final statusLabel = pendingWo?.status == WorkOrderStatus.inProgress
+                      ? 'En Progreso'
+                      : 'Pendiente';
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFF59E0B)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFB45309)),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Orden de trabajo activa en este activo (${pendingWo?.id ?? ""})',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Color(0xFF92400E),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Este equipo ya cuenta con la orden de trabajo ${pendingWo?.id ?? ""} en estado "$statusLabel". '
+                          'Por norma operativa de mantenimiento, no se permite crear una nueva orden de trabajo sobre el mismo equipo hasta que la actual sea completada o cancelada.',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF78350F), height: 1.3),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+
               const SizedBox(height: 18),
 
               // Selector de Naturaleza (Correctivo vs Preventivo)
@@ -982,10 +1068,12 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
                 height: 48,
                 child: FilledButton.icon(
                   key: const Key('ot-submit'),
-                  onPressed: vm.isSubmitting ? null : widget.onSubmit,
+                  onPressed: (vm.isSubmitting || vm.isAssetPending(vm.assetId)) ? null : widget.onSubmit,
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF0055A5),
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    disabledForegroundColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -1000,11 +1088,15 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
                             color: Colors.white,
                           ),
                         )
-                      : const Icon(Icons.assignment_turned_in_outlined, size: 20),
+                      : (vm.isAssetPending(vm.assetId)
+                          ? const Icon(Icons.block_rounded, size: 20)
+                          : const Icon(Icons.assignment_turned_in_outlined, size: 20)),
                   label: Text(
                     vm.isSubmitting
                         ? 'Emitiendo Orden de Trabajo...'
-                        : 'Emitir Orden de Trabajo (REG.GMC-MTN-001)',
+                        : (vm.isAssetPending(vm.assetId)
+                            ? 'Activo con OT Pendiente (${vm.getOpenWorkOrderForAsset(vm.assetId)?.id ?? ""})'
+                            : 'Emitir Orden de Trabajo (REG.GMC-MTN-001)'),
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.2),
                   ),
                 ),
@@ -1076,6 +1168,357 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
       ],
     );
   }
+
+  Widget _buildReadOnlyAreaCard({
+    required String areaId,
+    required String areaName,
+    required bool isDark,
+    required Color borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: const Color(0xFF0055A5).withValues(alpha: 0.25),
+                width: 0.8,
+              ),
+            ),
+            child: Text(
+              areaId.isNotEmpty ? areaId : 'N/A',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0055A5),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              areaName.isNotEmpty ? areaName : areaId,
+              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyAssetCard({
+    required String assetId,
+    required String assetName,
+    required bool isDark,
+    required Color borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(
+                color: const Color(0xFF0055A5).withValues(alpha: 0.25),
+                width: 0.8,
+              ),
+            ),
+            child: Text(
+              assetId.isNotEmpty ? assetId : 'N/A',
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF0055A5),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              assetName.isNotEmpty ? assetName : assetId,
+              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAreaSelectorCard({
+    required BuildContext context,
+    required ThemeData theme,
+    required WorkOrderCreateViewModel vm,
+    required bool isDark,
+    required Color borderColor,
+    required VoidCallback onTapSearch,
+  }) {
+    final hasArea = vm.areaId.isNotEmpty;
+    final selectedArea = vm.areas.where((a) => a.id == vm.areaId).firstOrNull;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: hasArea ? const Color(0xFF0055A5).withValues(alpha: 0.6) : borderColor,
+          width: hasArea ? 1.2 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: vm.isLoadingAreas ? null : onTapSearch,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                if (!hasArea) ...[
+                  Expanded(
+                    child: Text(
+                      vm.isLoadingAreas
+                          ? 'Cargando catálogo de áreas...'
+                          : 'Buscar o seleccionar área operativa...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: const Color(0xFF64748B).withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: const Color(0xFF0055A5).withValues(alpha: 0.25),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      vm.areaId,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0055A5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          vm.areaName.isNotEmpty ? vm.areaName : vm.areaId,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (selectedArea != null && selectedArea.costCenter.isNotEmpty)
+                          Text(
+                            'Centro de Costos: ${selectedArea.costCenter}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: vm.isLoadingAreas ? null : onTapSearch,
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: const Color(0xFF0055A5),
+                    side: BorderSide(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.3),
+                      width: 0.9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                  child: Text(
+                    hasArea ? 'Cambiar' : 'Buscar Área',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssetSelectorCard({
+    required BuildContext context,
+    required ThemeData theme,
+    required WorkOrderCreateViewModel vm,
+    required bool isDark,
+    required Color borderColor,
+    required VoidCallback onTapSearch,
+  }) {
+    final hasAsset = vm.assetId.isNotEmpty;
+    final selectedAsset = vm.assets.where((a) => a.id == vm.assetId).firstOrNull;
+    final serial = selectedAsset?.serial;
+    final hasSerial = serial != null && serial.isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: vm.isAssetPending(vm.assetId)
+              ? const Color(0xFFF59E0B)
+              : (hasAsset ? const Color(0xFF0055A5).withValues(alpha: 0.6) : borderColor),
+          width: hasAsset ? 1.2 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTapSearch,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                if (!hasAsset) ...[
+                  Expanded(
+                    child: Text(
+                      'Buscar o seleccionar equipo (${vm.assets.length} disponibles)...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: const Color(0xFF64748B).withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: const Color(0xFF0055A5).withValues(alpha: 0.25),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      vm.assetId,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0055A5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          vm.assetName.isNotEmpty ? vm.assetName : vm.assetId,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (hasSerial)
+                          Text(
+                            'Serie: $serial',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: onTapSearch,
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: const Color(0xFF0055A5),
+                    side: BorderSide(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.3),
+                      width: 0.9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                  child: Text(
+                    hasAsset ? 'Cambiar' : 'Buscar Equipo',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openAreaSearchModal(BuildContext context, WorkOrderCreateViewModel vm) {
+    showDialog(
+      context: context,
+      builder: (_) => _AreaSearchDialog(
+        areas: vm.areas,
+        selectedAreaId: vm.areaId,
+        onAreaSelected: (area) => vm.selectArea(area.id, areaName: area.name),
+      ),
+    );
+  }
+
+  void _openAssetSearchModal(BuildContext context, WorkOrderCreateViewModel vm) {
+    showDialog(
+      context: context,
+      builder: (_) => _AssetSearchDialog(
+        assets: vm.assets,
+        selectedAssetId: vm.assetId,
+        getOpenWorkOrder: vm.getOpenWorkOrderForAsset,
+        onAssetSelected: vm.selectAsset,
+      ),
+    );
+  }
 }
 
 /// Tarjeta de Prioridad Ejecutiva
@@ -1142,6 +1585,537 @@ class _PriorityOptionCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Diálogo Modal Ejecutivo para Búsqueda en Tiempo Real de Áreas Operativas
+class _AreaSearchDialog extends StatefulWidget {
+  const _AreaSearchDialog({
+    required this.areas,
+    required this.selectedAreaId,
+    required this.onAreaSelected,
+  });
+
+  final List<Area> areas;
+  final String? selectedAreaId;
+  final ValueChanged<Area> onAreaSelected;
+
+  @override
+  State<_AreaSearchDialog> createState() => _AreaSearchDialogState();
+}
+
+class _AreaSearchDialogState extends State<_AreaSearchDialog> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  String _clean(String input) {
+    return input
+        .toLowerCase()
+        .trim()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cleanQuery = _clean(_query);
+
+    final filtered = widget.areas.where((a) {
+      if (cleanQuery.isEmpty) return true;
+      final idClean = _clean(a.id);
+      final nameClean = _clean(a.name);
+      final ccClean = _clean(a.costCenter);
+      return idClean.contains(cleanQuery) ||
+          nameClean.contains(cleanQuery) ||
+          ccClean.contains(cleanQuery);
+    }).toList();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 600),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.business_outlined,
+                      color: Color(0xFF0055A5),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Seleccionar Área Operativa',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        Text(
+                          'Filtra por código (ej. A003) o por nombre de área',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (val) => setState(() => _query = val),
+                decoration: InputDecoration(
+                  hintText: 'Escribe el código o nombre del área...',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF0055A5), width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Mostrando ${filtered.length} de ${widget.areas.length} áreas operativas',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off_rounded, size: 40, color: Colors.grey.shade400),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No se encontraron áreas coincidentes con "$_query"',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1, indent: 56),
+                      itemBuilder: (context, idx) {
+                        final area = filtered[idx];
+                        final isSelected = area.id == widget.selectedAreaId;
+
+                        return Material(
+                          color: isSelected
+                              ? const Color(0xFF0055A5).withValues(alpha: 0.07)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            leading: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF0055A5)
+                                    : const Color(0xFF0055A5).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                area.id,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? Colors.white : const Color(0xFF0055A5),
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              area.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: area.costCenter.isNotEmpty
+                                ? Text(
+                                    'CC: ${area.costCenter}',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                  )
+                                : null,
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle_rounded,
+                                    color: Color(0xFF0055A5), size: 18)
+                                : const Icon(Icons.chevron_right_rounded,
+                                    color: Color(0xFFCBD5E1), size: 18),
+                            onTap: () {
+                              widget.onAreaSelected(area);
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Diálogo Modal Ejecutivo para Búsqueda en Tiempo Real de Equipos / Activos
+class _AssetSearchDialog extends StatefulWidget {
+  const _AssetSearchDialog({
+    required this.assets,
+    required this.selectedAssetId,
+    required this.onAssetSelected,
+    this.getOpenWorkOrder,
+  });
+
+  final List<Asset> assets;
+  final String? selectedAssetId;
+  final ValueChanged<Asset> onAssetSelected;
+  final WorkOrder? Function(String assetId)? getOpenWorkOrder;
+
+  @override
+  State<_AssetSearchDialog> createState() => _AssetSearchDialogState();
+}
+
+class _AssetSearchDialogState extends State<_AssetSearchDialog> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  String _clean(String input) {
+    return input
+        .toLowerCase()
+        .trim()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cleanQuery = _clean(_query);
+
+    final filtered = widget.assets.where((a) {
+      if (cleanQuery.isEmpty) return true;
+      final idClean = _clean(a.id);
+      final nameClean = _clean(a.name);
+      final serialClean = _clean(a.serial ?? '');
+      return idClean.contains(cleanQuery) ||
+          nameClean.contains(cleanQuery) ||
+          serialClean.contains(cleanQuery);
+    }).toList();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 580, maxHeight: 600),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.settings_suggest_outlined,
+                      color: Color(0xFF0055A5),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Seleccionar Equipo Afectado',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        Text(
+                          'Filtra por código de activo, nombre de equipo o serie',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (val) => setState(() => _query = val),
+                decoration: InputDecoration(
+                  hintText: 'Escribe el código, nombre o serie...',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF0055A5), width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Mostrando ${filtered.length} de ${widget.assets.length} equipos disponibles',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off_rounded, size: 40, color: Colors.grey.shade400),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No se encontraron equipos coincidentes con "$_query"',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1, indent: 56),
+                      itemBuilder: (context, idx) {
+                        final asset = filtered[idx];
+                        final isSelected = asset.id == widget.selectedAssetId;
+                        final hasSerial = asset.serial != null && asset.serial!.isNotEmpty;
+
+                        return Material(
+                          color: isSelected
+                              ? const Color(0xFF0055A5).withValues(alpha: 0.07)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(6),
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                            leading: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFF0055A5)
+                                    : const Color(0xFF0055A5).withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                asset.id,
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? Colors.white : const Color(0xFF0055A5),
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              asset.name,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: hasSerial
+                                ? Text(
+                                    'Serie: ${asset.serial!}',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                                  )
+                                : null,
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Builder(builder: (context) {
+                                  final openWo = widget.getOpenWorkOrder?.call(asset.id);
+                                  if (openWo == null) return const SizedBox.shrink();
+                                  return Container(
+                                    margin: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF3C7),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: const Color(0xFFF59E0B)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.warning_amber_rounded, size: 12, color: Color(0xFFB45309)),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          'OT: ${openWo.id}',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF92400E),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                                if (isSelected)
+                                  const Icon(Icons.check_circle_rounded,
+                                      color: Color(0xFF0055A5), size: 18)
+                                else
+                                  const Icon(Icons.chevron_right_rounded,
+                                      color: Color(0xFFCBD5E1), size: 18),
+                              ],
+                            ),
+                            onTap: () {
+                              widget.onAssetSelected(asset);
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );

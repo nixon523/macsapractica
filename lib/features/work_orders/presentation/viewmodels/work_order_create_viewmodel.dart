@@ -2,12 +2,18 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../app/di/get_it.dart';
 import '../../../../core/error/failures.dart';
+import '../../../../core/usecases/usecase.dart';
+import '../../../assets/domain/entities/area.dart';
+import '../../../assets/domain/entities/asset.dart';
+import '../../../assets/domain/usecases/get_areas_usecase.dart';
+import '../../../assets/domain/usecases/get_assets_by_area.dart';
 import '../../../breakdown_reports/domain/entities/breakdown_report.dart';
 import '../../../breakdown_reports/domain/usecases/link_breakdown_to_work_order.dart';
 import '../../../breakdown_reports/presentation/viewmodels/breakdown_alerts_viewmodel.dart';
 import '../../../breakdown_reports/presentation/viewmodels/my_reports_notifications_viewmodel.dart';
 import '../../../preventive_schedules/domain/repositories/preventive_schedule_repository.dart';
 import '../../domain/entities/work_order.dart';
+import '../../domain/repositories/work_order_repository.dart';
 import '../../domain/usecases/create_work_order.dart';
 import 'work_order_alerts_viewmodel.dart';
 
@@ -28,11 +34,35 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
   WorkOrderCreateViewModel({
     required CreateWorkOrderUseCase createWorkOrderUseCase,
     required LinkBreakdownToWorkOrderUseCase linkBreakdownToWorkOrderUseCase,
+    GetAreasUseCase? getAreasUseCase,
+    GetAssetsByAreaUseCase? getAssetsByAreaUseCase,
+    WorkOrderRepository? workOrderRepository,
   })  : _createWorkOrderUseCase = createWorkOrderUseCase,
-        _linkBreakdownToWorkOrderUseCase = linkBreakdownToWorkOrderUseCase;
+        _linkBreakdownToWorkOrderUseCase = linkBreakdownToWorkOrderUseCase,
+        _getAreasUseCase = getAreasUseCase ??
+            (getIt.isRegistered<GetAreasUseCase>() ? getIt<GetAreasUseCase>() : null),
+        _getAssetsByAreaUseCase = getAssetsByAreaUseCase ??
+            (getIt.isRegistered<GetAssetsByAreaUseCase>() ? getIt<GetAssetsByAreaUseCase>() : null),
+        _workOrderRepository = workOrderRepository ??
+            (getIt.isRegistered<WorkOrderRepository>() ? getIt<WorkOrderRepository>() : null);
 
   final CreateWorkOrderUseCase _createWorkOrderUseCase;
   final LinkBreakdownToWorkOrderUseCase _linkBreakdownToWorkOrderUseCase;
+  final GetAreasUseCase? _getAreasUseCase;
+  final GetAssetsByAreaUseCase? _getAssetsByAreaUseCase;
+  final WorkOrderRepository? _workOrderRepository;
+
+  List<Area> _areas = const [];
+  List<Area> get areas => _areas;
+
+  List<Asset> _assets = const [];
+  List<Asset> get assets => _assets;
+
+  bool _isLoadingAreas = false;
+  bool get isLoadingAreas => _isLoadingAreas;
+
+  bool _isLoadingAssets = false;
+  bool get isLoadingAssets => _isLoadingAssets;
 
   BreakdownReport? _report;
   BreakdownReport? get report => _report;
@@ -57,6 +87,96 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
 
   String _assignedTo = '';
   String get assignedTo => _assignedTo;
+
+  List<WorkOrder> _openWorkOrders = const [];
+  List<WorkOrder> get openWorkOrders => _openWorkOrders;
+
+  WorkOrder? getOpenWorkOrderForAsset(String assetId) {
+    final clean = assetId.trim();
+    if (clean.isEmpty) return null;
+    return _openWorkOrders.where((wo) {
+      if (wo.assetId.trim() != clean) return false;
+      return wo.status == WorkOrderStatus.pending || wo.status == WorkOrderStatus.inProgress;
+    }).firstOrNull;
+  }
+
+  bool isAssetPending(String assetId) => getOpenWorkOrderForAsset(assetId) != null;
+
+  Future<void> loadOpenWorkOrders() async {
+    if (_workOrderRepository == null) return;
+    try {
+      final list = await _workOrderRepository.getOpenWorkOrders();
+      _openWorkOrders = list.where((wo) =>
+        wo.status == WorkOrderStatus.pending || wo.status == WorkOrderStatus.inProgress
+      ).toList();
+      notifyListeners();
+    } catch (_) {
+      try {
+        final list = await _workOrderRepository.getAllWorkOrders();
+        _openWorkOrders = list.where((wo) =>
+          wo.status == WorkOrderStatus.pending || wo.status == WorkOrderStatus.inProgress
+        ).toList();
+        notifyListeners();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> loadAreas() async {
+    if (_getAreasUseCase == null) {
+      await loadOpenWorkOrders();
+      return;
+    }
+    _isLoadingAreas = true;
+    _errorMessage = '';
+    notifyListeners();
+    try {
+      _areas = await _getAreasUseCase(const NoParams());
+    } catch (_) {
+    } finally {
+      _isLoadingAreas = false;
+      notifyListeners();
+    }
+    await loadOpenWorkOrders();
+  }
+
+  Future<void> selectArea(String areaId, {String? areaName}) async {
+    _areaId = areaId;
+    _areaName = areaName ?? _areas.where((a) => a.id == areaId).firstOrNull?.name ?? areaId;
+    _assetId = '';
+    _assetName = '';
+    _assets = const [];
+    _errorMessage = '';
+    notifyListeners();
+
+    if (_getAssetsByAreaUseCase != null) {
+      _isLoadingAssets = true;
+      notifyListeners();
+      try {
+        _assets = await _getAssetsByAreaUseCase(GetAssetsByAreaParams(areaId: areaId));
+      } catch (_) {
+      } finally {
+        _isLoadingAssets = false;
+        notifyListeners();
+      }
+    }
+    await loadOpenWorkOrders();
+  }
+
+  void selectAsset(Asset asset) {
+    _assetId = asset.id;
+    _assetName = asset.name;
+    if (asset.areaId.isNotEmpty && _areaId.isEmpty) {
+      _areaId = asset.areaId;
+    }
+    if (isAssetPending(asset.id)) {
+      final existing = getOpenWorkOrderForAsset(asset.id);
+      _errorMessage =
+          'El activo "${asset.name}" ya cuenta con la orden de trabajo ${existing?.id ?? ""} en estado pendiente/en progreso. No se puede crear una nueva orden.';
+    } else {
+      _errorMessage = '';
+    }
+    notifyListeners();
+  }
 
   int? _assignedStaffCount;
   int? get assignedStaffCount => _assignedStaffCount;
@@ -107,6 +227,7 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
       }
     }
     notifyListeners();
+    loadOpenWorkOrders();
   }
 
   void initFromPreventiveSchedule(dynamic schedule) {
@@ -166,10 +287,18 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
       _estimatedHours = (schedule.estimatedHours as num).toDouble();
     }
     notifyListeners();
+    loadOpenWorkOrders();
   }
 
   void setAssetId(String value) {
     _assetId = value.trim();
+    if (_assetId.isNotEmpty && isAssetPending(_assetId)) {
+      final existing = getOpenWorkOrderForAsset(_assetId);
+      _errorMessage =
+          'El activo seleccionado ya cuenta con la orden de trabajo ${existing?.id ?? ""} en estado pendiente o en progreso. No se puede crear una orden duplicada.';
+    } else {
+      _errorMessage = '';
+    }
     notifyListeners();
   }
 
@@ -248,6 +377,13 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
     }
     if (_assetId.isEmpty) {
       _errorMessage = 'Indica el ID del activo.';
+      notifyListeners();
+      return null;
+    }
+    if (isAssetPending(_assetId)) {
+      final existing = getOpenWorkOrderForAsset(_assetId);
+      _errorMessage =
+          'El activo seleccionado ya cuenta con la orden de trabajo ${existing?.id ?? ""} en estado pendiente o en progreso. Debe concluirse o cancelarse antes de emitir una nueva.';
       notifyListeners();
       return null;
     }

@@ -693,27 +693,11 @@ class _CleanMyReportCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: borderColor, width: 1),
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Borde lateral ultra-fino de severidad
-            Container(
-              width: 3.5,
-              decoration: BoxDecoration(
-                color: sevColor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(10),
-                  bottomLeft: Radius.circular(10),
-                ),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
                     // Fila 1: Código, Nombre de Equipo, Criticidad y Estado
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -881,10 +865,6 @@ class _CleanMyReportCard extends StatelessWidget {
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
+            );
   }
 }

@@ -4,6 +4,11 @@
 
 ---
 
+## [2026-10-20] 2026-10-20_blindaje_ot_abierta_activo.sql
+- Actualiza `dbo.uspOrdenTrabajoCrear` con validación estricta de OT previa abierta por activo.
+- Rechaza creación de OT si el equipo tiene una orden en estado `pending`, `inProgress` o `paused`.
+- Asigna permisos de ejecución a `macsa_app`.
+
 ## [2026-09-28] init.sql — Carga Inicial
 - Estructura completa de la base de datos (tablas, SPs, índices)
 - Datos seed iniciales (roles, permisos, área raíz)

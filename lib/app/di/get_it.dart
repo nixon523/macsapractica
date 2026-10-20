@@ -104,7 +104,6 @@ import '../../features/work_orders/presentation/viewmodels/work_order_alerts_vie
 import '../../features/work_orders/presentation/viewmodels/work_order_create_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_detail_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_list_viewmodel.dart';
-import '../../core/notifications/notification_queue.dart';
 import '../../features/operation_reports/data/datasources/operation_report_remote_datasource.dart';
 import '../../features/operation_reports/data/repositories/operation_report_repository_impl.dart';
 import '../../features/operation_reports/domain/repositories/operation_report_repository.dart';
@@ -404,6 +403,9 @@ Future<void> configureDependencies() async {
     () => WorkOrderCreateViewModel(
       createWorkOrderUseCase: getIt<CreateWorkOrderUseCase>(),
       linkBreakdownToWorkOrderUseCase: getIt<LinkBreakdownToWorkOrderUseCase>(),
+      getAreasUseCase: getIt<GetAreasUseCase>(),
+      getAssetsByAreaUseCase: getIt<GetAssetsByAreaUseCase>(),
+      workOrderRepository: getIt<WorkOrderRepository>(),
     ),
   );
   getIt.registerFactory<WorkOrderDetailViewModel>(

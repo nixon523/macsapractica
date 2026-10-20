@@ -337,23 +337,22 @@ class WorkOrderPdfBuilder {
               pw.SizedBox(height: 10),
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   _buildSignatureBox(
-                    label: 'Responsable de Calidad\n(ACC / HACCP)',
-                    name: order.accHaccpResponsible,
-                  ),
-                  _buildSignatureBox(
-                    label: 'Resp. Mantenimiento\n(Ejecutor)',
+                    label: 'Responsable de Mantenimiento\n(Ejecutor)',
                     name: order.maintenanceResponsible,
+                    width: 155,
                   ),
                   _buildSignatureBox(
-                    label: 'Jefe de Área',
+                    label: 'Jefe de Área\n(Recepción)',
                     name: order.areaHeadResponsible,
+                    width: 155,
                   ),
                   _buildSignatureBox(
-                    label: 'Jefe de\nMantenimiento',
+                    label: 'Jefe de Mantenimiento\n(Aprobación)',
                     name: order.maintenanceHeadResponsible,
+                    width: 155,
                   ),
                 ],
               ),
@@ -529,35 +528,43 @@ class WorkOrderPdfBuilder {
   }
 
   // ─── Helper: Signature box ───
-  static pw.Widget _buildSignatureBox({required String label, String? name}) {
+  static pw.Widget _buildSignatureBox({
+    required String label,
+    String? name,
+    double width = 155,
+  }) {
     return pw.Container(
-      width: 125,
+      width: width,
       child: pw.Column(
+        mainAxisSize: pw.MainAxisSize.min,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
-          pw.SizedBox(height: 30),
+          pw.SizedBox(height: 35),
           pw.Container(
-            width: 125,
+            width: width,
             decoration: const pw.BoxDecoration(
               border: pw.Border(
                 top: pw.BorderSide(color: PdfColors.black, width: 1),
               ),
             ),
-            padding: const pw.EdgeInsets.only(top: 3),
+            padding: const pw.EdgeInsets.only(top: 4),
             child: pw.Column(
+              mainAxisSize: pw.MainAxisSize.min,
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
                 pw.Text(
                   label,
                   style: pw.TextStyle(
-                    fontSize: 7.5,
+                    fontSize: 8,
                     fontWeight: pw.FontWeight.bold,
                   ),
                   textAlign: pw.TextAlign.center,
                 ),
                 if (name != null && name.isNotEmpty) ...[
-                  pw.SizedBox(height: 1),
+                  pw.SizedBox(height: 2),
                   pw.Text(
                     name,
-                    style: const pw.TextStyle(fontSize: 7),
+                    style: const pw.TextStyle(fontSize: 7.5),
                     textAlign: pw.TextAlign.center,
                   ),
                 ],

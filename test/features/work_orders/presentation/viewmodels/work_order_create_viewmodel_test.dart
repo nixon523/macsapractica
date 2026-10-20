@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:macsapractica/features/breakdown_reports/domain/entities/breakdown_report.dart';
 import 'package:macsapractica/features/breakdown_reports/domain/usecases/link_breakdown_to_work_order.dart';
 import 'package:macsapractica/features/work_orders/domain/entities/work_order.dart';
+import 'package:macsapractica/features/work_orders/domain/repositories/work_order_repository.dart';
 import 'package:macsapractica/features/work_orders/domain/usecases/create_work_order.dart';
 import 'package:macsapractica/features/work_orders/presentation/viewmodels/work_order_create_viewmodel.dart';
 import 'package:mocktail/mocktail.dart';
@@ -10,6 +11,8 @@ class MockCreateWorkOrderUseCase extends Mock implements CreateWorkOrderUseCase 
 
 class MockLinkBreakdownToWorkOrderUseCase extends Mock
     implements LinkBreakdownToWorkOrderUseCase {}
+
+class MockWorkOrderRepository extends Mock implements WorkOrderRepository {}
 
 void main() {
   late MockCreateWorkOrderUseCase createUseCase;
@@ -102,5 +105,69 @@ void main() {
 
     expect(created!.id, 'OT-0002');
     verifyNever(() => linkUseCase.call(any()));
+  });
+
+  test('rechaza crear la OT si el activo ya cuenta con una orden de trabajo abierta', () async {
+    final mockRepo = MockWorkOrderRepository();
+    when(() => mockRepo.getOpenWorkOrders()).thenAnswer((_) async => const [
+          WorkOrder(
+            id: 'OT-2026-0001',
+            assetId: 'A003-001',
+            assetName: 'Línea Automática',
+            description: 'Falla previa',
+            status: WorkOrderStatus.pending,
+          ),
+        ]);
+
+    final vm = WorkOrderCreateViewModel(
+      createWorkOrderUseCase: createUseCase,
+      linkBreakdownToWorkOrderUseCase: linkUseCase,
+      workOrderRepository: mockRepo,
+    );
+
+    await vm.loadOpenWorkOrders();
+
+    expect(vm.isAssetPending('A003-001'), isTrue);
+    expect(vm.getOpenWorkOrderForAsset('A003-001')?.id, 'OT-2026-0001');
+
+    vm.setAssetId('A003-001');
+    vm.setDescription('Mantenimiento duplicado');
+
+    expect(vm.errorMessage, contains('OT-2026-0001'));
+
+    final result = await vm.submit(userId: 'admin', userName: 'Gestor');
+    expect(result, isNull);
+    expect(vm.errorMessage, contains('OT-2026-0001'));
+    verifyNever(() => createUseCase.call(any()));
+  });
+
+  test('permite crear la OT si las órdenes previas del activo están completadas o canceladas', () async {
+    final mockRepo = MockWorkOrderRepository();
+    when(() => mockRepo.getOpenWorkOrders()).thenAnswer((_) async => const []);
+    when(() => createUseCase.call(any())).thenAnswer((_) async => const WorkOrder(
+          id: 'OT-2026-0005',
+          assetId: 'A003-001',
+          assetName: 'Línea Automática',
+          description: 'Nuevo servicio',
+          status: WorkOrderStatus.pending,
+        ));
+
+    final vm = WorkOrderCreateViewModel(
+      createWorkOrderUseCase: createUseCase,
+      linkBreakdownToWorkOrderUseCase: linkUseCase,
+      workOrderRepository: mockRepo,
+    );
+
+    await vm.loadOpenWorkOrders();
+
+    expect(vm.isAssetPending('A003-001'), isFalse);
+
+    vm.setAssetId('A003-001');
+    vm.setDescription('Nuevo servicio');
+
+    final result = await vm.submit(userId: 'admin', userName: 'Gestor');
+    expect(result, isNotNull);
+    expect(result!.id, 'OT-2026-0005');
+    verify(() => createUseCase.call(any())).called(1);
   });
 }
