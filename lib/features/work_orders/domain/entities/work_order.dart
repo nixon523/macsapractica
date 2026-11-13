@@ -22,9 +22,28 @@ class WorkOrderMaterial {
 
   factory WorkOrderMaterial.fromMap(Map<String, dynamic> map) {
     return WorkOrderMaterial(
-      description: map['description'] ?? '',
-      quantity: (map['quantity'] as num?)?.toDouble() ?? 1.0,
-      unit: map['unit'] ?? 'pz',
+      description: (map['description'] ??
+              map['Description'] ??
+              map['name'] ??
+              map['Nombre'] ??
+              map['Descripcion'] ??
+              '')
+          .toString(),
+      quantity: (map['quantity'] ??
+              map['Quantity'] ??
+              map['Cantidad'] as num?)
+          ?.toDouble() ??
+          double.tryParse((map['quantity'] ??
+                  map['Quantity'] ??
+                  map['Cantidad'])
+              ?.toString() ??
+              '1') ??
+          1.0,
+      unit: (map['unit'] ??
+              map['Unit'] ??
+              map['Unidad'] ??
+              'pz')
+          .toString(),
     );
   }
 }
@@ -58,6 +77,7 @@ class WorkOrder {
     this.scheduledDate,
     this.reportId,
     this.preventiveScheduleId,
+    this.breakdownImageData,
     this.createdByUserId,
     this.createdByUserName,
     this.createdAt,
@@ -105,6 +125,9 @@ class WorkOrder {
 
   /// Plan preventivo que dio origen a esta OT (si existe)
   final String? preventiveScheduleId;
+
+  /// Fotografía de la avería capturada por el reportador original (si aplica)
+  final String? breakdownImageData;
 
   final String? createdByUserId;
   final String? createdByUserName;
@@ -164,6 +187,7 @@ class WorkOrder {
     DateTime? scheduledDate,
     String? reportId,
     String? preventiveScheduleId,
+    String? breakdownImageData,
     String? createdByUserId,
     String? createdByUserName,
     DateTime? createdAt,
@@ -197,6 +221,7 @@ class WorkOrder {
       scheduledDate: scheduledDate ?? this.scheduledDate,
       reportId: reportId ?? this.reportId,
       preventiveScheduleId: preventiveScheduleId ?? this.preventiveScheduleId,
+      breakdownImageData: breakdownImageData ?? this.breakdownImageData,
       createdByUserId: createdByUserId ?? this.createdByUserId,
       createdByUserName: createdByUserName ?? this.createdByUserName,
       createdAt: createdAt ?? this.createdAt,

@@ -3,11 +3,39 @@
 class TextSanitizer {
   TextSanitizer._();
 
+  /// Repara secuencias UTF-8 mal decodificadas como Windows-1252 / Latin1
+  /// (por ejemplo `Ã¡` -> `á`, `Ã©` -> `é`, `Ã\x81` -> `Á`, etc.).
+  static String fixEncoding(String? raw) {
+    if (raw == null || raw.isEmpty) return raw ?? '';
+    return raw
+        .replaceAll('\u00C3\u00A1', 'á') // Ã¡
+        .replaceAll('\u00C3\u00A9', 'é') // Ã©
+        .replaceAll('\u00C3\u00AD', 'í') // Ã­
+        .replaceAll('\u00C3\u00B3', 'ó') // Ã³
+        .replaceAll('\u00C3\u00BA', 'ú') // Ãº
+        .replaceAll('\u00C3\u00B1', 'ñ') // Ã±
+        .replaceAll('\u00C3\u00BC', 'ü') // Ã¼
+        .replaceAll('\u00C3\u0081', 'Á') // Ã\x81
+        .replaceAll('\u00C3\u0089', 'É')
+        .replaceAll('\u00C3\u2030', 'É') // Ã‰
+        .replaceAll('\u00C3\u008D', 'Í')
+        .replaceAll('\u00C3\u0093', 'Ó')
+        .replaceAll('\u00C3\u201C', 'Ó') // Ã“
+        .replaceAll('\u00C3\u009A', 'Ú')
+        .replaceAll('\u00C3\u0161', 'Ú') // Ãš
+        .replaceAll('\u00C3\u0091', 'Ñ')
+        .replaceAll('\u00C3\u2018', 'Ñ') // Ã‘
+        .replaceAll('\u00C2\u00BF', '¿')
+        .replaceAll('\u00C2\u00A1', '¡')
+        .replaceAll('\u00C2\u00B0', '°')
+        .replaceAll('\u00C2\u00B7', '·');
+  }
+
   /// Limpia una descripción o texto general eliminando caracteres no estándar,
   /// balas unicode problemáticas y secuencias mojibake (e.g. `â€¢`, `â\x80¢`).
   static String cleanDescription(String? raw) {
     if (raw == null || raw.isEmpty) return raw ?? '';
-    var cleaned = raw;
+    var cleaned = fixEncoding(raw);
 
     // 1. Limpieza exhaustiva de mojibake y secuencias de bytes mal interpretadas
     cleaned = cleaned

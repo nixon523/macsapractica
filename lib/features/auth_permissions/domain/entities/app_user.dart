@@ -10,6 +10,9 @@ class AppUser {
     this.disabled = false,
     this.mustChangePassword = false,
     this.passwordResetRequested = false,
+    this.employeeId,
+    this.employeePosition,
+    this.employeeAreaName,
   });
 
   final String userId;
@@ -20,6 +23,9 @@ class AppUser {
   final bool disabled;
   final bool mustChangePassword;
   final bool passwordResetRequested;
+  final int? employeeId;
+  final String? employeePosition;
+  final String? employeeAreaName;
 
   bool get isAdmin => role == UserRole.admin;
 

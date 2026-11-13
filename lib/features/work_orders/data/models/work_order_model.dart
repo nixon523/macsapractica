@@ -31,6 +31,7 @@ class WorkOrderModel extends WorkOrder {
     super.scheduledDate,
     super.reportId,
     super.preventiveScheduleId,
+    super.breakdownImageData,
     super.createdByUserId,
     super.createdByUserName,
     super.createdAt,
@@ -206,6 +207,15 @@ class WorkOrderModel extends WorkOrder {
       scheduledDate: parseDate(map['scheduledDate'] ?? map['ScheduledDate']),
       reportId: repId,
       preventiveScheduleId: prevPlanId,
+      breakdownImageData: (map['breakdownImageData'] ??
+              map['BreakdownImageData'] ??
+              map['FotoAveriaUrl'] ??
+              map['ImagenAveriaUrl'] ??
+              map['reportImageData'] ??
+              map['ReportImageData'] ??
+              map['reportImageUrl'] ??
+              map['imagenAveria'])
+          ?.toString(),
       createdByUserId: (map['createdByUserId'] ?? map['CreatedByUserId'])?.toString(),
       createdByUserName: (map['createdByUserName'] ?? map['CreatedByUserName'])?.toString(),
       createdAt: parseDate(map['createdAt'] ?? map['CreatedAt']),
@@ -238,9 +248,15 @@ class WorkOrderModel extends WorkOrder {
       'unfulfillmentReason': unfulfillmentReason,
       'reprogramDate': reprogramDate?.toIso8601String(),
       'scheduledDate': scheduledDate?.toIso8601String(),
+      'maintenanceResponsible': maintenanceResponsible,
+      'accHaccpResponsible': accHaccpResponsible,
+      'areaHeadResponsible': areaHeadResponsible,
+      'maintenanceHeadResponsible': maintenanceHeadResponsible,
       'reportId': reportId != null ? int.tryParse(reportId!) : null,
       'preventiveScheduleId': preventiveScheduleId,
       'planPreventivoId': preventiveScheduleId,
+      if (breakdownImageData != null && breakdownImageData!.isNotEmpty)
+        'breakdownImageData': breakdownImageData,
     };
   }
 

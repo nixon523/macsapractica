@@ -37,62 +37,59 @@ class AssetImageWidget extends StatelessWidget {
       return _buildFallback(context, br);
     }
 
-    // 1. Caso URL de Servidor (relativa o absoluta)
-    if (data.startsWith('/image') ||
-        data.startsWith('image/') ||
-        data.startsWith('http://') ||
-        data.startsWith('https://')) {
-      final apiClient = getIt<ApiClient>();
-      final fullUrl = apiClient.resolveImageUrl(data);
+    // 1. Caso Base64 (data:image/... o string codificado largo)
+    if (data.startsWith('data:') || (!data.startsWith('/') && !data.startsWith('http') && data.length > 200)) {
+      try {
+        final base64String = data.contains(',') ? data.split(',').last : data;
+        final bytes = base64Decode(base64String);
+        return ClipRRect(
+          borderRadius: br,
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Image.memory(
+              bytes,
+              fit: fit,
+              errorBuilder: (_, __, ___) => _buildFallback(context, br, isError: true),
+            ),
+          ),
+        );
+      } catch (_) {
+        return _buildFallback(context, br, isError: true);
+      }
+    }
 
-      return ClipRRect(
-        borderRadius: br,
-        child: SizedBox(
-          width: width,
-          height: height,
-          child: Image.network(
-            fullUrl,
-            fit: fit,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Container(
-                width: width,
-                height: height,
-                color: fallbackBgColor ?? Colors.grey.shade100,
-                child: const Center(
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
+    // 2. Caso URL de Servidor (relativa o absoluta: /image, /uploads, http://, etc.)
+    final apiClient = getIt<ApiClient>();
+    final fullUrl = apiClient.resolveImageUrl(data);
+
+    return ClipRRect(
+      borderRadius: br,
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: Image.network(
+          fullUrl,
+          fit: fit,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Container(
+              width: width,
+              height: height,
+              color: fallbackBgColor ?? Colors.grey.shade100,
+              child: const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
-              );
-            },
-            errorBuilder: (_, __, ___) => _buildFallback(context, br, isError: true),
-          ),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => _buildFallback(context, br, isError: true),
         ),
-      );
-    }
-
-    // 2. Caso Base64 (retrocompatibilidad)
-    try {
-      final base64String = data.contains(',') ? data.split(',').last : data;
-      final bytes = base64Decode(base64String);
-      return ClipRRect(
-        borderRadius: br,
-        child: SizedBox(
-          width: width,
-          height: height,
-          child: Image.memory(
-            bytes,
-            fit: fit,
-            errorBuilder: (_, __, ___) => _buildFallback(context, br, isError: true),
-          ),
-        ),
-      );
-    } catch (_) {
-      return _buildFallback(context, br, isError: true);
-    }
+      ),
+    );
   }
 
   Widget _buildFallback(BuildContext context, BorderRadius br, {bool isError = false}) {

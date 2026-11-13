@@ -1,9 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/usecases/usecase.dart';
 import '../../../../features/assets/domain/entities/area.dart';
 import '../../../../features/assets/domain/usecases/get_areas_usecase.dart';
+import '../../../../features/auth_permissions/domain/entities/user_role.dart';
+import '../../../../features/auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../../app/di/get_it.dart';
 import '../../domain/entities/operation_report.dart';
 import '../viewmodels/operation_report_viewmodel.dart';
@@ -380,7 +384,7 @@ class _AreaSearchDialogState extends State<_AreaSearchDialog> {
       ),
       content: SizedBox(
         width: double.maxFinite,
-        height: 400,
+        height: math.min(400.0, MediaQuery.sizeOf(context).height * 0.5),
         child: Column(
           children: [
             TextField(
@@ -613,6 +617,9 @@ class _WeeklyGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final authVm = context.watch<AuthViewModel>();
+    final canEdit = authVm.hasPermission(AppPermissions.operationReportEdit) ||
+        authVm.hasPermission(AppPermissions.assetEdit);
     final equipos = vm.weeklyReports.keys.toList();
     final monday = vm.currentMonday;
 
@@ -697,7 +704,9 @@ class _WeeklyGrid extends StatelessWidget {
 
                   return DataCell(
                     InkWell(
-                      onTap: () => _openForm(context, codigo, nombre, dia, reporte, areaId),
+                      onTap: canEdit
+                          ? () => _openForm(context, codigo, nombre, dia, reporte, areaId)
+                          : null,
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         width: 60,
@@ -724,11 +733,19 @@ class _WeeklyGrid extends StatelessWidget {
                                     color: _colorFromDisp(reporte.disponibilidad),
                                   ),
                                 )
-                              : Icon(
-                                  Icons.add_circle_outline,
-                                  size: 18,
-                                  color: colors.outline,
-                                ),
+                              : (canEdit
+                                  ? Icon(
+                                      Icons.add_circle_outline,
+                                      size: 18,
+                                      color: colors.outline,
+                                    )
+                                  : Text(
+                                      '—',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: colors.outline,
+                                      ),
+                                    )),
                         ),
                       ),
                     ),

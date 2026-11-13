@@ -1,10 +1,17 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
 import '../../../assets/domain/entities/area.dart';
 import '../../../assets/domain/entities/asset.dart';
+import '../../../assets/presentation/views/widgets/asset_image_widget.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
+import '../../data/datasources/breakdown_report_remote_datasource.dart';
 import '../../domain/entities/breakdown_report.dart';
 import '../viewmodels/report_breakdown_viewmodel.dart';
 
@@ -22,6 +29,14 @@ class _ReportBreakdownViewState extends State<ReportBreakdownView> {
       getIt<ReportBreakdownViewModel>();
   final TextEditingController _descCtrl = TextEditingController();
 
+  Uint8List? _pendingImageBytes;
+  String? _pendingImageFilename;
+  String? _imageData;
+  bool _imageProcessing = false;
+
+  static const int _maxImageDimension = 1200;
+  static const int _jpegQuality = 80;
+
   @override
   void initState() {
     super.initState();
@@ -38,23 +53,81 @@ class _ReportBreakdownViewState extends State<ReportBreakdownView> {
     super.dispose();
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    try {
+      final file = await picker.pickImage(
+        source: source,
+        maxWidth: _maxImageDimension.toDouble(),
+        maxHeight: _maxImageDimension.toDouble(),
+        imageQuality: _jpegQuality,
+      );
+      if (file == null) return;
+
+      setState(() => _imageProcessing = true);
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _pendingImageBytes = bytes;
+        _pendingImageFilename = file.name;
+        _imageData = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al capturar o leer la imagen: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _imageProcessing = false);
+    }
+  }
+
+  void _removeImage() {
+    setState(() {
+      _pendingImageBytes = null;
+      _pendingImageFilename = null;
+      _imageData = null;
+    });
+  }
+
   Future<void> _submit() async {
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
+    String? finalImageUrl = _imageData;
+
+    if (_pendingImageBytes != null) {
+      setState(() => _imageProcessing = true);
+      try {
+        final ds = getIt<BreakdownReportRemoteDataSource>();
+        final uploaded = await ds.uploadBreakdownImage(
+          _pendingImageBytes!,
+          filename: _pendingImageFilename ?? 'breakdown.jpg',
+        );
+        finalImageUrl = uploaded;
+      } catch (e) {
+        // Fallback Base64 para garantizar persistencia si el endpoint falla
+        finalImageUrl = 'data:image/jpeg;base64,${base64Encode(_pendingImageBytes!)}';
+      } finally {
+        if (mounted) setState(() => _imageProcessing = false);
+      }
+    }
+
     final ok = await _viewModel.submit(
       userId: user.userId,
       userName: user.username,
+      imageData: finalImageUrl,
     );
     if (!mounted) return;
 
     if (ok) {
       _descCtrl.clear();
+      _removeImage();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          backgroundColor: const Color(0xFF0F766E),
+          backgroundColor: const Color(0xFF0055A5),
           content: const Row(
             children: [
               Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
@@ -99,6 +172,11 @@ class _ReportBreakdownViewState extends State<ReportBreakdownView> {
       child: _ReportForm(
         onSubmit: _submit,
         descController: _descCtrl,
+        pendingImageBytes: _pendingImageBytes,
+        imageData: _imageData,
+        imageProcessing: _imageProcessing,
+        onPickImage: _pickImage,
+        onRemoveImage: _removeImage,
       ),
     );
   }
@@ -108,10 +186,20 @@ class _ReportForm extends StatelessWidget {
   const _ReportForm({
     required this.onSubmit,
     required this.descController,
+    required this.pendingImageBytes,
+    required this.imageData,
+    required this.imageProcessing,
+    required this.onPickImage,
+    required this.onRemoveImage,
   });
 
   final Future<void> Function() onSubmit;
   final TextEditingController descController;
+  final Uint8List? pendingImageBytes;
+  final String? imageData;
+  final bool imageProcessing;
+  final void Function(ImageSource source) onPickImage;
+  final VoidCallback onRemoveImage;
 
   void _openAreaSearchModal(BuildContext context, ReportBreakdownViewModel vm) {
     showDialog(
@@ -547,6 +635,33 @@ class _ReportForm extends StatelessWidget {
                       style: TextStyle(fontSize: 11.5, color: secondaryText),
                     ),
 
+                    const SizedBox(height: 28),
+                    Divider(height: 1, color: borderColor),
+                    const SizedBox(height: 24),
+
+                    // ==========================================
+                    // SECCIÓN 4: EVIDENCIA FOTOGRÁFICA (OPCIONAL)
+                    // ==========================================
+                    _buildSectionHeader(
+                      stepNumber: '04',
+                      title: 'Evidencia Fotográfica (Opcional)',
+                      subtitle: 'Adjunta una fotografía clara de la avería, fuga o daño mecánico para agilizar la revisión.',
+                      theme: theme,
+                      isDark: isDark,
+                    ),
+                    const SizedBox(height: 14),
+
+                    _BreakdownImageSelector(
+                      pendingBytes: pendingImageBytes,
+                      imageData: imageData,
+                      processing: imageProcessing,
+                      onPickCamera: () => onPickImage(ImageSource.camera),
+                      onPickGallery: () => onPickImage(ImageSource.gallery),
+                      onRemove: onRemoveImage,
+                      isDark: isDark,
+                      borderColor: borderColor,
+                    ),
+
                     const SizedBox(height: 32),
 
                     // Botón de Envío Oficial
@@ -555,7 +670,7 @@ class _ReportForm extends StatelessWidget {
                       height: 48,
                       child: FilledButton(
                         key: const Key('breakdown-submit'),
-                        onPressed: (vm.isSubmitting || isAssetBlocked) ? null : onSubmit,
+                        onPressed: (vm.isSubmitting || isAssetBlocked || imageProcessing) ? null : onSubmit,
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(0xFF0055A5),
                           foregroundColor: Colors.white,
@@ -564,7 +679,7 @@ class _ReportForm extends StatelessWidget {
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
-                        child: vm.isSubmitting
+                        child: (vm.isSubmitting || imageProcessing)
                             ? const SizedBox(
                                 width: 18,
                                 height: 18,
@@ -1517,6 +1632,217 @@ class _SeverityExecutiveCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Selector y previsualizador de fotografía para reportes de avería.
+class _BreakdownImageSelector extends StatelessWidget {
+  const _BreakdownImageSelector({
+    required this.pendingBytes,
+    required this.imageData,
+    required this.processing,
+    required this.onPickCamera,
+    required this.onPickGallery,
+    required this.onRemove,
+    required this.isDark,
+    required this.borderColor,
+  });
+
+  final Uint8List? pendingBytes;
+  final String? imageData;
+  final bool processing;
+  final VoidCallback onPickCamera;
+  final VoidCallback onPickGallery;
+  final VoidCallback onRemove;
+  final bool isDark;
+  final Color borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    if (processing) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor),
+        ),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0055A5)),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'Procesando y optimizando imagen...',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final hasImage = pendingBytes != null || (imageData != null && imageData!.trim().isNotEmpty);
+    final isMobilePlatform = defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+
+    if (hasImage) {
+      return Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 200,
+                width: double.infinity,
+                child: pendingBytes != null
+                    ? Image.memory(pendingBytes!, fit: BoxFit.cover)
+                    : AssetImageWidget(imageData: imageData, fit: BoxFit.cover),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (isMobilePlatform) ...[
+                  OutlinedButton.icon(
+                    onPressed: onPickCamera,
+                    icon: const Icon(Icons.camera_alt_outlined, size: 16),
+                    label: const Text('Tomar otra'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0055A5),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onPickGallery,
+                    icon: const Icon(Icons.photo_library_outlined, size: 16),
+                    label: const Text('Cambiar desde Galería'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0055A5),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                ] else ...[
+                  OutlinedButton.icon(
+                    onPressed: onPickGallery,
+                    icon: const Icon(Icons.swap_horiz, size: 16),
+                    label: const Text('Cambiar fotografía'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0055A5),
+                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                  ),
+                ],
+                TextButton.icon(
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline, size: 16, color: Color(0xFFDC2626)),
+                  label: const Text(
+                    'Quitar fotografía',
+                    style: TextStyle(color: Color(0xFFDC2626), fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.add_a_photo_outlined, size: 36, color: Colors.blueGrey.shade400),
+          const SizedBox(height: 10),
+          const Text(
+            '¿Deseas adjuntar una foto del daño o anomalía?',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Una imagen facilita el diagnóstico técnico y la asignación del repuesto adecuado (opcional).',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          if (isMobilePlatform)
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: onPickCamera,
+                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                  label: const Text('Tomar Foto'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0055A5),
+                    side: const BorderSide(color: Color(0xFF0055A5)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onPickGallery,
+                  icon: const Icon(Icons.image_outlined, size: 18),
+                  label: const Text('Subir desde Galería'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0055A5),
+                    side: const BorderSide(color: Color(0xFF0055A5)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                ),
+              ],
+            )
+          else ...[
+            OutlinedButton.icon(
+              onPressed: onPickGallery,
+              icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+              label: const Text('Seleccionar o subir fotografía'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF0055A5),
+                side: const BorderSide(color: Color(0xFF0055A5)),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'En computadora selecciona el archivo de imagen (.jpg, .png) de tu equipo o captura.',
+              style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ],
       ),
     );
   }

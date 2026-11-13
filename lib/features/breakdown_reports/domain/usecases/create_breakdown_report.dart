@@ -12,6 +12,7 @@ class CreateBreakdownReportParams {
     required this.severity,
     required this.reportedByUserId,
     required this.reportedByUserName,
+    this.imageData,
   });
 
   final String assetId;
@@ -21,6 +22,7 @@ class CreateBreakdownReportParams {
   final BreakdownSeverity severity;
   final String reportedByUserId;
   final String reportedByUserName;
+  final String? imageData;
 }
 
 class CreateBreakdownReportUseCase
@@ -61,6 +63,7 @@ class CreateBreakdownReportUseCase
       severity: params.severity,
       reportedByUserId: params.reportedByUserId,
       reportedByUserName: params.reportedByUserName,
+      imageData: params.imageData,
     );
   }
 }

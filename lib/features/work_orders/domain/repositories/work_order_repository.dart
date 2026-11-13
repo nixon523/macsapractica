@@ -26,6 +26,7 @@ abstract class WorkOrderRepository {
     DateTime? scheduledDate,
     String? reportId,
     String? preventiveScheduleId,
+    String? breakdownImageData,
     required String createdByUserId,
     required String createdByUserName,
   });

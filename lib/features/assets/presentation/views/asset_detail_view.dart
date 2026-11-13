@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
 import '../../../../app/widgets/app_dialog.dart';
+import '../../../../app/widgets/app_feedback.dart';
 import '../../../../app/widgets/app_info_row.dart';
 import '../../../asset_deletion/domain/entities/asset_delete_request.dart';
 import '../../../asset_deletion/presentation/viewmodels/asset_deletion_request_viewmodel.dart';
@@ -15,6 +16,7 @@ import '../../../kardex/presentation/views/kardex_list_view.dart';
 import '../../../operation_reports/domain/usecases/actualizar_es_equipo_proceso.dart';
 import '../../../operation_reports/presentation/viewmodels/operation_report_viewmodel.dart';
 import '../../../operation_reports/presentation/views/operation_report_form_view.dart';
+import '../../../operation_reports/presentation/views/asset_history_analytics_view.dart';
 import '../../../operation_reports/presentation/views/operation_report_metrics_view.dart';
 import '../reports/asset_report_filter_dialog.dart';
 import '../viewmodels/asset_detail_viewmodel.dart';
@@ -100,9 +102,7 @@ class _AssetDetailViewState extends State<AssetDetailView> {
     if (result is Asset && mounted) {
       setState(() => _asset = result);
       _reloadChildren();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Activo actualizado.')),
-      );
+      AppFeedback.showSuccess(context, 'Activo actualizado.');
     }
   }
 
@@ -119,9 +119,7 @@ class _AssetDetailViewState extends State<AssetDetailView> {
     // en el detalle para verlo reflejado.
     if (result != null && mounted) {
       _reloadChildren();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Hijo creado.')),
-      );
+      AppFeedback.showSuccess(context, 'Componente hijo creado exitosamente.');
     }
   }
 
@@ -179,17 +177,12 @@ class _AssetDetailViewState extends State<AssetDetailView> {
 
     if (!mounted) return;
     if (ok) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Activo reactivado correctamente.')),
-      );
+      AppFeedback.showSuccess(context, 'Activo reactivado correctamente.');
       Navigator.of(context).pop(true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Error: ${_viewModel.reactivationError ?? 'No se pudo reactivar'}',
-          ),
-        ),
+      AppFeedback.showError(
+        context,
+        'Error: ${_viewModel.reactivationError ?? 'No se pudo reactivar'}',
       );
     }
   }
@@ -223,47 +216,49 @@ class _AssetDetailViewState extends State<AssetDetailView> {
         ),
         content: SizedBox(
           width: responsiveDialogWidth(context, 440),
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isPausing ? Colors.orange.shade50 : Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isPausing ? Colors.orange.shade200 : Colors.green.shade200,
+          child: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isPausing ? Colors.orange.shade50 : Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: isPausing ? Colors.orange.shade200 : Colors.green.shade200,
+                      ),
+                    ),
+                    child: Text(
+                      isPausing
+                          ? 'Al inactivar este activo se registrará como fuera de servicio en el área ${_asset.areaId} y se iniciará el conteo de tiempo de parada (Downtime).'
+                          : 'Al reactivar el activo volverá a estar disponible para operaciones y mantenimiento en el área ${_asset.areaId}.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isPausing ? Colors.orange.shade900 : Colors.green.shade900,
+                      ),
                     ),
                   ),
-                  child: Text(
-                    isPausing
-                        ? 'Al inactivar este activo se registrará como fuera de servicio en el área ${_asset.areaId} y se iniciará el conteo de tiempo de parada (Downtime).'
-                        : 'Al reactivar el activo volverá a estar disponible para operaciones y mantenimiento en el área ${_asset.areaId}.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isPausing ? Colors.orange.shade900 : Colors.green.shade900,
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: reasonCtrl,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText: 'Motivo de la ${isPausing ? "Inactivación" : "Reactivación"} *',
+                      hintText: isPausing
+                          ? 'Ej: Falla en rodamiento, en espera de repuesto...'
+                          : 'Ej: Reparación concluida, pruebas aprobadas...',
+                      border: const OutlineInputBorder(),
                     ),
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Debes ingresar el motivo'
+                        : null,
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: reasonCtrl,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    labelText: 'Motivo de la ${isPausing ? "Inactivación" : "Reactivación"} *',
-                    hintText: isPausing
-                        ? 'Ej: Falla en rodamiento, en espera de repuesto...'
-                        : 'Ej: Reparación concluida, pruebas aprobadas...',
-                    border: const OutlineInputBorder(),
-                  ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Debes ingresar el motivo'
-                      : null,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -330,14 +325,11 @@ class _AssetDetailViewState extends State<AssetDetailView> {
           );
         });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              newStatus == AssetStatus.inactive
-                  ? 'Activo marcado como Inactivo / Fuera de Servicio.'
-                  : 'Activo reactivado exitosamente.',
-            ),
-          ),
+        AppFeedback.showSuccess(
+          context,
+          newStatus == AssetStatus.inactive
+              ? 'Activo marcado como Inactivo / Fuera de Servicio.'
+              : 'Activo reactivado exitosamente.',
         );
       }
     }
@@ -377,21 +369,16 @@ class _AssetDetailViewState extends State<AssetDetailView> {
         setState(() {
           _asset = _asset.copyWith(esEquipoProceso: newVal);
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              newVal
-                  ? 'Activo configurado como Equipo de Proceso.'
-                  : 'Activo desmarcado de Equipos de Proceso.',
-            ),
-          ),
+        AppFeedback.showSuccess(
+          context,
+          newVal
+              ? 'Activo configurado como Equipo de Proceso.'
+              : 'Activo desmarcado de Equipos de Proceso.',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar: $e')),
-        );
+        AppFeedback.showError(context, 'Error al actualizar: $e');
       }
     }
   }
@@ -405,14 +392,16 @@ class _AssetDetailViewState extends State<AssetDetailView> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Solicitar eliminación'),
-        content: TextField(
-          controller: reasonCtrl,
-          autofocus: true,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Motivo de la baja *',
-            hintText: 'Ej: Obsolescencia, reemplazo por nuevo equipo…',
-            border: OutlineInputBorder(),
+        content: SingleChildScrollView(
+          child: TextField(
+            controller: reasonCtrl,
+            autofocus: true,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Motivo de la baja *',
+              hintText: 'Ej: Obsolescencia, reemplazo por nuevo equipo…',
+              border: OutlineInputBorder(),
+            ),
           ),
         ),
         actions: [
@@ -432,9 +421,7 @@ class _AssetDetailViewState extends State<AssetDetailView> {
 
     final reason = reasonCtrl.text.trim();
     if (reason.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Debes indicar el motivo de la solicitud.')),
-      );
+      AppFeedback.showWarning(context, 'Debes indicar el motivo de la solicitud.');
       return;
     }
 
@@ -446,15 +433,11 @@ class _AssetDetailViewState extends State<AssetDetailView> {
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? 'Solicitud enviada al Gerente de Operaciones.'
-              : 'Error: ${_deletionViewModel.errorMessage}',
-        ),
-      ),
-    );
+    if (ok) {
+      AppFeedback.showSuccess(context, 'Solicitud enviada al Gerente de Operaciones.');
+    } else {
+      AppFeedback.showError(context, 'Error: ${_deletionViewModel.errorMessage}');
+    }
   }
 
   void _openChild(Asset child) {
@@ -504,6 +487,19 @@ class _AssetDetailViewState extends State<AssetDetailView> {
               icon: const Icon(Icons.history),
               tooltip: 'Ver historial (Kardex)',
               onPressed: _openHistory,
+            ),
+            IconButton(
+              icon: const Icon(Icons.analytics_outlined),
+              tooltip: 'Hoja de Vida y AnalÃ­tica (OTs, AverÃ­as, Piezas)',
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AssetHistoryAnalyticsView(
+                    codigoActivo: _asset.id,
+                    nombreActivo: _asset.name,
+                  ),
+                ),
+              ),
             ),
           ],
         ),

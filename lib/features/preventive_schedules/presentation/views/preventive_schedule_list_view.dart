@@ -15,6 +15,7 @@ import '../states/preventive_schedule_state.dart';
 import '../viewmodels/preventive_schedule_viewmodel.dart';
 import '../widgets/batch_generate_preventive_ots_dialog.dart';
 import '../widgets/generate_preventive_ot_dialog.dart';
+import '../widgets/preventive_plan_detail_dialog.dart';
 
 enum _PreventiveFilterTab {
   all('Todos'),
@@ -305,7 +306,7 @@ class _PreventiveScheduleListViewState
     final vm = context.watch<PreventiveScheduleViewModel>();
     final authVm = context.watch<AuthViewModel>();
     final canManage = authVm.hasPermission('preventive.manage');
-    final isAdmin = authVm.currentUser?.role.code == 'admin';
+    final isAdmin = authVm.currentUser?.role.code == 'admin' || canManage;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -997,16 +998,30 @@ class _CleanPreventiveCardState extends State<_CleanPreventiveCard> {
     final textSecondary = widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
     final innerBg = widget.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: cardBg,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => PreventivePlanDetailDialog.show(
+          context,
+          schedule: schedule,
+          activeOt: widget.activeOt,
+          canGenerateOt: widget.canGenerateOt,
+          isAdmin: widget.isAdmin,
+          onGenerateOt: widget.onGenerateOt,
+          onAmend: widget.onAmend,
+          onToggleStatus: widget.onToggleStatus,
+        ),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: widget.borderColor, width: 1),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Column(
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: widget.borderColor, width: 1),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
                       // Fila 1: ID Monospace + Frecuencia + Componentes + Alert Level / Pausado
@@ -1440,11 +1455,39 @@ class _CleanPreventiveCardState extends State<_CleanPreventiveCard> {
                               icon: Icon(Icons.more_vert_rounded, size: 18, color: textSecondary),
                               tooltip: 'Opciones del Plan',
                               onSelected: (value) {
+                                if (value == 'detail') {
+                                  PreventivePlanDetailDialog.show(
+                                    context,
+                                    schedule: schedule,
+                                    activeOt: widget.activeOt,
+                                    canGenerateOt: widget.canGenerateOt,
+                                    isAdmin: widget.isAdmin,
+                                    onGenerateOt: widget.onGenerateOt,
+                                    onAmend: widget.onAmend,
+                                    onToggleStatus: widget.onToggleStatus,
+                                  );
+                                }
                                 if (value == 'duplicate') widget.onDuplicate();
                                 if (value == 'amend') widget.onAmend();
                                 if (value == 'toggle') widget.onToggleStatus();
                               },
                               itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'detail',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.visibility_outlined, size: 16, color: Color(0xFF0055A5)),
+                                      SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'Ver Detalle Completo',
+                                          style: TextStyle(fontSize: 13),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                                 const PopupMenuItem(
                                   value: 'duplicate',
                                   child: Row(
@@ -1505,7 +1548,9 @@ class _CleanPreventiveCardState extends State<_CleanPreventiveCard> {
                     ],
                   ),
                 ),
-              );
+              ),
+            ),
+          );
   }
 }
 
@@ -1751,13 +1796,23 @@ class _CreatePreventivePlanDialogState
 
       final listToUse = equipmentAssets.isNotEmpty ? equipmentAssets : activeAssets;
 
+      Asset? templateAsset;
+      if (widget.templateSchedule != null && widget.templateSchedule!.assetId.isNotEmpty) {
+        templateAsset = listToUse.where((a) => a.id == widget.templateSchedule!.assetId).firstOrNull ??
+            activeAssets.where((a) => a.id == widget.templateSchedule!.assetId).firstOrNull;
+      }
+
       if (mounted) {
         setState(() {
           _allAssets = activeAssets;
           _equipmentAssets = listToUse;
-          _selectedAsset = null;
+          _selectedAsset = templateAsset;
           _loadingDependencies = false;
         });
+
+        if (templateAsset != null) {
+          _loadChildrenForAsset(templateAsset.id, activeAssets);
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _loadingDependencies = false);
@@ -1775,12 +1830,16 @@ class _CreatePreventivePlanDialogState
       final assets = allAreaAssets ??
           (_selectedArea != null
               ? await getIt<AssetRepository>().getAllAssetsByArea(_selectedArea!.id)
-              : _allAssets);
+              : (_selectedAsset != null && _selectedAsset!.areaId.isNotEmpty
+                  ? await getIt<AssetRepository>().getAllAssetsByArea(_selectedAsset!.areaId)
+                  : _allAssets));
 
       final children = assets.where((a) {
         return a.status == AssetStatus.active &&
             a.id != parentId &&
-            (a.parentAssetId == parentId || a.ancestors.contains(parentId));
+            (a.parentAssetId == parentId ||
+                a.ancestors.contains(parentId) ||
+                a.id.startsWith('$parentId-'));
       }).toList();
 
       if (mounted) {
@@ -2147,6 +2206,7 @@ class _CreatePreventivePlanDialogState
                       );
                     } else {
                       areaSection = Autocomplete<Area>(
+                        key: ValueKey('area_${_selectedArea?.id}'),
                         displayStringForOption: (a) => '${a.id} - ${a.name}',
                         initialValue: _selectedArea != null
                             ? TextEditingValue(text: '${_selectedArea!.id} - ${_selectedArea!.name}')
@@ -2285,6 +2345,7 @@ class _CreatePreventivePlanDialogState
                       );
                     } else {
                       assetField = Autocomplete<Asset>(
+                        key: ValueKey('asset_${_selectedAsset?.id}_${_equipmentAssets.length}'),
                         displayStringForOption: (a) => '${a.id} - ${a.name}',
                         initialValue: _selectedAsset != null
                             ? TextEditingValue(text: '${_selectedAsset!.id} - ${_selectedAsset!.name}')
@@ -2551,10 +2612,16 @@ class _CreatePreventivePlanDialogState
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _childDrafts.isNotEmpty
-                                ? 'Configura las tareas, frecuencia personalizada y repuestos de cada componente. Puedes agregar múltiples actividades por hijo:'
-                                : 'Este equipo no tiene componentes hijos registrados. Puedes definir materiales globales abajo:',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            _selectedAsset == null
+                                ? 'Busca y selecciona un equipo principal arriba para listar sus componentes hijos.'
+                                : (_childDrafts.isNotEmpty
+                                    ? 'Se encontraron ${_childDrafts.length} componente(s) hijo(s). Configura las tareas, frecuencia y repuestos de cada uno:'
+                                    : 'El equipo ${_selectedAsset!.id} - ${_selectedAsset!.name} no tiene componentes hijos registrados en el catálogo. Puedes definir materiales globales abajo:'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _selectedAsset == null ? Colors.blueGrey.shade700 : Colors.grey.shade600,
+                              fontStyle: _selectedAsset == null ? FontStyle.italic : FontStyle.normal,
+                            ),
                           ),
                           const SizedBox(height: 10),
 
@@ -3316,9 +3383,11 @@ class _AuthorizeStatusChangeDialogState
           ),
         ],
       ),
-      content: SizedBox(
-        width: 480,
-        child: Form(
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: SizedBox(
+          width: double.maxFinite,
+          child: Form(
           key: _formKey,
           child: SingleChildScrollView(
             child: Column(
@@ -3398,6 +3467,7 @@ class _AuthorizeStatusChangeDialogState
               ],
             ),
           ),
+        ),
         ),
       ),
       actions: [

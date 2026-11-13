@@ -10,6 +10,7 @@ class CreateUserParams {
     required this.password,
     required this.role,
     this.permissions = const {},
+    this.employeeId,
   });
 
   final String username;
@@ -17,6 +18,7 @@ class CreateUserParams {
   final String password;
   final UserRole role;
   final Set<String> permissions;
+  final int? employeeId;
 }
 
 class CreateUserUseCase implements UseCase<void, CreateUserParams> {
@@ -32,6 +34,7 @@ class CreateUserUseCase implements UseCase<void, CreateUserParams> {
       password: params.password,
       role: params.role,
       permissions: params.permissions,
+      employeeId: params.employeeId,
     );
   }
 }

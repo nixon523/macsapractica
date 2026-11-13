@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../assets/presentation/views/widgets/asset_image_widget.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../domain/entities/breakdown_report.dart';
 import '../viewmodels/my_reports_viewmodel.dart';
@@ -653,6 +654,48 @@ class _CleanMyReportCard extends StatelessWidget {
     return '$dayStr $timeStr';
   }
 
+  void _showImageDialog(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              clipBehavior: Clip.none,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  color: Colors.black87,
+                  constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
+                  child: AssetImageWidget(
+                    imageData: imageUrl,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final (sevColor, sevText) = switch (report.severity) {
@@ -812,6 +855,68 @@ class _CleanMyReportCard extends StatelessWidget {
                           fontSize: 12,
                           color: Color(0xFFDC2626),
                           fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+
+                    // Fotografía de evidencia si fue adjuntada
+                    if (report.imageData != null && report.imageData!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      InkWell(
+                        onTap: () => _showImageDialog(context, report.imageData!),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: SizedBox(
+                                  width: 42,
+                                  height: 42,
+                                  child: AssetImageWidget(
+                                    imageData: report.imageData,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.photo_camera_outlined, size: 14, color: Color(0xFF0055A5)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Fotografía de Avería',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF0055A5),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Toca para inspeccionar en pantalla completa',
+                                    style: TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.zoom_in, size: 16, color: Color(0xFF0055A5)),
+                            ],
+                          ),
                         ),
                       ),
                     ],

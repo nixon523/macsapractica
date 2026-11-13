@@ -15,6 +15,7 @@ import '../../features/kardex/presentation/viewmodels/kardex_list_viewmodel.dart
 import '../../features/preventive_schedules/presentation/viewmodels/preventive_schedule_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_list_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_alerts_viewmodel.dart';
+import '../../features/employees/presentation/viewmodels/employee_list_viewmodel.dart';
 import '../../features/app_update/presentation/viewmodels/app_update_viewmodel.dart';
 import 'get_it.dart';
 
@@ -63,5 +64,8 @@ final List<SingleChildWidget> appProviders = [
   ),
   ChangeNotifierProvider<WorkOrderAlertsViewModel>(
     create: (_) => getIt<WorkOrderAlertsViewModel>(),
+  ),
+  ChangeNotifierProvider<EmployeeListViewModel>(
+    create: (_) => getIt<EmployeeListViewModel>(),
   ),
 ];

@@ -143,7 +143,7 @@ class _AssetTransferViewState extends State<AssetTransferView> {
             ViewState.error => Card(
                 child: ListTile(
                   leading: const Icon(Icons.error_outline),
-                  title: Text('No se pudieron cargar las áreas'),
+                  title: const Text('No se pudieron cargar las áreas'),
                   subtitle: Text(areaState.errorMessage),
                   trailing: TextButton(
                     onPressed: () =>
@@ -159,24 +159,7 @@ class _AssetTransferViewState extends State<AssetTransferView> {
                       child: Text('No hay otras áreas disponibles.'),
                     ),
                   )
-                : DropdownButtonFormField<Area>(
-                    initialValue: _targetArea,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: 'Selecciona un área',
-                    ),
-                    items: [
-                      for (final area in eligibleAreas)
-                        DropdownMenuItem(
-                          value: area,
-                          child: Text('${area.id} - ${area.name}'),
-                        ),
-                    ],
-                    onChanged: (area) {
-                      setState(() => _targetArea = area);
-                      if (area != null) _loadPreview(area.id);
-                    },
-                  ),
+                : _buildAreaSelectorCard(context, eligibleAreas),
           },
           const SizedBox(height: 16),
           if (_targetArea != null) ...[
@@ -221,6 +204,383 @@ class _AssetTransferViewState extends State<AssetTransferView> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildAreaSelectorCard(BuildContext context, List<Area> eligibleAreas) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+    final hasArea = _targetArea != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: hasArea
+              ? const Color(0xFF0055A5).withValues(alpha: 0.6)
+              : borderColor,
+          width: hasArea ? 1.2 : 1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openAreaSearchDialog(context, eligibleAreas),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                if (!hasArea) ...[
+                  const Expanded(
+                    child: Text(
+                      'Buscar o seleccionar área de destino...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: const Color(0xFF0055A5).withValues(alpha: 0.25),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      _targetArea!.id,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0055A5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _targetArea!.name,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (_targetArea!.costCenter.isNotEmpty)
+                          Text(
+                            'Centro de Costos: ${_targetArea!.costCenter}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: () => _openAreaSearchDialog(context, eligibleAreas),
+                  style: OutlinedButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: const Color(0xFF0055A5),
+                    side: BorderSide(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.35),
+                      width: 0.9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  ),
+                  child: Text(
+                    hasArea ? 'Cambiar' : 'Buscar Área',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openAreaSearchDialog(BuildContext context, List<Area> eligibleAreas) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _TransferAreaSearchDialog(
+        areas: eligibleAreas,
+        selectedAreaId: _targetArea?.id,
+        onAreaSelected: (area) {
+          setState(() => _targetArea = area);
+          _loadPreview(area.id);
+        },
+      ),
+    );
+  }
+}
+
+class _TransferAreaSearchDialog extends StatefulWidget {
+  const _TransferAreaSearchDialog({
+    required this.areas,
+    required this.selectedAreaId,
+    required this.onAreaSelected,
+  });
+
+  final List<Area> areas;
+  final String? selectedAreaId;
+  final ValueChanged<Area> onAreaSelected;
+
+  @override
+  State<_TransferAreaSearchDialog> createState() => _TransferAreaSearchDialogState();
+}
+
+class _TransferAreaSearchDialogState extends State<_TransferAreaSearchDialog> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  String _clean(String input) {
+    return input
+        .toLowerCase()
+        .trim()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cleanQuery = _clean(_query);
+
+    final filtered = widget.areas.where((a) {
+      if (cleanQuery.isEmpty) return true;
+      final idClean = _clean(a.id);
+      final nameClean = _clean(a.name);
+      final ccClean = _clean(a.costCenter);
+      return idClean.contains(cleanQuery) ||
+          nameClean.contains(cleanQuery) ||
+          ccClean.contains(cleanQuery);
+    }).toList();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 580),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.business_outlined,
+                      color: Color(0xFF0055A5),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Seleccionar Área de Destino',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        Text(
+                          'Filtra por código (ej. A003) o por nombre de área',
+                          style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (val) => setState(() => _query = val),
+                decoration: InputDecoration(
+                  hintText: 'Escribe el código o nombre del área...',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: Color(0xFF0055A5), width: 1.5),
+                  ),
+                ),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Áreas disponibles: ${filtered.length}',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off_rounded, size: 38, color: Colors.grey.shade400),
+                            const SizedBox(height: 10),
+                            Text(
+                              'No se encontraron áreas para "$_query"',
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, idx) {
+                        final area = filtered[idx];
+                        final isSelected = widget.selectedAreaId == area.id;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Material(
+                            color: isSelected
+                                ? const Color(0xFF0055A5).withValues(alpha: 0.08)
+                                : Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: BorderSide(
+                                color: isSelected
+                                    ? const Color(0xFF0055A5).withValues(alpha: 0.4)
+                                    : Colors.transparent,
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: ListTile(
+                              dense: true,
+                              onTap: () {
+                                widget.onAreaSelected(area);
+                                Navigator.of(context).pop();
+                              },
+                            leading: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                area.id,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0055A5),
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              area.name,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                                color: isSelected ? const Color(0xFF0055A5) : null,
+                              ),
+                            ),
+                            subtitle: Text(
+                              area.costCenter.isNotEmpty
+                                  ? 'Centro de Costos: ${area.costCenter}'
+                                  : 'Área Operativa',
+                              style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle, color: Color(0xFF0055A5), size: 20)
+                                : const Icon(Icons.chevron_right, size: 18, color: Color(0xFF94A3B8)),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

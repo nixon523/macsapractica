@@ -46,6 +46,7 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
     DateTime? scheduledDate,
     String? reportId,
     String? preventiveScheduleId,
+    String? breakdownImageData,
     required String createdByUserId,
     required String createdByUserName,
   }) {
@@ -64,6 +65,7 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
       scheduledDate: scheduledDate,
       reportId: reportId,
       preventiveScheduleId: preventiveScheduleId,
+      breakdownImageData: breakdownImageData,
       createdByUserId: createdByUserId,
       createdByUserName: createdByUserName,
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../app/widgets/app_dialog.dart';
 import '../../../../core/utils/upper_case_formatter.dart';
 import 'package:macsapractica/app/router/app_router.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
@@ -61,6 +62,7 @@ class _AreaSelectionViewState extends State<AreaSelectionView> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: Row(
           children: [
@@ -82,52 +84,52 @@ class _AreaSelectionViewState extends State<AreaSelectionView> {
           ],
         ),
         content: SizedBox(
-          width: 440,
+          width: responsiveDialogWidth(ctx, 440),
           child: Form(
             key: formKey,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Modifica los datos del área. Todo cambio quedará registrado en el Kardex.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: nameCtrl,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.characters,
-                  inputFormatters: [UpperCaseTextFormatter()],
-                  decoration: InputDecoration(
-                    labelText: 'Nombre del Área / Centro de Costo *',
-                    hintText: 'Ej: ALMACEN GENERAL',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
+                  Text(
+                    'Modifica los datos del área. Todo cambio quedará registrado en el Kardex.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                   ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'El nombre es obligatorio.' : null,
-                ),
-                const SizedBox(height: 14),
-                TextFormField(
-                  controller: ccCtrl,
-                  textCapitalization: TextCapitalization.characters,
-                  inputFormatters: [UpperCaseTextFormatter()],
-                  decoration: InputDecoration(
-                    labelText: 'Centro de Costo (CC) *',
-                    hintText: 'Ej: CC-50',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    filled: true,
-                    fillColor: Colors.grey.shade50,
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: nameCtrl,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [UpperCaseTextFormatter()],
+                    decoration: InputDecoration(
+                      labelText: 'Nombre del Área / Centro de Costo *',
+                      hintText: 'Ej: ALMACEN GENERAL',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'El nombre es obligatorio.' : null,
                   ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? 'El centro de costo es obligatorio.' : null,
-                ),
-              ],
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: ccCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [UpperCaseTextFormatter()],
+                    decoration: InputDecoration(
+                      labelText: 'Centro de Costo (CC) *',
+                      hintText: 'Ej: CC-50',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'El centro de costo es obligatorio.' : null,
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -194,39 +196,44 @@ class _AreaSelectionViewState extends State<AreaSelectionView> {
             ),
           ],
         ),
-        content: SizedBox(
-          width: 440,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '¿Estás seguro de que deseas dar de baja o eliminar el área "${area.name}" (${area.id})?',
-                style: const TextStyle(fontSize: 13, height: 1.3),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '¿Estás seguro de que deseas dar de baja o eliminar el área "${area.name}" (${area.id})?',
+                  style: const TextStyle(fontSize: 13, height: 1.3),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.info_outline, size: 16, color: Color(0xFFD97706)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Integridad: El sistema verificará que el área no contenga activos activos, planes preventivos u órdenes de trabajo en curso antes de proceder.',
-                        style: TextStyle(fontSize: 11.5, color: Colors.brown.shade800, height: 1.3),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline, size: 16, color: Color(0xFFD97706)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Integridad: El sistema verificará que el área no contenga activos activos, planes preventivos u órdenes de trabajo en curso antes de proceder.',
+                          style: TextStyle(fontSize: 11.5, color: Colors.brown.shade800, height: 1.3),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
           ),
         ),
         actions: [

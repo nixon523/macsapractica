@@ -18,6 +18,7 @@ class BreakdownReportRepositoryImpl implements BreakdownReportRepository {
     required BreakdownSeverity severity,
     required String reportedByUserId,
     required String reportedByUserName,
+    String? imageData,
   }) {
     return remoteDataSource.createReport(
       assetId: assetId,
@@ -27,6 +28,7 @@ class BreakdownReportRepositoryImpl implements BreakdownReportRepository {
       severity: severity,
       reportedByUserId: reportedByUserId,
       reportedByUserName: reportedByUserName,
+      imageData: imageData,
     );
   }
 

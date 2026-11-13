@@ -65,6 +65,7 @@ class AuthRemoteDataSource {
     required UserRole role,
     Set<String> permissions = const {},
     bool mustChangePassword = true,
+    int? employeeId,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.users,
@@ -74,6 +75,7 @@ class AuthRemoteDataSource {
         'roleCode': role.code,
         'password': password,
         if (permissions.isNotEmpty) 'permissions': permissions.toList(),
+        if (employeeId != null) 'employeeId': employeeId,
       },
     );
 
@@ -87,6 +89,7 @@ class AuthRemoteDataSource {
       role: role,
       permissions: permissions.isNotEmpty ? permissions : role.defaultPermissions,
       mustChangePassword: mustChangePassword,
+      employeeId: employeeId,
     );
   }
 
@@ -96,6 +99,7 @@ class AuthRemoteDataSource {
     UserRole? role,
     String? newPassword,
     Set<String>? permissions,
+    int? employeeId,
   }) async {
     await _apiClient.put(
       ApiEndpoints.userById(userId),
@@ -105,6 +109,7 @@ class AuthRemoteDataSource {
         if (newPassword != null && newPassword.isNotEmpty)
           'newPassword': newPassword,
         if (permissions != null) 'permissions': permissions.toList(),
+        if (employeeId != null) 'employeeId': employeeId,
       },
     );
   }

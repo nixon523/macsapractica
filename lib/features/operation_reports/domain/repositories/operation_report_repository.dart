@@ -1,4 +1,5 @@
-﻿import '../entities/operation_report.dart';
+import '../entities/maintenance_analytics.dart';
+import '../entities/operation_report.dart';
 
 abstract class OperationReportRepository {
   Future<OperationReport> registrarReporte({
@@ -12,6 +13,11 @@ abstract class OperationReportRepository {
     double horasParoPlanificado = 0.0,
     double horasParoExterno = 0.0,
     String? observaciones,
+    double? unidadesProducidas,
+    double? unidadesEsperadas,
+    double? unidadesConformes,
+    double? rendimientoDirectoPct,
+    double? calidadDirectoPct,
   });
 
   Future<List<OperationReport>> obtenerPorActivo(
@@ -38,5 +44,40 @@ abstract class OperationReportRepository {
   Future<void> actualizarEsEquipoProceso(
     String codigoActivo, {
     required bool esEquipoProceso,
+  });
+
+  // Analítica & Reportería
+  Future<AssetHistoryAnalytics> obtenerHistorialActivo(
+    String codigoActivo, {
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+    bool incluirHijos = true,
+  });
+
+  Future<List<SeasonalityStat>> obtenerEstacionalidad({
+    String? areaId,
+    int? anio,
+  });
+
+  Future<List<TopFailureAsset>> obtenerTopFallas({
+    String? areaId,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+    int top = 10,
+  });
+
+  Future<List<PartReplacementStat>> obtenerConsumoRepuestos({
+    String? areaId,
+    String? codigoActivo,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+    int top = 20,
+  });
+
+  Future<List<OeeGeneralRecord>> obtenerOEEGeneral({
+    String? areaId,
+    String? codigoActivo,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
   });
 }

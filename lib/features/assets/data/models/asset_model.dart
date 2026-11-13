@@ -54,7 +54,7 @@ class AssetModel extends Asset {
     final areaId = (map['areaId'] ?? map['AreaId'] ?? '').toString();
     final stationId = (map['stationId'] ?? map['StationId'] ?? '').toString();
     final parentAssetId =
-        (map['parentAssetId'] ?? map['ParentAssetCode'] ?? map['parentAssetCode'])
+        (map['parentAssetId'] ?? map['ParentAssetCode'] ?? map['parentAssetCode'] ?? map['CodigoActivoPadre'] ?? map['codigoActivoPadre'])
             ?.toString();
 
     final levelStr =
@@ -74,7 +74,7 @@ class AssetModel extends Asset {
           (map['ancestorsPath'] ?? map['AncestorsPath'])?.toString();
       if (path != null && path.trim().isNotEmpty) {
         ancestors = path
-            .split(',')
+            .split(RegExp(r'[/,]'))
             .map((s) => s.trim())
             .where((s) => s.isNotEmpty)
             .toList();
@@ -245,3 +245,4 @@ class AssetModel extends Asset {
     };
   }
 }
+

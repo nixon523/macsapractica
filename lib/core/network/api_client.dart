@@ -1,3 +1,4 @@
+import 'dart:async' show TimeoutException;
 import 'dart:convert';
 import 'dart:io' show SocketException;
 
@@ -22,22 +23,25 @@ class ApiClient {
   final http.Client _httpClient;
   final SessionManager _sessionManager;
 
+  static const Duration defaultTimeout = Duration(seconds: 15);
+
   static String get defaultBaseUrl {
     const fromEnv = String.fromEnvironment('API_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
 
-    // Producción Web (en IIS detrás del Reverse Proxy):
-    if (kIsWeb && kReleaseMode) {
-      return 'http://192.168.1.15/api';
-    }
-
-    // Desarrollo Local en tu PC (Debug Web, Windows o Emulador):
-    if (kDebugMode) {
+    if (kIsWeb) {
+      final host = Uri.base.host;
+      if (host.isNotEmpty && host != 'localhost' && host != '127.0.0.1') {
+        return '${Uri.base.scheme}://$host:3000/api';
+      }
       return 'http://localhost:3000/api';
     }
 
-    // Producción Release (APK Android / Build de Producción):
-    return 'http://192.168.1.15/api';
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:3000/api';
+    }
+
+    return 'http://localhost:3000/api';
   }
 
   String get baseUrl => _baseUrl;
@@ -89,11 +93,17 @@ class ApiClient {
   }) async {
     final uri = _buildUri(path, queryParameters);
     try {
-      final response = await _httpClient.get(
-        uri,
-        headers: _buildHeaders(extraHeaders: headers),
-      );
+      final response = await _httpClient
+          .get(
+            uri,
+            headers: _buildHeaders(extraHeaders: headers),
+          )
+          .timeout(defaultTimeout);
       return _handleResponse(response);
+    } on TimeoutException catch (_) {
+      throw const ServerFailure(
+        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+      );
     } on SocketException catch (_) {
       throw const ServerFailure(
         message: 'No se pudo establecer conexión con el servidor de la API.',
@@ -113,12 +123,18 @@ class ApiClient {
   }) async {
     final uri = _buildUri(path, queryParameters);
     try {
-      final response = await _httpClient.post(
-        uri,
-        headers: _buildHeaders(extraHeaders: headers),
-        body: body != null ? jsonEncode(body) : null,
-      );
+      final response = await _httpClient
+          .post(
+            uri,
+            headers: _buildHeaders(extraHeaders: headers),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(defaultTimeout);
       return _handleResponse(response);
+    } on TimeoutException catch (_) {
+      throw const ServerFailure(
+        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+      );
     } on SocketException catch (_) {
       throw const ServerFailure(
         message: 'No se pudo establecer conexión con el servidor de la API.',
@@ -138,12 +154,18 @@ class ApiClient {
   }) async {
     final uri = _buildUri(path, queryParameters);
     try {
-      final response = await _httpClient.put(
-        uri,
-        headers: _buildHeaders(extraHeaders: headers),
-        body: body != null ? jsonEncode(body) : null,
-      );
+      final response = await _httpClient
+          .put(
+            uri,
+            headers: _buildHeaders(extraHeaders: headers),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(defaultTimeout);
       return _handleResponse(response);
+    } on TimeoutException catch (_) {
+      throw const ServerFailure(
+        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+      );
     } on SocketException catch (_) {
       throw const ServerFailure(
         message: 'No se pudo establecer conexión con el servidor de la API.',
@@ -163,12 +185,18 @@ class ApiClient {
   }) async {
     final uri = _buildUri(path, queryParameters);
     try {
-      final response = await _httpClient.patch(
-        uri,
-        headers: _buildHeaders(extraHeaders: headers),
-        body: body != null ? jsonEncode(body) : null,
-      );
+      final response = await _httpClient
+          .patch(
+            uri,
+            headers: _buildHeaders(extraHeaders: headers),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(defaultTimeout);
       return _handleResponse(response);
+    } on TimeoutException catch (_) {
+      throw const ServerFailure(
+        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+      );
     } on SocketException catch (_) {
       throw const ServerFailure(
         message: 'No se pudo establecer conexión con el servidor de la API.',
@@ -188,12 +216,18 @@ class ApiClient {
   }) async {
     final uri = _buildUri(path, queryParameters);
     try {
-      final response = await _httpClient.delete(
-        uri,
-        headers: _buildHeaders(extraHeaders: headers),
-        body: body != null ? jsonEncode(body) : null,
-      );
+      final response = await _httpClient
+          .delete(
+            uri,
+            headers: _buildHeaders(extraHeaders: headers),
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(defaultTimeout);
       return _handleResponse(response);
+    } on TimeoutException catch (_) {
+      throw const ServerFailure(
+        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+      );
     } on SocketException catch (_) {
       throw const ServerFailure(
         message: 'No se pudo establecer conexión con el servidor de la API.',
@@ -241,9 +275,13 @@ class ApiClient {
       if (fields != null) {
         request.fields.addAll(fields);
       }
-      final streamedResponse = await _httpClient.send(request);
+      final streamedResponse = await _httpClient.send(request).timeout(defaultTimeout);
       final response = await http.Response.fromStream(streamedResponse);
       return _handleResponse(response);
+    } on TimeoutException catch (_) {
+      throw const ServerFailure(
+        message: 'Tiempo de espera agotado al subir el archivo (15 s). Verifica tu conexión.',
+      );
     } on SocketException catch (_) {
       throw const ServerFailure(
         message: 'No se pudo establecer conexión con el servidor de la API.',

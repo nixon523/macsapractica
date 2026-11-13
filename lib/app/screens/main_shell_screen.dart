@@ -11,6 +11,7 @@ import '../../features/preventive_schedules/presentation/views/preventive_schedu
 import '../../features/kardex/presentation/views/kardex_list_view.dart';
 import '../../features/auth_permissions/presentation/views/user_list_view.dart';
 import '../../features/asset_deletion/presentation/views/deletion_requests_view.dart';
+import '../../features/employees/presentation/views/employee_list_view.dart';
 import '../../features/breakdown_reports/presentation/views/report_breakdown_view.dart';
 import '../../features/breakdown_reports/presentation/views/my_reports_view.dart';
 import '../../features/breakdown_reports/presentation/views/breakdown_reports_view.dart';
@@ -19,6 +20,7 @@ import '../../features/breakdown_reports/presentation/viewmodels/my_reports_noti
 import '../../features/auth_permissions/presentation/viewmodels/password_reset_alerts_viewmodel.dart';
 import '../../features/preventive_schedules/presentation/viewmodels/preventive_schedule_viewmodel.dart';
 import '../../features/work_orders/presentation/viewmodels/work_order_alerts_viewmodel.dart';
+import '../../features/operation_reports/presentation/views/maintenance_analytics_dashboard_view.dart';
 import '../../features/operation_reports/presentation/views/operation_report_list_view.dart';
 import '../../features/operation_reports/presentation/viewmodels/operation_report_viewmodel.dart';
 import '../../features/app_update/presentation/viewmodels/app_update_viewmodel.dart';
@@ -38,11 +40,13 @@ enum _ShellSection {
   workOrders,
   preventive,
   operationReports,
+  maintenanceAnalytics,
   kardex,
   reportBreakdown,
   myReports,
   breakdownReports,
   deletionRequests,
+  employees,
   users,
 }
 
@@ -126,6 +130,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
       activeIcon: Icons.event_repeat,
       label: 'Mantenimiento Preventivo',
     ),
+    _ShellSection.maintenanceAnalytics: const SidebarItem(
+      icon: Icons.insights_outlined,
+      activeIcon: Icons.insights,
+      label: 'Analítica y Reportería',
+    ),
     _ShellSection.operationReports: SidebarItem(
       icon: Icons.speed_outlined,
       activeIcon: Icons.speed,
@@ -156,6 +165,11 @@ class _MainShellScreenState extends State<MainShellScreen> {
       activeIcon: Icons.pending_actions,
       label: 'Solicitudes',
     ),
+    _ShellSection.employees: SidebarItem(
+      icon: Icons.badge_outlined,
+      activeIcon: Icons.badge,
+      label: 'Personal / Empleados',
+    ),
     _ShellSection.users: SidebarItem(
       icon: Icons.people_outlined,
       activeIcon: Icons.people,
@@ -168,6 +182,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       return const [
         _ShellSection.dashboard,
         _ShellSection.operationReports,
+        _ShellSection.maintenanceAnalytics,
         _ShellSection.kardex,
         _ShellSection.assets,
         _ShellSection.workOrders,
@@ -176,6 +191,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         _ShellSection.myReports,
         _ShellSection.breakdownReports,
         _ShellSection.deletionRequests,
+        _ShellSection.employees,
         _ShellSection.users,
       ];
     }
@@ -186,10 +202,10 @@ class _MainShellScreenState extends State<MainShellScreen> {
     if (user.hasPermission(AppPermissions.dashboardView)) {
       sections.add(_ShellSection.dashboard);
     }
-    if (user.hasPermission('operation_report.view') ||
-        user.hasPermission(AppPermissions.dashboardView) ||
-        user.role == UserRole.jefe) {
+    if (user.hasPermission(AppPermissions.operationReportView) ||
+        user.hasPermission(AppPermissions.dashboardView)) {
       sections.add(_ShellSection.operationReports);
+      sections.add(_ShellSection.maintenanceAnalytics);
     }
     if (user.hasPermission(AppPermissions.kardexView)) {
       sections.add(_ShellSection.kardex);
@@ -207,17 +223,14 @@ class _MainShellScreenState extends State<MainShellScreen> {
         user.hasPermission(AppPermissions.workOrderPrint)) {
       sections.add(_ShellSection.workOrders);
     }
-    if (user.hasPermission(AppPermissions.preventiveView)) {
+    if (user.hasPermission(AppPermissions.preventiveView) ||
+        user.hasPermission(AppPermissions.preventiveManage)) {
       sections.add(_ShellSection.preventive);
     }
 
     // Incidencias y Averías
     if (user.hasPermission(AppPermissions.breakdownReport)) {
       sections.add(_ShellSection.reportBreakdown);
-    }
-    if (user.hasPermission(AppPermissions.breakdownReport) ||
-        user.hasPermission(AppPermissions.breakdownView) ||
-        user.role == UserRole.reportador) {
       sections.add(_ShellSection.myReports);
     }
     if (user.hasPermission(AppPermissions.breakdownView) ||
@@ -229,6 +242,10 @@ class _MainShellScreenState extends State<MainShellScreen> {
     if (user.hasPermission(AppPermissions.assetDeleteApprove) ||
         user.hasPermission(AppPermissions.assetDeleteRequest)) {
       sections.add(_ShellSection.deletionRequests);
+    }
+    if (user.hasPermission(AppPermissions.employeeManage) ||
+        user.hasPermission(AppPermissions.userManage)) {
+      sections.add(_ShellSection.employees);
     }
     if (user.hasPermission(AppPermissions.userManage)) {
       sections.add(_ShellSection.users);
@@ -273,6 +290,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       _ShellSection.assets => const AreaSelectionView(),
       _ShellSection.workOrders => const WorkOrderListView(),
       _ShellSection.preventive => const PreventiveScheduleListView(),
+      _ShellSection.maintenanceAnalytics => const MaintenanceAnalyticsDashboardView(),
       _ShellSection.operationReports => ChangeNotifierProvider.value(
           value: getIt<OperationReportViewModel>(),
           child: const OperationReportListView(),
@@ -282,6 +300,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       _ShellSection.myReports => const MyReportsView(),
       _ShellSection.breakdownReports => const BreakdownReportsView(),
       _ShellSection.deletionRequests => const DeletionRequestsView(),
+      _ShellSection.employees => const EmployeeListView(),
       _ShellSection.users => const UserListView(),
     };
   }
@@ -579,6 +598,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         sections: const [
           _ShellSection.dashboard,
           _ShellSection.operationReports,
+        _ShellSection.maintenanceAnalytics,
           _ShellSection.kardex,
         ],
       ),
@@ -608,6 +628,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
         icon: Icons.admin_panel_settings_outlined,
         sections: const [
           _ShellSection.deletionRequests,
+          _ShellSection.employees,
           _ShellSection.users,
         ],
       ),

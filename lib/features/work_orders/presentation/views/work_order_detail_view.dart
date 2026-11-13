@@ -3,8 +3,12 @@ import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
+import '../../../../app/widgets/app_dialog.dart';
+import '../../../../app/widgets/app_feedback.dart';
+import '../../../assets/presentation/views/widgets/asset_image_widget.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../breakdown_reports/domain/usecases/resolve_breakdown_report.dart';
+import '../../../employees/presentation/viewmodels/employee_list_viewmodel.dart';
 import '../../domain/entities/work_order.dart';
 import '../viewmodels/work_order_create_viewmodel.dart';
 import '../viewmodels/work_order_detail_viewmodel.dart';
@@ -80,20 +84,14 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
         WorkOrderStatus.completed => 'Completada',
         WorkOrderStatus.cancelled => 'Cancelada',
       };
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          content: Text('Estado de la OT actualizado a $statusLabel.'),
-        ),
+      AppFeedback.showSuccess(
+        context,
+        'Estado de la OT actualizado a $statusLabel.',
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: const Color(0xFFDC2626),
-          content: Text('Error: ${_viewModel.errorMessage}'),
-        ),
+      AppFeedback.showError(
+        context,
+        'Error: ${_viewModel.errorMessage}',
       );
     }
   }
@@ -133,7 +131,10 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
     final hoursCtrl = TextEditingController(
       text: _currentOrder.estimatedHours != null ? _currentOrder.estimatedHours.toString() : '',
     );
-    final mtnCtrl = TextEditingController(text: _currentOrder.maintenanceResponsible);
+    final initialMtn = (_currentOrder.maintenanceResponsible != null && _currentOrder.maintenanceResponsible!.trim().isNotEmpty)
+        ? _currentOrder.maintenanceResponsible!
+        : (_currentOrder.assignedTo ?? '');
+    final mtnCtrl = TextEditingController(text: initialMtn);
     final areaHeadCtrl = TextEditingController(text: _currentOrder.areaHeadResponsible);
     final mtnHeadCtrl = TextEditingController(text: _currentOrder.maintenanceHeadResponsible);
 
@@ -157,9 +158,11 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
               ),
             ],
           ),
-          content: SizedBox(
-            width: 520,
-            child: SingleChildScrollView(
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -244,10 +247,75 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
                   TextField(
                     controller: mtnCtrl,
                     decoration: InputDecoration(
-                      labelText: '1. Responsable Mantenimiento (Ejecutor)',
+                      labelText: '1. Responsable(s) Mantenimiento (Ejecutores)',
+                      hintText: 'Ej: Carlos Hernández, Jorge Morales...',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       isDense: true,
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.people_alt_outlined, size: 18, color: Color(0xFF0055A5)),
+                        tooltip: 'Seleccionar del catálogo de técnicos',
+                        onPressed: () async {
+                          final empVm = context.read<EmployeeListViewModel>();
+                          if (empVm.employees.isEmpty) {
+                            await empVm.loadEmployees();
+                          }
+                          final techList = empVm.maintenanceTechnicians;
+                          if (techList.isEmpty || !context.mounted) return;
+
+                          final currentTechs = mtnCtrl.text
+                              .split(',')
+                              .map((s) => s.trim())
+                              .where((s) => s.isNotEmpty)
+                              .toSet();
+
+                          await showDialog(
+                            context: context,
+                            builder: (ctx) => StatefulBuilder(
+                              builder: (ctx, setMulti) => AppDialog(
+                                maxWidth: 440,
+                                icon: const Icon(Icons.engineering, color: Color(0xFF0055A5)),
+                                title: const Text('Seleccionar Ejecutores'),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: techList.map((t) {
+                                    final isChecked = currentTechs.contains(t.fullName);
+                                    return CheckboxListTile(
+                                      value: isChecked,
+                                      dense: true,
+                                      activeColor: const Color(0xFF0055A5),
+                                      title: Text(t.fullName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                      subtitle: Text(t.position, style: const TextStyle(fontSize: 11)),
+                                      onChanged: (val) {
+                                        setMulti(() {
+                                          if (val == true) {
+                                            currentTechs.add(t.fullName);
+                                          } else {
+                                            currentTechs.remove(t.fullName);
+                                          }
+                                        });
+                                      },
+                                    );
+                                  }).toList(),
+                                ),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                                  FilledButton(
+                                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        mtnCtrl.text = currentTechs.join(', ');
+                                      });
+                                      Navigator.pop(ctx);
+                                    },
+                                    child: const Text('Aceptar'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -273,6 +341,7 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
                 ],
               ),
             ),
+            ),
           ),
           actions: [
             TextButton(
@@ -280,7 +349,23 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: () {
+                if (workDoneCtrl.text.trim().isEmpty) {
+                  AppFeedback.showWarning(
+                    context,
+                    'El campo "Trabajo realizado y observaciones" es obligatorio.',
+                  );
+                  return;
+                }
+                if (!isCompleted && unfulfillmentCtrl.text.trim().isEmpty) {
+                  AppFeedback.showWarning(
+                    context,
+                    'Debes especificar el motivo del no cumplimiento.',
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
               child: const Text('Guardar Informe'),
             ),
           ],
@@ -289,9 +374,11 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
     );
 
     if (saved == true && mounted) {
+      final hoursVal = double.tryParse(hoursCtrl.text.trim());
       final updated = _currentOrder.copyWith(
         assignedStaffCount: int.tryParse(staffCtrl.text.trim()),
-        estimatedHours: double.tryParse(hoursCtrl.text.trim()),
+        estimatedHours: hoursVal ?? _currentOrder.estimatedHours,
+        actualHours: hoursVal ?? _currentOrder.actualHours,
         workDoneDescription: workDoneCtrl.text.trim(),
         isCompleted: isCompleted,
         unfulfillmentReason: !isCompleted ? unfulfillmentCtrl.text.trim() : null,
@@ -308,13 +395,16 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
 
       if (ok && mounted) {
         setState(() => _currentOrder = updated);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            backgroundColor: const Color(0xFF16A34A),
-            content: const Text('Informe de mantenimiento guardado.'),
-          ),
+        AppFeedback.showSuccess(
+          context,
+          'Informe de mantenimiento guardado exitosamente.',
+        );
+      } else if (mounted) {
+        AppFeedback.showError(
+          context,
+          _viewModel.errorMessage.isNotEmpty
+              ? 'Error al guardar el informe: ${_viewModel.errorMessage}'
+              : 'No se pudo guardar el informe de mantenimiento en el servidor.',
         );
       }
     }
@@ -323,7 +413,9 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
   @override
   Widget build(BuildContext context) {
     final order = _currentOrder;
-    final canPrint = context.watch<AuthViewModel>().hasPermission('work_order.print');
+    final authVm = context.watch<AuthViewModel>();
+    final canPrint = authVm.hasPermission('work_order.print');
+    final canManage = authVm.hasPermission('work_order.create');
 
     return ChangeNotifierProvider<WorkOrderDetailViewModel>.value(
       value: _viewModel,
@@ -361,6 +453,7 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
             child: _WorkOrderDetail(
               order: order,
               isProcessing: _viewModel.isProcessing,
+              canManage: canManage,
               onStart: () => _changeStatus(WorkOrderStatus.inProgress),
               onComplete: () async {
                 await _changeStatus(WorkOrderStatus.completed);
@@ -380,6 +473,7 @@ class _WorkOrderDetail extends StatelessWidget {
   const _WorkOrderDetail({
     required this.order,
     required this.isProcessing,
+    required this.canManage,
     required this.onStart,
     required this.onComplete,
     required this.onCancel,
@@ -389,11 +483,54 @@ class _WorkOrderDetail extends StatelessWidget {
 
   final WorkOrder order;
   final bool isProcessing;
+  final bool canManage;
   final VoidCallback onStart;
   final VoidCallback onComplete;
   final VoidCallback onCancel;
   final VoidCallback onEditExecution;
   final VoidCallback? onPrint;
+
+  void _showImageDialog(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              clipBehavior: Clip.none,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  color: Colors.black87,
+                  constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
+                  child: AssetImageWidget(
+                    imageData: imageUrl,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -502,6 +639,67 @@ class _WorkOrderDetail extends StatelessWidget {
               if (order.areaId != null && order.areaId!.isNotEmpty)
                 _InfoTile(icon: Icons.business_outlined, label: 'Área Operativa', value: order.areaId!),
               _InfoTile(icon: Icons.notes_outlined, label: 'Falla o Trabajo', value: order.description),
+              if (order.breakdownImageData != null && order.breakdownImageData!.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                InkWell(
+                  onTap: () => _showImageDialog(context, order.breakdownImageData!),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF0055A5).withValues(alpha: 0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: SizedBox(
+                            width: 58,
+                            height: 58,
+                            child: AssetImageWidget(
+                              imageData: order.breakdownImageData,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.photo_camera_outlined, size: 15, color: Color(0xFF0055A5)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    order.reportId != null && order.reportId!.isNotEmpty
+                                        ? 'Evidencia de Avería #${order.reportId}'
+                                        : 'Evidencia Fotográfica de la Falla',
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0055A5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Fotografía capturada al reportar la incidencia. Toca para examinar en detalle.',
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.zoom_in, color: Color(0xFF0055A5), size: 22),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               if (order.requestedWorkTypes.isNotEmpty)
                 _InfoTile(
                   icon: Icons.build_circle_outlined,
@@ -509,7 +707,7 @@ class _WorkOrderDetail extends StatelessWidget {
                   value: order.requestedWorkTypes.map((t) => kWorkTypeLabels[t] ?? t).join(', '),
                 ),
               if (order.assignedTo != null && order.assignedTo!.isNotEmpty)
-                _InfoTile(icon: Icons.person_outline, label: 'Técnico Asignado', value: order.assignedTo!),
+                _InfoTile(icon: Icons.person_outline, label: 'Técnico(s) Asignado(s)', value: order.assignedTo!),
               if (order.assignedStaffCount != null || order.estimatedHours != null)
                 _InfoTile(
                   icon: Icons.access_time_outlined,
@@ -645,7 +843,7 @@ class _WorkOrderDetail extends StatelessWidget {
                   if (order.unfulfillmentReason != null)
                     _InfoTile(icon: Icons.warning_amber_outlined, label: 'Motivo No Cumplimiento', value: order.unfulfillmentReason!),
                   if (order.maintenanceResponsible != null && order.maintenanceResponsible!.isNotEmpty)
-                    _InfoTile(icon: Icons.engineering_outlined, label: '1. Ejecutor Mantenimiento', value: order.maintenanceResponsible!),
+                    _InfoTile(icon: Icons.engineering_outlined, label: '1. Ejecutor(es) Mantenimiento', value: order.maintenanceResponsible!),
                   if (order.areaHeadResponsible != null && order.areaHeadResponsible!.isNotEmpty)
                     _InfoTile(icon: Icons.person_pin_outlined, label: '2. Jefe de Área', value: order.areaHeadResponsible!),
                   if (order.maintenanceHeadResponsible != null && order.maintenanceHeadResponsible!.isNotEmpty)
@@ -670,7 +868,7 @@ class _WorkOrderDetail extends StatelessWidget {
 
         const SizedBox(height: 10),
 
-        if (order.status == WorkOrderStatus.inProgress) ...[
+        if (canManage && order.status == WorkOrderStatus.inProgress) ...[
           SizedBox(
             height: 44,
             child: OutlinedButton.icon(
@@ -682,7 +880,7 @@ class _WorkOrderDetail extends StatelessWidget {
           const SizedBox(height: 10),
         ],
 
-        if (order.status == WorkOrderStatus.pending) ...[
+        if (canManage && order.status == WorkOrderStatus.pending) ...[
           SizedBox(
             height: 46,
             child: FilledButton.icon(
@@ -703,7 +901,7 @@ class _WorkOrderDetail extends StatelessWidget {
           ),
         ],
 
-        if (order.status == WorkOrderStatus.inProgress) ...[
+        if (canManage && order.status == WorkOrderStatus.inProgress) ...[
           if (order.workDoneDescription == null || order.workDoneDescription!.trim().isEmpty)
             Container(
               padding: const EdgeInsets.all(10),
@@ -729,12 +927,19 @@ class _WorkOrderDetail extends StatelessWidget {
           SizedBox(
             height: 46,
             child: FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),
-              onPressed: isProcessing ||
-                      order.workDoneDescription == null ||
-                      order.workDoneDescription!.trim().isEmpty
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
+              onPressed: isProcessing
                   ? null
-                  : onComplete,
+                  : (order.workDoneDescription == null ||
+                          order.workDoneDescription!.trim().isEmpty
+                      ? () {
+                          AppFeedback.showWarning(
+                            context,
+                            'Primero debes registrar el informe de ejecución.',
+                          );
+                          onEditExecution();
+                        }
+                      : onComplete),
               icon: const Icon(Icons.check_circle_outline, size: 20),
               label: const Text('Completar y Cerrar Orden de Trabajo', style: TextStyle(fontWeight: FontWeight.bold)),
             ),

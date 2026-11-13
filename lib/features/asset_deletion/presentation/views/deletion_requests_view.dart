@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
+import '../../../../app/widgets/app_feedback.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../domain/entities/asset_delete_request.dart';
 import '../viewmodels/deletion_requests_viewmodel.dart';
@@ -182,15 +183,11 @@ class _DeletionRequestsContentState extends State<_DeletionRequestsContent> {
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? 'Solicitud aprobada: ${request.assetId} dado de baja.'
-              : 'Error: ${viewModel.errorMessage}',
-        ),
-      ),
-    );
+    if (ok) {
+      AppFeedback.showSuccess(context, 'Solicitud aprobada: ${request.assetId} dado de baja.');
+    } else {
+      AppFeedback.showError(context, 'Error: ${viewModel.errorMessage}');
+    }
   }
 
   Future<void> _confirmReject(AssetDeleteRequest request) async {
@@ -202,13 +199,15 @@ class _DeletionRequestsContentState extends State<_DeletionRequestsContent> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Rechazar solicitud'),
-        content: TextField(
-          controller: reasonCtrl,
-          autofocus: true,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Motivo del rechazo *',
-            border: OutlineInputBorder(),
+        content: SingleChildScrollView(
+          child: TextField(
+            controller: reasonCtrl,
+            autofocus: true,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Motivo del rechazo *',
+              border: OutlineInputBorder(),
+            ),
           ),
         ),
         actions: [
@@ -229,9 +228,7 @@ class _DeletionRequestsContentState extends State<_DeletionRequestsContent> {
 
     final reason = reasonCtrl.text.trim();
     if (reason.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Debes indicar el motivo del rechazo.')),
-      );
+      AppFeedback.showWarning(context, 'Debes indicar el motivo del rechazo.');
       return;
     }
 
@@ -244,13 +241,11 @@ class _DeletionRequestsContentState extends State<_DeletionRequestsContent> {
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok ? 'Solicitud rechazada.' : 'Error: ${viewModel.errorMessage}',
-        ),
-      ),
-    );
+    if (ok) {
+      AppFeedback.showSuccess(context, 'Solicitud de baja rechazada.');
+    } else {
+      AppFeedback.showError(context, 'Error: ${viewModel.errorMessage}');
+    }
   }
 
   List<AssetDeleteRequest> _filterRequests(List<AssetDeleteRequest> list) {

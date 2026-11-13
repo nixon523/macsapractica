@@ -22,6 +22,7 @@ class BreakdownReport {
     this.rejectedByUserId,
     this.rejectedByUserName,
     this.rejectedAt,
+    this.imageData,
   });
 
   final String id;
@@ -34,6 +35,9 @@ class BreakdownReport {
   final String reportedByUserName;
   final DateTime? reportedAt;
   final BreakdownReportStatus status;
+
+  /// Evidencia fotográfica de la avería (URL de servidor o base64).
+  final String? imageData;
 
   /// OT generada para atender este reporte (si existe).
   final String? workOrderId;

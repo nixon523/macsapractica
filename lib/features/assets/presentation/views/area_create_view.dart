@@ -79,6 +79,8 @@ class _AreaFormState extends State<_AreaForm> {
     final vm = context.watch<AreaCreateEditViewModel>();
     final currentPreview = vm.previewId ?? 'A...';
 
+    final isMobile = MediaQuery.sizeOf(context).width < 500;
+
     return Scaffold(
       backgroundColor: colors.surfaceContainerLowest,
       appBar: AppBar(
@@ -89,7 +91,7 @@ class _AreaFormState extends State<_AreaForm> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20, vertical: 20),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 580),
               child: Card(
@@ -100,7 +102,7 @@ class _AreaFormState extends State<_AreaForm> {
                 ),
                 color: colors.surface,
                 child: Padding(
-                  padding: const EdgeInsets.all(28),
+                  padding: EdgeInsets.all(isMobile ? 16 : 28),
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -163,30 +165,34 @@ class _AreaFormState extends State<_AreaForm> {
                             children: [
                               const Icon(Icons.tag, size: 20, color: Color(0xFF0284C7)),
                               const SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Código de Área (ID Secuencial)',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: colors.onSurfaceVariant,
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Código de Área (ID Secuencial)',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: colors.onSurfaceVariant,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    currentPreview,
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF0369A1),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      currentPreview,
+                                      style: const TextStyle(
+                                        fontFamily: 'monospace',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF0369A1),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(

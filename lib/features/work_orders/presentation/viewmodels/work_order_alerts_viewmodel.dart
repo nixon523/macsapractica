@@ -66,7 +66,7 @@ class WorkOrderAlertsViewModel extends ChangeNotifier {
 
   Future<void> _poll() async {
     try {
-      final openOrders = await _repository?.getAllWorkOrders() ?? [];
+      final openOrders = await _repository?.getOpenWorkOrders() ?? [];
       final open = openOrders
           .where((o) =>
               o.status == WorkOrderStatus.pending ||

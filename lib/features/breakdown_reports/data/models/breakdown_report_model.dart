@@ -21,6 +21,7 @@ class BreakdownReportModel extends BreakdownReport {
     super.rejectedByUserId,
     super.rejectedByUserName,
     super.rejectedAt,
+    super.imageData,
   });
 
   factory BreakdownReportModel.fromJson(
@@ -126,6 +127,17 @@ class BreakdownReportModel extends BreakdownReport {
           ?.toString(),
       rejectedAt: parseDate(
           map['rejectedAt'] ?? map['RejectedAt'] ?? map['RechazadoEn']),
+      imageData: (map['imageData'] ??
+              map['ImageData'] ??
+              map['ImagenUrl'] ??
+              map['imagenUrl'] ??
+              map['imageUrl'] ??
+              map['ImageUrl'] ??
+              map['imagen'] ??
+              map['Imagen'] ??
+              map['fotoUrl'] ??
+              map['FotoUrl'])
+          ?.toString(),
     );
   }
 
@@ -146,6 +158,7 @@ class BreakdownReportModel extends BreakdownReport {
       'status': status.name,
       if (workOrderId != null) 'workOrderId': workOrderId,
       if (rejectionReason != null) 'reason': rejectionReason,
+      if (imageData != null && imageData!.isNotEmpty) 'imageData': imageData,
     };
   }
 }

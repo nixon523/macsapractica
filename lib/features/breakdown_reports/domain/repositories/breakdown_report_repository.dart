@@ -9,6 +9,7 @@ abstract class BreakdownReportRepository {
     required BreakdownSeverity severity,
     required String reportedByUserId,
     required String reportedByUserName,
+    String? imageData,
   });
 
   Future<List<BreakdownReport>> getAllReports({

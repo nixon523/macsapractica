@@ -1,4 +1,5 @@
-﻿import '../../domain/entities/operation_report.dart';
+import '../../domain/entities/maintenance_analytics.dart';
+import '../../domain/entities/operation_report.dart';
 import '../../domain/repositories/operation_report_repository.dart';
 import '../datasources/operation_report_remote_datasource.dart';
 
@@ -18,6 +19,11 @@ class OperationReportRepositoryImpl implements OperationReportRepository {
     double horasParoPlanificado = 0.0,
     double horasParoExterno = 0.0,
     String? observaciones,
+    double? unidadesProducidas,
+    double? unidadesEsperadas,
+    double? unidadesConformes,
+    double? rendimientoDirectoPct,
+    double? calidadDirectoPct,
   }) {
     return _remoteDataSource.registrarReporte(
       codigoActivo: codigoActivo,
@@ -30,6 +36,11 @@ class OperationReportRepositoryImpl implements OperationReportRepository {
       horasParoPlanificado: horasParoPlanificado,
       horasParoExterno: horasParoExterno,
       observaciones: observaciones,
+      unidadesProducidas: unidadesProducidas,
+      unidadesEsperadas: unidadesEsperadas,
+      unidadesConformes: unidadesConformes,
+      rendimientoDirectoPct: rendimientoDirectoPct,
+      calidadDirectoPct: calidadDirectoPct,
     );
   }
 
@@ -64,11 +75,7 @@ class OperationReportRepositoryImpl implements OperationReportRepository {
     DateTime fechaDesde,
     DateTime fechaHasta,
   ) {
-    return _remoteDataSource.obtenerMetricas(
-      codigoActivo,
-      fechaDesde,
-      fechaHasta,
-    );
+    return _remoteDataSource.obtenerMetricas(codigoActivo, fechaDesde, fechaHasta);
   }
 
   @override
@@ -84,6 +91,81 @@ class OperationReportRepositoryImpl implements OperationReportRepository {
     return _remoteDataSource.actualizarEsEquipoProceso(
       codigoActivo,
       esEquipoProceso: esEquipoProceso,
+    );
+  }
+
+  // --- Analítica & Reportería ---
+
+  @override
+  Future<AssetHistoryAnalytics> obtenerHistorialActivo(
+    String codigoActivo, {
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+    bool incluirHijos = true,
+  }) {
+    return _remoteDataSource.obtenerHistorialActivo(
+      codigoActivo,
+      fechaDesde: fechaDesde,
+      fechaHasta: fechaHasta,
+      incluirHijos: incluirHijos,
+    );
+  }
+
+  @override
+  Future<List<SeasonalityStat>> obtenerEstacionalidad({
+    String? areaId,
+    int? anio,
+  }) {
+    return _remoteDataSource.obtenerEstacionalidad(
+      areaId: areaId,
+      anio: anio,
+    );
+  }
+
+  @override
+  Future<List<TopFailureAsset>> obtenerTopFallas({
+    String? areaId,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+    int top = 10,
+  }) {
+    return _remoteDataSource.obtenerTopFallas(
+      areaId: areaId,
+      fechaDesde: fechaDesde,
+      fechaHasta: fechaHasta,
+      top: top,
+    );
+  }
+
+  @override
+  Future<List<PartReplacementStat>> obtenerConsumoRepuestos({
+    String? areaId,
+    String? codigoActivo,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+    int top = 20,
+  }) {
+    return _remoteDataSource.obtenerConsumoRepuestos(
+      areaId: areaId,
+      codigoActivo: codigoActivo,
+      fechaDesde: fechaDesde,
+      fechaHasta: fechaHasta,
+      top: top,
+    );
+  }
+
+  @override
+  Future<List<OeeGeneralRecord>> obtenerOEEGeneral({
+    String? areaId,
+    String? codigoActivo,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+  }) {
+    return _remoteDataSource.obtenerOEEGeneral(
+      areaId: areaId,
+      codigoActivo: codigoActivo,
+      fechaDesde: fechaDesde,
+      fechaHasta: fechaHasta,
     );
   }
 }

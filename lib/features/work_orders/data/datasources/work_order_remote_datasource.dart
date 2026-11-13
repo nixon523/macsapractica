@@ -89,6 +89,7 @@ class WorkOrderRemoteDataSource {
     DateTime? scheduledDate,
     String? reportId,
     String? preventiveScheduleId,
+    String? breakdownImageData,
     required String createdByUserId,
     required String createdByUserName,
   }) async {
@@ -116,6 +117,10 @@ class WorkOrderRemoteDataSource {
         'reportId': reportId != null ? int.tryParse(reportId) : null,
         'preventiveScheduleId': preventiveScheduleId,
         'planPreventivoId': preventiveScheduleId,
+        if (breakdownImageData != null && breakdownImageData.isNotEmpty) ...{
+          'breakdownImageData': breakdownImageData,
+          'fotoAveriaUrl': breakdownImageData,
+        },
       },
     );
 
@@ -146,6 +151,7 @@ class WorkOrderRemoteDataSource {
       scheduledDate: scheduledDate,
       reportId: reportId,
       preventiveScheduleId: preventiveScheduleId,
+      breakdownImageData: breakdownImageData,
       createdByUserId: createdByUserId,
       createdByUserName: createdByUserName,
       createdAt: DateTime.now(),
@@ -179,15 +185,20 @@ class WorkOrderRemoteDataSource {
         'assignedTo': workOrder.assignedTo,
         'assignedStaffCount': workOrder.assignedStaffCount,
         'estimatedHours': workOrder.estimatedHours,
-        'actualHours': workOrder.actualHours,
+        'actualHours': workOrder.actualHours ?? workOrder.estimatedHours,
         'workDoneDescription': workOrder.workDoneDescription,
         'isCompleted': workOrder.isCompleted,
         'unfulfillmentReason': workOrder.unfulfillmentReason,
         'reprogramDate': workOrder.reprogramDate?.toIso8601String(),
         'scheduledDate': workOrder.scheduledDate?.toIso8601String(),
+        'maintenanceResponsible': workOrder.maintenanceResponsible,
+        'accHaccpResponsible': workOrder.accHaccpResponsible,
+        'areaHeadResponsible': workOrder.areaHeadResponsible,
+        'maintenanceHeadResponsible': workOrder.maintenanceHeadResponsible,
         'materials': workOrder.materials
+            .where((m) => m.description.trim().isNotEmpty)
             .map((m) => {
-                  'description': m.description,
+                  'description': m.description.trim(),
                   'quantity': m.quantity,
                   'unit': m.unit,
                 })

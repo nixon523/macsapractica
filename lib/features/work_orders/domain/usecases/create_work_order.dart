@@ -18,6 +18,7 @@ class CreateWorkOrderParams {
     this.scheduledDate,
     this.reportId,
     this.preventiveScheduleId,
+    this.breakdownImageData,
     required this.createdByUserId,
     required this.createdByUserName,
   });
@@ -36,6 +37,7 @@ class CreateWorkOrderParams {
   final DateTime? scheduledDate;
   final String? reportId;
   final String? preventiveScheduleId;
+  final String? breakdownImageData;
   final String createdByUserId;
   final String createdByUserName;
 }
@@ -62,6 +64,7 @@ class CreateWorkOrderUseCase implements UseCase<WorkOrder, CreateWorkOrderParams
       scheduledDate: params.scheduledDate,
       reportId: params.reportId,
       preventiveScheduleId: params.preventiveScheduleId,
+      breakdownImageData: params.breakdownImageData,
       createdByUserId: params.createdByUserId,
       createdByUserName: params.createdByUserName,
     );

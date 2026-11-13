@@ -1,3 +1,5 @@
+import 'dart:ui' show Color;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -149,6 +151,7 @@ class LocalNotificationService {
       importance: importance,
       priority: priority,
       icon: '@mipmap/ic_launcher',
+      color: const Color(0xFF0055A5),
       styleInformation: BigTextStyleInformation(body),
     );
 

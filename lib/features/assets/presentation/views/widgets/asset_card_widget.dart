@@ -1,7 +1,4 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
-
 import '../../../domain/entities/asset.dart';
 import 'asset_image_widget.dart';
 
@@ -20,11 +17,11 @@ class AssetCardWidget extends StatelessWidget {
   final bool isHierarchicalView;
 
   int get _depth => switch (asset.level) {
-        AssetLevel.equipment => 0,
-        AssetLevel.subEquipment => 1,
-        AssetLevel.part => 2,
-        AssetLevel.subPart => 3,
-      };
+    AssetLevel.equipment => 0,
+    AssetLevel.subEquipment => 1,
+    AssetLevel.part => 2,
+    AssetLevel.subPart => 3,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -36,9 +33,11 @@ class AssetCardWidget extends StatelessWidget {
     final isMobile = screenWidth < 600;
 
     // Indentación proporcional y compacta para no saturar en móviles
-    final indentWidth = depth == 0 ? 0.0 : (isMobile ? depth * 16.0 + 2.0 : depth * 20.0);
+    final indentWidth = depth == 0
+        ? 0.0
+        : (isMobile ? depth * 16.0 + 2.0 : depth * 20.0);
 
-    // Paleta refinada por nivel jerárquico
+    // Paleta y etiqueta de nivel jerárquico para el badge del lateral derecho
     final (levelColor, levelBg, levelLabel) = switch (asset.level) {
       AssetLevel.equipment => (
           const Color(0xFF0284C7),
@@ -64,8 +63,14 @@ class AssetCardWidget extends StatelessWidget {
 
     // Subtítulo inteligente: sólo muestra datos reales si existen
     final brandModel = [
-      if (asset.brand != null && asset.brand!.trim().isNotEmpty && asset.brand != '—') asset.brand!.trim(),
-      if (asset.model != null && asset.model!.trim().isNotEmpty && asset.model != '—') asset.model!.trim(),
+      if (asset.brand != null &&
+          asset.brand!.trim().isNotEmpty &&
+          asset.brand != '—')
+        asset.brand!.trim(),
+      if (asset.model != null &&
+          asset.model!.trim().isNotEmpty &&
+          asset.model != '—')
+        asset.model!.trim(),
     ].join(' · ');
 
     final hasSerial = asset.serial != null && asset.serial!.trim().isNotEmpty;
@@ -88,7 +93,7 @@ class AssetCardWidget extends StatelessWidget {
               child: Icon(
                 Icons.subdirectory_arrow_right_rounded,
                 size: isMobile ? 14 : 16,
-                color: levelColor.withValues(alpha: 0.6),
+                color: Colors.grey.shade400,
               ),
             ),
           ],
@@ -112,31 +117,21 @@ class AssetCardWidget extends StatelessWidget {
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  decoration: BoxDecoration(
-                    border: Border(
-                      left: BorderSide(
-                        color: levelColor,
-                        width: depth == 0 ? 4.0 : 3.0,
-                      ),
-                    ),
-                  ),
                   padding: EdgeInsets.symmetric(
                     horizontal: isMobile ? 8 : 12,
                     vertical: isMobile ? 8 : 10,
                   ),
                   child: Row(
                     children: [
-                      // Ícono o Miniatura
-                      AssetImageWidget(
-                        imageData: imageData,
-                        width: depth == 0 ? 36 : (isMobile ? 28 : 30),
-                        height: depth == 0 ? 36 : (isMobile ? 28 : 30),
-                        fallbackIcon: _getIconForLevel(asset.level),
-                        fallbackColor: levelColor,
-                        fallbackBgColor: levelBg,
-                      ),
-
-                      const SizedBox(width: 10),
+                      // Miniatura (solo si hay imagen cargada)
+                      if (imageData != null && imageData.trim().isNotEmpty) ...[
+                        AssetImageWidget(
+                          imageData: imageData,
+                          width: depth == 0 ? 36 : (isMobile ? 28 : 30),
+                          height: depth == 0 ? 36 : (isMobile ? 28 : 30),
+                        ),
+                        const SizedBox(width: 10),
+                      ],
 
                       // Título y datos esenciales
                       Expanded(
@@ -152,15 +147,21 @@ class AssetCardWidget extends StatelessWidget {
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontFamily: 'monospace',
-                                      fontSize: depth == 0 ? 13.5 : (isMobile ? 12 : 12.5),
+                                      fontSize: depth == 0
+                                          ? 13.5
+                                          : (isMobile ? 12 : 12.5),
                                       color: const Color(0xFF0F172A),
                                     ),
                                   ),
                                   TextSpan(
                                     text: '— ${asset.name}',
                                     style: TextStyle(
-                                      fontWeight: depth == 0 ? FontWeight.w600 : FontWeight.w500,
-                                      fontSize: depth == 0 ? 13.5 : (isMobile ? 12 : 12.5),
+                                      fontWeight: depth == 0
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                      fontSize: depth == 0
+                                          ? 13.5
+                                          : (isMobile ? 12 : 12.5),
                                       color: const Color(0xFF1E293B),
                                     ),
                                   ),
@@ -178,20 +179,13 @@ class AssetCardWidget extends StatelessWidget {
                                 runSpacing: 2,
                                 children: [
                                   if (hasSerial)
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.qr_code, size: 11, color: colors.secondary),
-                                        const SizedBox(width: 3),
-                                        Text(
-                                          asset.serial!,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: colors.secondary,
-                                          ),
-                                        ),
-                                      ],
+                                    Text(
+                                      asset.serial!,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: colors.secondary,
+                                      ),
                                     ),
                                   if (brandModel.isNotEmpty)
                                     Text(
@@ -214,13 +208,18 @@ class AssetCardWidget extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Badge de Nivel
+                          // Badge de Nivel con color de activo en la derecha
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: levelBg,
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: levelColor.withValues(alpha: 0.25)),
+                              border: Border.all(
+                                color: levelColor.withValues(alpha: 0.25),
+                              ),
                             ),
                             child: Text(
                               levelLabel,
@@ -245,7 +244,10 @@ class AssetCardWidget extends StatelessWidget {
                               onPressed: onEdit,
                               padding: EdgeInsets.zero,
                               visualDensity: VisualDensity.compact,
-                              constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                              constraints: const BoxConstraints(
+                                minWidth: 28,
+                                minHeight: 28,
+                              ),
                               color: Colors.grey.shade600,
                             ),
                           ],
@@ -268,13 +270,6 @@ class AssetCardWidget extends StatelessWidget {
       ),
     );
   }
-
-  IconData _getIconForLevel(AssetLevel level) => switch (level) {
-        AssetLevel.equipment => Icons.precision_manufacturing_outlined,
-        AssetLevel.subEquipment => Icons.settings_suggest_outlined,
-        AssetLevel.part => Icons.extension_outlined,
-        AssetLevel.subPart => Icons.grain_outlined,
-      };
 }
 
 class _StatusChip extends StatelessWidget {
@@ -286,7 +281,10 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final (color, label) = switch (status) {
       AssetStatus.active => (Colors.green.shade700, 'Activo'),
-      AssetStatus.transferredDeactivated => (Colors.orange.shade800, 'Traspasado'),
+      AssetStatus.transferredDeactivated => (
+        Colors.orange.shade800,
+        'Traspasado',
+      ),
       AssetStatus.inactive => (Colors.red.shade700, 'Inactivo'),
       AssetStatus.deleted => (Colors.grey.shade600, 'Eliminado'),
     };
@@ -300,7 +298,11 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

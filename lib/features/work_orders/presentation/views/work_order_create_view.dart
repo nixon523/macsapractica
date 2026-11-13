@@ -3,10 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
+import '../../../../app/widgets/app_dialog.dart';
 import '../../../assets/domain/entities/area.dart';
 import '../../../assets/domain/entities/asset.dart';
+import '../../../assets/presentation/views/widgets/asset_image_widget.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../breakdown_reports/domain/entities/breakdown_report.dart';
+import '../../../employees/presentation/viewmodels/employee_list_viewmodel.dart';
 import '../../domain/entities/work_order.dart';
 import '../viewmodels/work_order_create_viewmodel.dart';
 
@@ -68,7 +71,7 @@ class _WorkOrderCreateViewState extends State<WorkOrderCreateView> {
         SnackBar(
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          backgroundColor: const Color(0xFF0F766E),
+          backgroundColor: const Color(0xFF0055A5),
           content: Row(
             children: [
               const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
@@ -172,6 +175,9 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
   late final TextEditingController _assignedStaffCountCtrl;
   late final TextEditingController _estimatedHoursCtrl;
 
+  final TextEditingController _manualTechCtrl = TextEditingController();
+  List<String> _assignedTechnicians = [];
+
   final TextEditingController _matDescCtrl = TextEditingController();
   final TextEditingController _matQtyCtrl = TextEditingController(text: '1');
   final String _matUnit = 'pz';
@@ -188,6 +194,15 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
     _estimatedHoursCtrl = TextEditingController(
       text: vm.estimatedHours != null ? vm.estimatedHours!.toInt().toString() : '',
     );
+
+    final initialAssigned = vm.assignedTo;
+    if (initialAssigned.trim().isNotEmpty) {
+      _assignedTechnicians = initialAssigned
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    }
   }
 
   @override
@@ -196,9 +211,152 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
     _assignedToCtrl.dispose();
     _assignedStaffCountCtrl.dispose();
     _estimatedHoursCtrl.dispose();
+    _manualTechCtrl.dispose();
     _matDescCtrl.dispose();
     _matQtyCtrl.dispose();
     super.dispose();
+  }
+
+  void _showImageDialog(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            InteractiveViewer(
+              clipBehavior: Clip.none,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  color: Colors.black87,
+                  constraints: const BoxConstraints(maxWidth: 800, maxHeight: 600),
+                  child: AssetImageWidget(
+                    imageData: imageUrl,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _syncTechnicians() {
+    final combined = _assignedTechnicians.join(', ');
+    _assignedToCtrl.text = combined;
+    widget.viewModel.setAssignedTo(combined);
+
+    if (_assignedTechnicians.isNotEmpty) {
+      _assignedStaffCountCtrl.text = _assignedTechnicians.length.toString();
+      widget.viewModel.setAssignedStaffCount(_assignedTechnicians.length);
+    }
+  }
+
+  Future<void> _openTechnicianSelectorDialog() async {
+    final empVm = context.read<EmployeeListViewModel>();
+    if (empVm.employees.isEmpty) {
+      await empVm.loadEmployees();
+    }
+    final technicians = empVm.maintenanceTechnicians;
+    if (!mounted) return;
+
+    final selected = Set<String>.from(_assignedTechnicians);
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AppDialog(
+          maxWidth: 480,
+          icon: const Icon(Icons.engineering, color: Color(0xFF0055A5)),
+          title: const Text('Asignar Técnicos de Mantenimiento'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Selecciona a uno o más técnicos del personal de mantenimiento para atender esta Orden de Trabajo:',
+                style: TextStyle(fontSize: 12.5),
+              ),
+              const SizedBox(height: 12),
+              if (technicians.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFF59E0B)),
+                  ),
+                  child: const Text(
+                    'No hay técnicos registrados en el Catálogo de Empleados. Puedes agregarlos desde el menú "Personal / Empleados" o escribir sus nombres manualmente en el campo inferior.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF78350F)),
+                  ),
+                )
+              else
+                ...technicians.map((t) {
+                  final isChecked = selected.contains(t.fullName);
+                  return CheckboxListTile(
+                    value: isChecked,
+                    dense: true,
+                    activeColor: const Color(0xFF0055A5),
+                    title: Text(
+                      t.fullName,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                    ),
+                    subtitle: Text(
+                      '${t.position}${t.areaName != null ? " · ${t.areaName}" : ""}',
+                      style: const TextStyle(fontSize: 11.5),
+                    ),
+                    onChanged: (val) {
+                      setDlgState(() {
+                        if (val == true) {
+                          selected.add(t.fullName);
+                        } else {
+                          selected.remove(t.fullName);
+                        }
+                      });
+                    },
+                  );
+                }),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
+              onPressed: () {
+                setState(() {
+                  _assignedTechnicians = selected.toList();
+                  _syncTechnicians();
+                });
+                Navigator.pop(ctx);
+              },
+              child: Text('Confirmar (${selected.length})'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _addMaterial() {
@@ -554,96 +712,214 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
               ),
               const SizedBox(height: 8),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: (isFromReport || isFromPreventive)
-                          ? null
-                          : () => vm.setMaintenanceNature(isPreventive: false),
-                      borderRadius: BorderRadius.circular(8),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 140),
-                        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: vm.isCorrective
-                              ? const Color(0xFFD97706).withValues(alpha: isDark ? 0.18 : 0.08)
-                              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFFAFAFA)),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: vm.isCorrective ? const Color(0xFFD97706) : borderColor,
-                            width: vm.isCorrective ? 1.5 : 1,
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final isCompact = constraints.maxWidth < 580;
+
+                  Widget buildCorrectiveContent() {
+                    if (isCompact) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.build_circle_outlined,
+                                size: 16,
+                                color: vm.isCorrective ? const Color(0xFFD97706) : secondaryText,
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Correctivo',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: vm.isCorrective ? FontWeight.w700 : FontWeight.w500,
+                                    color: vm.isCorrective
+                                        ? (isDark ? Colors.white : const Color(0xFFB45309))
+                                        : secondaryText,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Atención a Fallas',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: vm.isCorrective
+                                  ? (isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E))
+                                  : secondaryText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.build_circle_outlined,
+                          size: 17,
+                          color: vm.isCorrective ? const Color(0xFFD97706) : secondaryText,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Correctivo (Atención a Fallas)',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: vm.isCorrective ? FontWeight.w700 : FontWeight.w500,
+                              color: vm.isCorrective
+                                  ? (isDark ? Colors.white : const Color(0xFFB45309))
+                                  : secondaryText,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.build_circle_outlined,
-                              size: 17,
-                              color: vm.isCorrective ? const Color(0xFFD97706) : secondaryText,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Correctivo (Atención a Fallas)',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: vm.isCorrective ? FontWeight.w700 : FontWeight.w500,
-                                color: vm.isCorrective
-                                    ? (isDark ? Colors.white : const Color(0xFFB45309))
-                                    : secondaryText,
+                      ],
+                    );
+                  }
+
+                  Widget buildPreventiveContent() {
+                    if (isCompact) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.event_note_outlined,
+                                size: 16,
+                                color: vm.isPreventive ? const Color(0xFF0055A5) : secondaryText,
                               ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Preventivo',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: vm.isPreventive ? FontWeight.w700 : FontWeight.w500,
+                                    color: vm.isPreventive
+                                        ? (isDark ? Colors.white : const Color(0xFF0055A5))
+                                        : secondaryText,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Planificado',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: vm.isPreventive
+                                  ? (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF))
+                                  : secondaryText,
+                              fontWeight: FontWeight.w500,
                             ),
-                          ],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.event_note_outlined,
+                          size: 17,
+                          color: vm.isPreventive ? const Color(0xFF0055A5) : secondaryText,
                         ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: InkWell(
-                      onTap: (isFromReport || isFromPreventive)
-                          ? null
-                          : () => vm.setMaintenanceNature(isPreventive: true),
-                      borderRadius: BorderRadius.circular(8),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 140),
-                        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: vm.isPreventive
-                              ? const Color(0xFF0055A5).withValues(alpha: isDark ? 0.2 : 0.08)
-                              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFFAFAFA)),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: vm.isPreventive ? const Color(0xFF0055A5) : borderColor,
-                            width: vm.isPreventive ? 1.5 : 1,
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Preventivo (Planificado)',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: vm.isPreventive ? FontWeight.w700 : FontWeight.w500,
+                              color: vm.isPreventive
+                                  ? (isDark ? Colors.white : const Color(0xFF0055A5))
+                                  : secondaryText,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.event_note_outlined,
-                              size: 17,
-                              color: vm.isPreventive ? const Color(0xFF0055A5) : secondaryText,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Preventivo (Planificado)',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: vm.isPreventive ? FontWeight.w700 : FontWeight.w500,
-                                color: vm.isPreventive
-                                    ? (isDark ? Colors.white : const Color(0xFF0055A5))
-                                    : secondaryText,
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: (isFromReport || isFromPreventive)
+                              ? null
+                              : () => vm.setMaintenanceNature(isPreventive: false),
+                          borderRadius: BorderRadius.circular(8),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 140),
+                            padding: EdgeInsets.symmetric(vertical: isCompact ? 8 : 11, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: vm.isCorrective
+                                  ? const Color(0xFFD97706).withValues(alpha: isDark ? 0.18 : 0.08)
+                                  : (isDark ? const Color(0xFF0F172A) : const Color(0xFFFAFAFA)),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: vm.isCorrective ? const Color(0xFFD97706) : borderColor,
+                                width: vm.isCorrective ? 1.5 : 1,
                               ),
                             ),
-                          ],
+                            child: buildCorrectiveContent(),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: InkWell(
+                          onTap: (isFromReport || isFromPreventive)
+                              ? null
+                              : () => vm.setMaintenanceNature(isPreventive: true),
+                          borderRadius: BorderRadius.circular(8),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 140),
+                            padding: EdgeInsets.symmetric(vertical: isCompact ? 8 : 11, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: vm.isPreventive
+                                  ? const Color(0xFF0055A5).withValues(alpha: isDark ? 0.2 : 0.08)
+                                  : (isDark ? const Color(0xFF0F172A) : const Color(0xFFFAFAFA)),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: vm.isPreventive ? const Color(0xFF0055A5) : borderColor,
+                                width: vm.isPreventive ? 1.5 : 1,
+                              ),
+                            ),
+                            child: buildPreventiveContent(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 18),
 
@@ -708,6 +984,71 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
                   contentPadding: const EdgeInsets.all(14),
                 ),
               ),
+
+              if (isFromReport && vm.report?.imageData != null && vm.report!.imageData!.trim().isNotEmpty) ...[
+                const SizedBox(height: 14),
+                InkWell(
+                  onTap: () => _showImageDialog(context, vm.report!.imageData!),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF0055A5).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: SizedBox(
+                            width: 60,
+                            height: 60,
+                            child: AssetImageWidget(
+                              imageData: vm.report!.imageData,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.photo_camera_outlined, size: 15, color: Color(0xFF0055A5)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Evidencia Fotográfica de la Avería #${vm.report!.id}',
+                                    style: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF0055A5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Fotografía adjunta por ${vm.report!.reportedByUserName}. Toca para examinar en pantalla completa.',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: secondaryText,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.zoom_in, color: Color(0xFF0055A5), size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 28),
               Divider(height: 1, color: borderColor),
@@ -795,21 +1136,113 @@ class _WorkOrderCreateFormState extends State<_WorkOrderCreateForm> {
               ),
               const SizedBox(height: 12),
 
-              // Técnico o cuadrilla asignada
-              TextField(
-                key: const Key('ot-assigned-to'),
-                controller: _assignedToCtrl,
-                onChanged: vm.setAssignedTo,
-                style: const TextStyle(fontSize: 13),
-                decoration: InputDecoration(
-                  labelText: 'RESPONSABLE / TÉCNICO ASIGNADO',
-                  labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.5),
-                  hintText: 'Nombre del técnico mecánico/eléctrico o cuadrilla',
-                  prefixIcon: const Icon(Icons.person_outline, size: 18),
-                  filled: true,
-                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              // Asignación de Técnico(s) / Cuadrilla de Mantenimiento
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.engineering, size: 20, color: Color(0xFF0055A5)),
+                            SizedBox(width: 8),
+                            Text(
+                              'RESPONSABLE(S) DE MANTENIMIENTO',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                            ),
+                          ],
+                        ),
+                        FilledButton.tonalIcon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                            foregroundColor: const Color(0xFF0055A5),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          ),
+                          onPressed: _openTechnicianSelectorDialog,
+                          icon: const Icon(Icons.person_add_alt_1, size: 16),
+                          label: const Text('Catálogo de Técnicos', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                    if (_assignedTechnicians.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: _assignedTechnicians.map((name) {
+                          return InputChip(
+                            avatar: const Icon(Icons.person, size: 15, color: Color(0xFF0055A5)),
+                            label: Text(name, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                            backgroundColor: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                            deleteIcon: const Icon(Icons.close, size: 16, color: Color(0xFF0055A5)),
+                            onDeleted: () {
+                              setState(() {
+                                _assignedTechnicians.remove(name);
+                                _syncTechnicians();
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _manualTechCtrl,
+                            style: const TextStyle(fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: _assignedTechnicians.isEmpty
+                                  ? 'Escribe nombre del técnico o cuadrilla externa y presiona "+"...'
+                                  : 'Agregar otro técnico o contratista externo...',
+                              prefixIcon: const Icon(Icons.add_circle_outline, size: 18),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                            ),
+                            onSubmitted: (val) {
+                              if (val.trim().isNotEmpty) {
+                                setState(() {
+                                  _assignedTechnicians.add(val.trim());
+                                  _manualTechCtrl.clear();
+                                  _syncTechnicians();
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          style: IconButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
+                          icon: const Icon(Icons.add, size: 18),
+                          tooltip: 'Agregar a la orden',
+                          onPressed: () {
+                            if (_manualTechCtrl.text.trim().isNotEmpty) {
+                              setState(() {
+                                _assignedTechnicians.add(_manualTechCtrl.text.trim());
+                                _manualTechCtrl.clear();
+                                _syncTechnicians();
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../domain/entities/work_order.dart';
+import '../reports/work_order_report_filter_dialog.dart';
 import '../viewmodels/work_order_list_viewmodel.dart';
 import 'work_order_create_view.dart';
 import 'work_order_detail_view.dart';
@@ -252,6 +253,14 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
           title: Text('Órdenes de Trabajo: ${widget.assetId}'),
           actions: [
             IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Exportar Reporte Personalizado',
+              onPressed: () => WorkOrderReportFilterDialog.show(
+                context,
+                initialOrders: vm.workOrders,
+              ),
+            ),
+            IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: 'Actualizar',
               onPressed: _loadData,
@@ -317,6 +326,15 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
                           Expanded(child: _buildDateMenuButton(isDark, borderColor)),
                           const SizedBox(width: 8),
                           Expanded(child: _buildTypeMenuButton(isDark, borderColor)),
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            icon: const Icon(Icons.picture_as_pdf_outlined, size: 20),
+                            tooltip: 'Exportar Reporte',
+                            onPressed: () => WorkOrderReportFilterDialog.show(
+                              context,
+                              initialOrders: context.read<WorkOrderListViewModel>().workOrders,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -328,8 +346,26 @@ class _WorkOrderListViewState extends State<WorkOrderListView> {
                       _buildDateMenuButton(isDark, borderColor),
                       const SizedBox(width: 8),
                       _buildTypeMenuButton(isDark, borderColor),
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0055A5),
+                          side: const BorderSide(color: Color(0xFF0055A5)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () => WorkOrderReportFilterDialog.show(
+                          context,
+                          initialOrders: context.read<WorkOrderListViewModel>().workOrders,
+                        ),
+                        icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                        label: const Text(
+                          'Exportar Reporte',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                       if (canCreate) ...[
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         FilledButton.icon(
                           style: FilledButton.styleFrom(
                             backgroundColor: const Color(0xFF0055A5),

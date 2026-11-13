@@ -84,7 +84,7 @@ abstract final class ApiEndpoints {
   // Dashboard
   static const String dashboardStats = '/dashboard/estadisticas';
 
-  // Reportes de Operación
+  // Reportes de Operación & Analítica Avanzada
   static const String operationReports         = '/reportes-operacion';
   static const String operationReportsWeek     = '/reportes-operacion/semana';
   static const String processEquipment         = '/reportes-operacion/equipos';
@@ -94,4 +94,26 @@ abstract final class ApiEndpoints {
       '/reportes-operacion/metricas/${Uri.encodeComponent(assetCode)}';
   static String toggleProcessEquipment(String assetCode) =>
       '/reportes-operacion/equipos/${Uri.encodeComponent(assetCode)}/proceso';
+
+  // Empleados & Puestos
+  static const String employees = '/empleados';
+  static String employeeById(dynamic id) => '/empleados/$id';
+  static String toggleEmployeeStatus(dynamic id) => '/empleados/$id/estado';
+  static const String employeePositions = '/empleados/puestos';
+  static String employeePositionById(dynamic id) => '/empleados/puestos/$id';
+
+  // Catálogos dinámicos (Roles, Permisos, Puestos, Enums)
+  static const String catalogs = '/catalogos';
+
+  // Analítica & Reportería de Mantenimiento / OEE
+  static String analyticsAssetHistory(String assetCode) =>
+      '/reportes-operacion/analitica/historial-activo/${Uri.encodeComponent(assetCode)}';
+  static const String analyticsSeasonality =
+      '/reportes-operacion/analitica/estacionalidad';
+  static const String analyticsTopFailures =
+      '/reportes-operacion/analitica/top-fallas';
+  static const String analyticsPartsConsumption =
+      '/reportes-operacion/analitica/consumo-repuestos';
+  static const String analyticsOeeGeneral =
+      '/reportes-operacion/analitica/oee-general';
 }

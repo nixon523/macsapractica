@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import '../../../../core/error/failures.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../domain/entities/breakdown_report.dart';
@@ -62,6 +65,7 @@ class BreakdownReportRemoteDataSource {
     required BreakdownSeverity severity,
     required String reportedByUserId,
     required String reportedByUserName,
+    String? imageData,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.breakdownReports,
@@ -71,6 +75,14 @@ class BreakdownReportRemoteDataSource {
         'areaId': areaId,
         'description': description.trim(),
         'severity': severity.name,
+        'reportedByUserId': reportedByUserId,
+        'reportedByUserName': reportedByUserName,
+        if (imageData != null && imageData.isNotEmpty) ...{
+          'imageData': imageData,
+          'imagenUrl': imageData,
+          'imageUrl': imageData,
+          'imagen': imageData,
+        },
       },
     );
 
@@ -94,7 +106,29 @@ class BreakdownReportRemoteDataSource {
       reportedByUserName: reportedByUserName,
       reportedAt: DateTime.now(),
       status: BreakdownReportStatus.reported,
+      imageData: imageData,
     );
+  }
+
+  /// Sube la fotografía de la avería al servidor y retorna su URL relativa (/image/...)
+  Future<String> uploadBreakdownImage(
+    Uint8List bytes, {
+    String filename = 'breakdown_photo.jpg',
+  }) async {
+    final response = await _apiClient.postMultipart(
+      ApiEndpoints.uploadAssetImage,
+      fileBytes: bytes,
+      filename: filename,
+    );
+    if (response is Map<String, dynamic>) {
+      final url = response['imageUrl'] ??
+          response['url'] ??
+          response['path'] ??
+          response['image'] ??
+          response['ImagenUrl'];
+      if (url != null) return url.toString();
+    }
+    throw const ServerFailure(message: 'Respuesta inválida al subir la fotografía.');
   }
 
   Future<void> linkWorkOrder({

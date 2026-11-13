@@ -411,6 +411,7 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
           materials: _materials,
           reportId: _report?.id,
           preventiveScheduleId: _preventiveSchedule != null ? _preventiveSchedule.id.toString() : null,
+          breakdownImageData: _report?.imageData,
           createdByUserId: userId,
           createdByUserName: userName,
         ),

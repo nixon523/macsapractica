@@ -1,8 +1,9 @@
-﻿import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
+import '../../domain/entities/maintenance_analytics.dart';
 import '../models/operation_report_model.dart';
 
-/// DataSource remoto para reportes de operación diaria.
+/// DataSource remoto para reportes de operación diaria y analítica avanzada.
 class OperationReportRemoteDataSource {
   const OperationReportRemoteDataSource(this._apiClient);
   final ApiClient _apiClient;
@@ -18,22 +19,30 @@ class OperationReportRemoteDataSource {
     double horasParoPlanificado = 0.0,
     double horasParoExterno = 0.0,
     String? observaciones,
+    double? unidadesProducidas,
+    double? unidadesEsperadas,
+    double? unidadesConformes,
+    double? rendimientoDirectoPct,
+    double? calidadDirectoPct,
   }) async {
     final response = await _apiClient.post(
       ApiEndpoints.operationReports,
       body: {
-        'codigoActivo':         codigoActivo,
-        'fechaOperacion':       '${fechaOperacion.year.toString().padLeft(4,"0")}-'
-                                '${fechaOperacion.month.toString().padLeft(2,"0")}-'
-                                '${fechaOperacion.day.toString().padLeft(2,"0")}',
-        'horasTotalesJornada':  horasTotalesJornada,
-        'horasOperacion':       horasOperacion,
-        'horasParoFalla':       horasParoFalla,
-        'horasParoMantPrev':    horasParoMantPrev,
-        'horasParoMantCorr':    horasParoMantCorr,
-        'horasParoPlanificado': horasParoPlanificado,
-        'horasParoExterno':     horasParoExterno,
+        'codigoActivo':          codigoActivo,
+        'fechaOperacion':        _formatDate(fechaOperacion),
+        'horasTotalesJornada':   horasTotalesJornada,
+        'horasOperacion':        horasOperacion,
+        'horasParoFalla':        horasParoFalla,
+        'horasParoMantPrev':     horasParoMantPrev,
+        'horasParoMantCorr':     horasParoMantCorr,
+        'horasParoPlanificado':  horasParoPlanificado,
+        'horasParoExterno':      horasParoExterno,
         if (observaciones != null) 'observaciones': observaciones,
+        if (unidadesProducidas != null) 'unidadesProducidas': unidadesProducidas,
+        if (unidadesEsperadas != null) 'unidadesEsperadas': unidadesEsperadas,
+        if (unidadesConformes != null) 'unidadesConformes': unidadesConformes,
+        if (rendimientoDirectoPct != null) 'rendimientoDirectoPct': rendimientoDirectoPct,
+        if (calidadDirectoPct != null) 'calidadDirectoPct': calidadDirectoPct,
       },
     );
     if (response is Map<String, dynamic>) {
@@ -129,8 +138,146 @@ class OperationReportRemoteDataSource {
     );
   }
 
+  // --- MÉTODOS DE ANALÍTICA AVANZADA Y HOJA DE VIDA ---
+
+  Future<AssetHistoryAnalytics> obtenerHistorialActivo(
+    String codigoActivo, {
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+    bool incluirHijos = true,
+  }) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.analyticsAssetHistory(codigoActivo),
+      queryParameters: {
+        if (fechaDesde != null) 'fechaDesde': _formatDate(fechaDesde),
+        if (fechaHasta != null) 'fechaHasta': _formatDate(fechaHasta),
+        'incluirHijos': incluirHijos.toString(),
+      },
+    );
+
+    if (response is Map<String, dynamic>) {
+      final resumenJson = response['resumen'] is Map<String, dynamic>
+          ? response['resumen'] as Map<String, dynamic>
+          : <String, dynamic>{};
+      final timelineList = response['timeline'] is List
+          ? (response['timeline'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(MaintenanceIntervention.fromJson)
+              .toList()
+          : <MaintenanceIntervention>[];
+      final repuestosList = response['repuestos'] is List
+          ? (response['repuestos'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(PartReplacementStat.fromJson)
+              .toList()
+          : <PartReplacementStat>[];
+
+      return AssetHistoryAnalytics(
+        resumen: AssetKpiSummary.fromJson(resumenJson),
+        timeline: timelineList,
+        repuestos: repuestosList,
+      );
+    }
+
+    throw Exception('Error al obtener la hoja de vida del activo.');
+  }
+
+  Future<List<SeasonalityStat>> obtenerEstacionalidad({
+    String? areaId,
+    int? anio,
+  }) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.analyticsSeasonality,
+      queryParameters: {
+        if (areaId != null && areaId.isNotEmpty) 'areaId': areaId,
+        if (anio != null) 'anio': anio,
+      },
+    );
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(SeasonalityStat.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<TopFailureAsset>> obtenerTopFallas({
+    String? areaId,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+    int top = 10,
+  }) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.analyticsTopFailures,
+      queryParameters: {
+        if (areaId != null && areaId.isNotEmpty) 'areaId': areaId,
+        if (fechaDesde != null) 'fechaDesde': _formatDate(fechaDesde),
+        if (fechaHasta != null) 'fechaHasta': _formatDate(fechaHasta),
+        'top': top,
+      },
+    );
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(TopFailureAsset.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<PartReplacementStat>> obtenerConsumoRepuestos({
+    String? areaId,
+    String? codigoActivo,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+    int top = 20,
+  }) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.analyticsPartsConsumption,
+      queryParameters: {
+        if (areaId != null && areaId.isNotEmpty) 'areaId': areaId,
+        if (codigoActivo != null && codigoActivo.isNotEmpty) 'codigoActivo': codigoActivo,
+        if (fechaDesde != null) 'fechaDesde': _formatDate(fechaDesde),
+        if (fechaHasta != null) 'fechaHasta': _formatDate(fechaHasta),
+        'top': top,
+      },
+    );
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(PartReplacementStat.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<OeeGeneralRecord>> obtenerOEEGeneral({
+    String? areaId,
+    String? codigoActivo,
+    DateTime? fechaDesde,
+    DateTime? fechaHasta,
+  }) async {
+    final response = await _apiClient.get(
+      ApiEndpoints.analyticsOeeGeneral,
+      queryParameters: {
+        if (areaId != null && areaId.isNotEmpty) 'areaId': areaId,
+        if (codigoActivo != null && codigoActivo.isNotEmpty) 'codigoActivo': codigoActivo,
+        if (fechaDesde != null) 'fechaDesde': _formatDate(fechaDesde),
+        if (fechaHasta != null) 'fechaHasta': _formatDate(fechaHasta),
+      },
+    );
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(OeeGeneralRecord.fromJson)
+          .toList();
+    }
+    return [];
+  }
+
   static String _formatDate(DateTime d) =>
-      '${d.year.toString().padLeft(4,"0")}-'
-      '${d.month.toString().padLeft(2,"0")}-'
-      '${d.day.toString().padLeft(2,"0")}';
+      '${d.year.toString().padLeft(4, "0")}-'
+      '${d.month.toString().padLeft(2, "0")}-'
+      '${d.day.toString().padLeft(2, "0")}';
 }

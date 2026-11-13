@@ -16,6 +16,7 @@ abstract class AuthRepository {
     required UserRole role,
     Set<String> permissions = const {},
     bool mustChangePassword = true,
+    int? employeeId,
   });
 
   /// Actualiza displayName, rol y opcionalmente la contraseña.
@@ -25,6 +26,7 @@ abstract class AuthRepository {
     UserRole? role,
     String? newPassword,
     Set<String>? permissions,
+    int? employeeId,
   });
 
   /// Habilita o deshabilita un usuario.

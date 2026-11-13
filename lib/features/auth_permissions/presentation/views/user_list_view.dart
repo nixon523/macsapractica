@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../app/widgets/app_dialog.dart';
 import '../../../../core/utils/upper_case_formatter.dart';
+import '../../../employees/domain/entities/employee.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/user_role.dart';
 import '../viewmodels/auth_viewmodel.dart';
@@ -260,7 +261,7 @@ class _UserListViewState extends State<UserListView> {
               builder: (context, constraints) {
                 final width = constraints.maxWidth;
                 final isCompact = width < 600;
-                final isMedium = width < 980;
+                final isMedium = width < 1100;
 
                 final segmented = SegmentedButton<_UserStatusFilter>(
                   segments: [
@@ -408,7 +409,7 @@ class _UserListViewState extends State<UserListView> {
                         children: [
                           Expanded(child: searchField),
                           const SizedBox(width: 8),
-                          buildRoleDropdown(width: 140),
+                          buildRoleDropdown(width: 230),
                           if (createBtn != null) ...[
                             const SizedBox(width: 8),
                             createBtn,
@@ -425,7 +426,7 @@ class _UserListViewState extends State<UserListView> {
                     const SizedBox(width: 10),
                     Expanded(child: searchField),
                     const SizedBox(width: 8),
-                    buildRoleDropdown(width: 145),
+                    buildRoleDropdown(width: 240),
                     if (createBtn != null) ...[
                       const SizedBox(width: 8),
                       createBtn,
@@ -532,6 +533,11 @@ class _SimpleUserTile extends StatelessWidget {
           runSpacing: 2,
           children: [
             Text('Rol: ${user.role.label}', style: const TextStyle(fontSize: 12)),
+            if (user.employeePosition != null && user.employeePosition!.isNotEmpty)
+              Text(
+                '· ${user.employeePosition!}${user.employeeAreaName != null && user.employeeAreaName!.isNotEmpty ? ' (${user.employeeAreaName})' : ''}',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF0055A5)),
+              ),
             if (user.disabled)
               const Text('· Deshabilitado', style: TextStyle(fontSize: 12, color: Colors.red))
             else if (isPendingReset)
@@ -726,18 +732,19 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
       title: Text('Restablecer Clave: @${widget.user.username}'),
       content: SizedBox(
         width: responsiveDialogWidth(context, 400),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Genera o escribe una clave temporal para el usuario. Al iniciar sesión se le exigirá cambiarla.',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _passwordController,
-              obscureText: _obscure,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Genera o escribe una clave temporal para el usuario. Al iniciar sesión se le exigirá cambiarla.',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _passwordController,
+                obscureText: _obscure,
               textCapitalization: TextCapitalization.characters,
               inputFormatters: [UpperCaseTextFormatter()],
               enableSuggestions: false,
@@ -776,6 +783,7 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
           ],
         ),
       ),
+    ),
       actions: [
         TextButton(
           onPressed: vm.isSaving ? null : () => Navigator.pop(context, false),
@@ -798,35 +806,57 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
 
 /// Mapa de permisos agrupados por módulo para mostrar en checkboxes.
 const _permissionGroups = <String, List<({String code, String label})>>{
-  'Dashboard': [
-    (code: 'dashboard.view', label: 'Ver Dashboard'),
+  'Dashboard, Operación y KPIs': [
+    (code: AppPermissions.dashboardView, label: 'Ver Dashboard e Indicadores'),
+    (
+      code: AppPermissions.operationReportView,
+      label: 'Ver Reportes de Operación y Analítica OEE'
+    ),
+    (
+      code: AppPermissions.operationReportEdit,
+      label: 'Registrar / Editar Reportes de Operación'
+    ),
   ],
   'Activos': [
-    (code: 'asset.view', label: 'Ver Activos'),
-    (code: 'asset.create', label: 'Crear Activos'),
-    (code: 'asset.edit', label: 'Editar Activos'),
-    (code: 'asset.transfer', label: 'Traspasar Activos'),
-    (code: 'asset.delete.request', label: 'Solicitar Baja'),
-    (code: 'asset.delete.approve', label: 'Aprobar/Rechazar Baja'),
+    (code: AppPermissions.assetView, label: 'Ver Activos y Exportar Reportes'),
+    (code: AppPermissions.assetCreate, label: 'Crear Activos y Áreas'),
+    (code: AppPermissions.assetEdit, label: 'Editar Activos y Equipos de Proceso'),
+    (code: AppPermissions.assetTransfer, label: 'Traspasar / Reactivar Activos'),
+    (code: AppPermissions.assetDeleteRequest, label: 'Solicitar Baja'),
+    (
+      code: AppPermissions.assetDeleteApprove,
+      label: 'Aprobar/Rechazar Baja (Solo Admin)'
+    ),
   ],
   'Órdenes de Trabajo': [
-    (code: 'work_order.view', label: 'Ver OTs'),
-    (code: 'work_order.create', label: 'Crear OTs'),
-    (code: 'work_order.print', label: 'Imprimir OTs'),
+    (code: AppPermissions.workOrderView, label: 'Ver OTs y Reportes'),
+    (code: AppPermissions.workOrderCreate, label: 'Crear / Gestionar OTs'),
+    (code: AppPermissions.workOrderPrint, label: 'Imprimir / Exportar OTs'),
   ],
   'Planes Preventivos': [
-    (code: 'preventive.view', label: 'Ver Preventivos'),
+    (code: AppPermissions.preventiveView, label: 'Ver Preventivos y Reportes'),
+    (
+      code: AppPermissions.preventiveManage,
+      label: 'Crear / Editar / Pausar Preventivos y Generar OTs'
+    ),
   ],
   'Kardex': [
-    (code: 'kardex.view', label: 'Ver Kardex'),
+    (code: AppPermissions.kardexView, label: 'Ver Kardex'),
   ],
   'Averías': [
-    (code: 'breakdown.report', label: 'Reportar Averías'),
-    (code: 'breakdown.view', label: 'Ver Averías'),
-    (code: 'breakdown.manage', label: 'Gestionar Averías'),
+    (code: AppPermissions.breakdownReport, label: 'Reportar Averías'),
+    (code: AppPermissions.breakdownView, label: 'Ver Reportes de Averías'),
+    (
+      code: AppPermissions.breakdownManage,
+      label: 'Gestionar Averías (Generar OT / Rechazar)'
+    ),
   ],
-  'Usuarios': [
-    (code: 'user.manage', label: 'Gestionar Usuarios'),
+  'Personal y Administración': [
+    (code: AppPermissions.employeeManage, label: 'Gestionar Empleados y Puestos'),
+    (
+      code: AppPermissions.userManage,
+      label: 'Gestionar Usuarios y Contraseñas (Solo Admin)'
+    ),
   ],
 };
 
@@ -848,8 +878,8 @@ class _UserFormDialogState extends State<_UserFormDialog> {
   final _confirmPasswordController = TextEditingController();
   late UserRole _selectedRole;
   late Set<String> _selectedPermissions;
+  Employee? _selectedEmployee;
   bool _obscurePassword = true;
-  bool _obscureConfirm = true;
   bool _permissionsExpanded = false;
 
   bool get isEditing => widget.editUser != null;
@@ -863,11 +893,13 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     _displayNameController = TextEditingController(
       text: widget.editUser?.displayName ?? '',
     );
-    _selectedRole = widget.editUser?.role ?? UserRole.lector;
+    _selectedRole = widget.editUser?.role ?? UserRole.reportador;
 
-    // Inicializar permisos: los del usuario (edición) o los por defecto del rol (creación)
-    if (isEditing && widget.editUser!.permissions.isNotEmpty) {
-      _selectedPermissions = Set<String>.from(widget.editUser!.permissions);
+    if (isEditing) {
+      _selectedPermissions = {
+        ..._selectedRole.defaultPermissions,
+        ...widget.editUser!.permissions,
+      };
     } else {
       _selectedPermissions = Set<String>.from(_selectedRole.defaultPermissions);
     }
@@ -893,9 +925,90 @@ class _UserFormDialogState extends State<_UserFormDialog> {
     if (newRole == null || newRole == _selectedRole) return;
     setState(() {
       _selectedRole = newRole;
-      // Resetear permisos a los del nuevo rol
       _selectedPermissions = Set<String>.from(newRole.defaultPermissions);
     });
+  }
+
+  String _cleanAccents(String input) {
+    return input
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ñ', 'n')
+        .replaceAll('Á', 'A')
+        .replaceAll('É', 'E')
+        .replaceAll('Í', 'I')
+        .replaceAll('Ó', 'O')
+        .replaceAll('Ú', 'U')
+        .replaceAll('Ñ', 'N');
+  }
+
+  String _suggestUsername(String fullName, List<AppUser> existingUsers) {
+    final cleaned = _cleanAccents(fullName).trim();
+    // Ignorar títulos comunes (Ing., Lic., Tec., etc.)
+    final words = cleaned
+        .split(RegExp(r'\s+'))
+        .where((w) {
+          final lw = w.toLowerCase().replaceAll('.', '');
+          return lw.isNotEmpty &&
+              !{'ing', 'lic', 'tec', 'sr', 'sra', 'dr', 'de', 'del', 'la', 'los'}
+                  .contains(lw);
+        })
+        .toList();
+
+    String base;
+    if (words.length >= 2) {
+      base = '${words.first[0]}${words[1]}';
+    } else if (words.isNotEmpty) {
+      base = words.first;
+    } else {
+      base = 'USUARIO';
+    }
+
+    base = base.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (base.isEmpty) base = 'USUARIO';
+
+    final existingLower =
+        existingUsers.map((u) => u.username.toLowerCase()).toSet();
+    if (!existingLower.contains(base.toLowerCase())) return base;
+
+    int suffix = 2;
+    while (existingLower.contains('$base$suffix'.toLowerCase())) {
+      suffix++;
+    }
+    return '$base$suffix';
+  }
+
+  void _onEmployeeSelected(Employee emp, List<AppUser> existingUsers) {
+    final suggestedRole = UserRole.suggestFromPosition(
+      emp.position,
+      isMaintenance: emp.isMaintenance,
+    );
+    setState(() {
+      _selectedEmployee = emp;
+      _displayNameController.text = emp.fullName;
+      if (!isEditing) {
+        _usernameController.text = _suggestUsername(emp.fullName, existingUsers);
+      }
+      _selectedRole = suggestedRole;
+      _selectedPermissions = Set<String>.from(suggestedRole.defaultPermissions);
+    });
+  }
+
+  Future<void> _openEmployeePicker(UserListViewModel vm) async {
+    final picked = await showDialog<Employee>(
+      context: context,
+      builder: (ctx) => _UserEmployeeSearchDialog(
+        employees: vm.employees,
+        users: vm.users,
+        selectedEmployeeId: _selectedEmployee?.id,
+      ),
+    );
+    if (picked != null && mounted) {
+      _onEmployeeSelected(picked, vm.users);
+    }
   }
 
   Future<void> _submit() async {
@@ -914,6 +1027,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
         role: _selectedRole,
         newPassword: newPassword,
         permissions: _selectedPermissions,
+        employeeId: _selectedEmployee?.id ?? widget.editUser!.employeeId,
       );
     } else {
       success = await vm.createUser(
@@ -922,6 +1036,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
         password: _passwordController.text,
         role: _selectedRole,
         permissions: _selectedPermissions,
+        employeeId: _selectedEmployee?.id,
       );
     }
 
@@ -946,12 +1061,23 @@ class _UserFormDialogState extends State<_UserFormDialog> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<UserListViewModel>();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final isAdmin = _selectedRole == UserRole.admin;
+    final roleDefaults = _selectedRole.defaultPermissions;
+
+    // Resolver empleado vinculado si estamos editando
+    final linkedEmp = _selectedEmployee ??
+        (widget.editUser?.employeeId != null
+            ? vm.employees
+                .where((e) => e.id == widget.editUser!.employeeId)
+                .firstOrNull
+            : null);
 
     return AlertDialog(
       title: Text(isEditing ? 'Editar Usuario' : 'Crear Nuevo Usuario'),
       content: SizedBox(
-        width: responsiveDialogWidth(context, 500),
+        width: responsiveDialogWidth(context, 540),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -959,11 +1085,192 @@ class _UserFormDialogState extends State<_UserFormDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // --- Vincular con Empleado del Catálogo ---
+                if (!isEditing || linkedEmp == null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _selectedEmployee != null
+                            ? const Color(0xFF0055A5).withValues(alpha: 0.6)
+                            : (isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFCBD5E1)),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.badge_outlined,
+                              size: 16,
+                              color: Color(0xFF0055A5),
+                            ),
+                            const SizedBox(width: 6),
+                            const Expanded(
+                              child: Text(
+                                'Importar desde Catálogo de Empleados (Opcional)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF0055A5),
+                                ),
+                              ),
+                            ),
+                            if (_selectedEmployee != null)
+                              InkWell(
+                                onTap: () =>
+                                    setState(() => _selectedEmployee = null),
+                                child: const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 4),
+                                  child: Text(
+                                    'Desvincular',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: Color(0xFFDC2626),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: vm.employees.isEmpty
+                              ? null
+                              : () => _openEmployeePicker(vm),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF1E293B)
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: isDark
+                                    ? const Color(0xFF334155)
+                                    : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: _selectedEmployee == null
+                                      ? Text(
+                                          vm.employees.isEmpty
+                                              ? 'No hay empleados cargados en el catálogo'
+                                              : 'Seleccionar empleado para auto-asignar nombre y rol...',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        )
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _selectedEmployee!.fullName,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${_selectedEmployee!.position} · ${_selectedEmployee!.areaName?.isNotEmpty == true ? _selectedEmployee!.areaName! : 'Taller Central'}',
+                                              style: const TextStyle(
+                                                fontSize: 11.5,
+                                                color: Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                const SizedBox(width: 8),
+                                OutlinedButton(
+                                  onPressed: vm.employees.isEmpty
+                                      ? null
+                                      : () => _openEmployeePicker(vm),
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    foregroundColor: const Color(0xFF0055A5),
+                                    side: BorderSide(
+                                      color: const Color(0xFF0055A5)
+                                          .withValues(alpha: 0.35),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _selectedEmployee != null
+                                        ? 'Cambiar'
+                                        : 'Buscar Empleado',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.badge,
+                          size: 18,
+                          color: Color(0xFF0055A5),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Empleado vinculado: ${linkedEmp.fullName} (${linkedEmp.position})',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0055A5),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
                 TextFormField(
                   controller: _usernameController,
                   decoration: const InputDecoration(
                     labelText: 'Nombre de Usuario *',
-                    hintText: 'Ej: KMEJIA',
+                    hintText: 'Ej: CHERNANDEZ',
                     border: OutlineInputBorder(),
                   ),
                   textCapitalization: TextCapitalization.characters,
@@ -998,15 +1305,20 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                         : 'Contraseña Temporal Inicial *',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   validator: (value) {
                     if (!isEditing && (value == null || value.isEmpty)) {
                       return 'La contraseña es obligatoria.';
                     }
-                    if (value != null && value.isNotEmpty && value.length < 8) {
+                    if (value != null &&
+                        value.isNotEmpty &&
+                        value.length < 8) {
                       return 'La contraseña debe tener al menos 8 caracteres.';
                     }
                     return null;
@@ -1017,7 +1329,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   value: _selectedRole,
                   isExpanded: true,
                   decoration: const InputDecoration(
-                    labelText: 'Rol *',
+                    labelText: 'Rol del Usuario *',
                     border: OutlineInputBorder(),
                   ),
                   items: UserRole.values.map((role) {
@@ -1032,6 +1344,40 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   }).toList(),
                   onChanged: _onRoleChanged,
                 ),
+                const SizedBox(height: 8),
+
+                // Descripción breve del Rol seleccionado
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Color(0xFF0055A5),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _selectedRole.description,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark
+                                ? Colors.grey.shade300
+                                : const Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 14),
 
                 // --- Sección de Permisos con Checkboxes ---
@@ -1044,26 +1390,36 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   child: Column(
                     children: [
                       InkWell(
-                        onTap: () => setState(() => _permissionsExpanded = !_permissionsExpanded),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                        onTap: () => setState(
+                            () => _permissionsExpanded = !_permissionsExpanded),
+                        borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(8)),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           child: Row(
                             children: [
                               Icon(
-                                _permissionsExpanded ? Icons.expand_less : Icons.expand_more,
+                                _permissionsExpanded
+                                    ? Icons.expand_less
+                                    : Icons.expand_more,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(
-                                  'Permisos del Usuario',
-                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                  'Permisos Detallados',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14),
                                 ),
                               ),
                               Text(
-                                '${_selectedPermissions.length} activo(s)',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                isAdmin
+                                    ? 'Acceso Total'
+                                    : '${_selectedPermissions.length} activo(s)',
+                                style: TextStyle(
+                                    fontSize: 12, color: Colors.grey.shade600),
                               ),
                             ],
                           ),
@@ -1074,7 +1430,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                           padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            'El Administrador tiene acceso total a todos los módulos.',
+                            'El Administrador tiene acceso total y exclusivo a todos los módulos del sistema.',
                             style: TextStyle(
                               fontSize: 12,
                               color: Colors.green.shade700,
@@ -1092,38 +1448,89 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Padding(
-                                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                                    padding: const EdgeInsets.fromLTRB(
+                                        12, 6, 12, 0),
                                     child: Text(
                                       group.key,
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
-                                        color: Theme.of(context).colorScheme.primary,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
                                       ),
                                     ),
                                   ),
                                   ...group.value.map((perm) {
-                                    final isChecked = _selectedPermissions.contains(perm.code);
+                                    final isFromRole =
+                                        roleDefaults.contains(perm.code);
+                                    final isChecked = isFromRole ||
+                                        _selectedPermissions
+                                            .contains(perm.code);
                                     return CheckboxListTile(
-                                      title: Text(perm.label, style: const TextStyle(fontSize: 13)),
-                                      subtitle: Text(perm.code, style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontFamily: 'monospace')),
+                                      title: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              perm.label,
+                                              style: const TextStyle(
+                                                  fontSize: 12.5),
+                                            ),
+                                          ),
+                                          if (isFromRole)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF0055A5)
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: const Text(
+                                                'Del Rol',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF0055A5),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      subtitle: Text(
+                                        perm.code,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey.shade500,
+                                          fontFamily: 'monospace',
+                                        ),
+                                      ),
                                       value: isChecked,
                                       dense: true,
                                       visualDensity: VisualDensity.compact,
-                                      controlAffinity: ListTileControlAffinity.leading,
-                                      onChanged: (val) {
-                                        setState(() {
-                                          if (val == true) {
-                                            _selectedPermissions.add(perm.code);
-                                          } else {
-                                            _selectedPermissions.remove(perm.code);
-                                          }
-                                        });
-                                      },
+                                      controlAffinity:
+                                          ListTileControlAffinity.leading,
+                                      onChanged: isFromRole
+                                          ? null
+                                          : (val) {
+                                              setState(() {
+                                                if (val == true) {
+                                                  _selectedPermissions
+                                                      .add(perm.code);
+                                                } else {
+                                                  _selectedPermissions
+                                                      .remove(perm.code);
+                                                }
+                                              });
+                                            },
                                     );
                                   }),
                                   if (group.key != _permissionGroups.keys.last)
-                                    const Divider(height: 1, indent: 12, endIndent: 12),
+                                    const Divider(
+                                        height: 1, indent: 12, endIndent: 12),
                                 ],
                               );
                             }).toList(),
@@ -1137,7 +1544,9 @@ class _UserFormDialogState extends State<_UserFormDialog> {
                   const SizedBox(height: 12),
                   Text(
                     vm.errorMessage,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12),
                   ),
                 ],
               ],
@@ -1156,11 +1565,245 @@ class _UserFormDialogState extends State<_UserFormDialog> {
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white),
                 )
               : Text(isEditing ? 'Guardar' : 'Crear'),
         ),
       ],
+    );
+  }
+}
+
+/// Buscador de Empleados para vincular al crear una cuenta de usuario.
+class _UserEmployeeSearchDialog extends StatefulWidget {
+  const _UserEmployeeSearchDialog({
+    required this.employees,
+    required this.users,
+    required this.selectedEmployeeId,
+  });
+
+  final List<Employee> employees;
+  final List<AppUser> users;
+  final int? selectedEmployeeId;
+
+  @override
+  State<_UserEmployeeSearchDialog> createState() =>
+      _UserEmployeeSearchDialogState();
+}
+
+class _UserEmployeeSearchDialogState extends State<_UserEmployeeSearchDialog> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  String _clean(String s) => s
+      .toLowerCase()
+      .trim()
+      .replaceAll('á', 'a')
+      .replaceAll('é', 'e')
+      .replaceAll('í', 'i')
+      .replaceAll('ó', 'o')
+      .replaceAll('ú', 'u');
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cleanQ = _clean(_query);
+
+    final linkedUserByEmpId = <int, AppUser>{
+      for (final u in widget.users)
+        if (u.employeeId != null) u.employeeId!: u,
+    };
+
+    final filtered = widget.employees.where((e) {
+      if (cleanQ.isEmpty) return true;
+      return _clean(e.fullName).contains(cleanQ) ||
+          _clean(e.position).contains(cleanQ) ||
+          _clean(e.areaName ?? '').contains(cleanQ);
+    }).toList();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 580),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.badge_outlined,
+                      color: Color(0xFF0055A5),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Seleccionar Empleado',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'Auto-completa nombre, usuario y sugiere el rol según su cargo',
+                          style: TextStyle(
+                              fontSize: 11.5, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: 'Buscar por nombre, puesto o área...',
+                  hintStyle:
+                      const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                  filled: true,
+                  fillColor: isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 11),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No se encontraron empleados para "$_query"',
+                        style: const TextStyle(color: Color(0xFF64748B)),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
+                      itemCount: filtered.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (ctx, idx) {
+                        final emp = filtered[idx];
+                        final existingUser = linkedUserByEmpId[emp.id];
+                        final hasUser = existingUser != null;
+                        final suggestedRole = UserRole.suggestFromPosition(
+                          emp.position,
+                          isMaintenance: emp.isMaintenance,
+                        );
+
+                        return ListTile(
+                          enabled: !hasUser,
+                          onTap: hasUser
+                              ? null
+                              : () => Navigator.of(context).pop(emp),
+                          leading: CircleAvatar(
+                            radius: 18,
+                            backgroundColor: hasUser
+                                ? Colors.grey.shade300
+                                : const Color(0xFF0055A5)
+                                    .withValues(alpha: 0.12),
+                            child: Icon(
+                              emp.isMaintenance
+                                  ? Icons.engineering_outlined
+                                  : Icons.person_outline,
+                              size: 18,
+                              color: hasUser
+                                  ? Colors.grey.shade600
+                                  : const Color(0xFF0055A5),
+                            ),
+                          ),
+                          title: Text(
+                            emp.fullName,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: hasUser ? Colors.grey : null,
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${emp.position} · ${emp.areaName?.isNotEmpty == true ? emp.areaName! : 'Taller Central'}',
+                                style: const TextStyle(fontSize: 11.5),
+                              ),
+                              if (hasUser)
+                                Text(
+                                  'Ya cuenta con usuario: @${existingUser.username}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFD97706),
+                                  ),
+                                )
+                              else
+                                Text(
+                                  'Rol sugerido: ${suggestedRole.label}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF0055A5),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          trailing: hasUser
+                              ? const Icon(Icons.lock_outline,
+                                  size: 18, color: Colors.grey)
+                              : (widget.selectedEmployeeId == emp.id
+                                  ? const Icon(Icons.check_circle,
+                                      color: Color(0xFF0055A5))
+                                  : const Icon(Icons.chevron_right, size: 18)),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

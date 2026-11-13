@@ -249,16 +249,6 @@ class _AssetListViewState extends State<AssetListView> {
               ),
             ),
             IconButton(
-              icon: Icon(
-                _showFullTree ? Icons.account_tree : Icons.account_tree_outlined,
-                color: _showFullTree ? Theme.of(context).colorScheme.primary : null,
-              ),
-              tooltip: _showFullTree
-                  ? 'Ver solo equipos raíz'
-                  : 'Ver árbol jerárquico completo (padres e hijos)',
-              onPressed: _toggleFullTree,
-            ),
-            IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: 'Actualizar',
               onPressed: () => _refresh(forceRefresh: true),
@@ -276,13 +266,15 @@ class _AssetListViewState extends State<AssetListView> {
         body: Consumer<AssetListViewModel>(
           builder: (context, viewModel, child) {
             final state = viewModel.state;
-            final isNarrow = MediaQuery.of(context).size.width < 750;
-
             final dateFilteredAssets = _filterByDate(state.assets);
-
             return Column(
               children: [
-                _buildFilterSection(isNarrow: isNarrow),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isNarrow = constraints.maxWidth < 750;
+                    return _buildFilterSection(isNarrow: isNarrow);
+                  },
+                ),
                 const Divider(height: 1),
                 if (state.viewState == ViewState.success)
                   _buildSummaryBar(dateFilteredAssets),

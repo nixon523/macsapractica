@@ -78,6 +78,14 @@ import '../../features/breakdown_reports/presentation/viewmodels/breakdown_repor
 import '../../features/breakdown_reports/presentation/viewmodels/my_reports_notifications_viewmodel.dart';
 import '../../features/breakdown_reports/presentation/viewmodels/my_reports_viewmodel.dart';
 import '../../features/breakdown_reports/presentation/viewmodels/report_breakdown_viewmodel.dart';
+import '../../features/employees/data/datasources/employee_remote_datasource.dart';
+import '../../features/employees/data/repositories/employee_repository_impl.dart';
+import '../../features/employees/domain/repositories/employee_repository.dart';
+import '../../features/employees/domain/usecases/create_employee_usecase.dart';
+import '../../features/employees/domain/usecases/get_employees_usecase.dart';
+import '../../features/employees/domain/usecases/toggle_employee_status_usecase.dart';
+import '../../features/employees/domain/usecases/update_employee_usecase.dart';
+import '../../features/employees/presentation/viewmodels/employee_list_viewmodel.dart';
 import '../../features/dashboard/data/dashboard_repository.dart';
 import '../../features/dashboard/data/datasources/dashboard_remote_datasource.dart';
 import '../../features/dashboard/presentation/viewmodels/dashboard_viewmodel.dart';
@@ -113,6 +121,8 @@ import '../../features/operation_reports/domain/usecases/obtener_reporte_semana.
 import '../../features/operation_reports/domain/usecases/obtener_metricas_operacion.dart';
 import '../../features/operation_reports/domain/usecases/listar_equipos_proceso.dart';
 import '../../features/operation_reports/domain/usecases/actualizar_es_equipo_proceso.dart';
+import '../../features/operation_reports/domain/usecases/obtener_analitica_mantenimiento.dart';
+import '../../features/operation_reports/presentation/viewmodels/maintenance_analytics_viewmodel.dart';
 import '../../features/operation_reports/presentation/viewmodels/operation_report_viewmodel.dart';
 
 final GetIt getIt = GetIt.instance;
@@ -493,7 +503,12 @@ Future<void> configureDependencies() async {
     ),
   );
   getIt.registerLazySingleton<DashboardViewModel>(
-    () => DashboardViewModel(dashboardRepository: getIt<DashboardRepository>()),
+    () => DashboardViewModel(
+      dashboardRepository: getIt<DashboardRepository>(),
+      getAllWorkOrdersUseCase: getIt<GetAllWorkOrdersUseCase>(),
+      getAllBreakdownReportsUseCase: getIt<GetAllBreakdownReportsUseCase>(),
+      preventiveScheduleRepository: getIt<PreventiveScheduleRepository>(),
+    ),
   );
 
   // --- MÓDULO: Reportes de Operación / Disponibilidad ---
@@ -521,6 +536,14 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<ActualizarEsEquipoProceso>(
     () => ActualizarEsEquipoProceso(getIt<OperationReportRepository>()),
   );
+  getIt.registerLazySingleton<ObtenerAnaliticaMantenimientoUseCase>(
+    () => ObtenerAnaliticaMantenimientoUseCase(getIt<OperationReportRepository>()),
+  );
+  getIt.registerFactory<MaintenanceAnalyticsViewModel>(
+    () => MaintenanceAnalyticsViewModel(
+      analyticsUseCase: getIt<ObtenerAnaliticaMantenimientoUseCase>(),
+    ),
+  );
   getIt.registerLazySingleton<OperationReportViewModel>(
     () => OperationReportViewModel(
       registrar:       getIt<RegistrarReporteOperacion>(),
@@ -544,6 +567,34 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<AppUpdateViewModel>(
     () => AppUpdateViewModel(
       checkAndroidUpdateUseCase: getIt<CheckAndroidUpdateUseCase>(),
+    ),
+  );
+
+  // --- MÓDULO: Empleados / Personal Técnico ---
+  getIt.registerLazySingleton<EmployeeRemoteDataSource>(
+    () => EmployeeRemoteDataSource(getIt<ApiClient>()),
+  );
+  getIt.registerLazySingleton<EmployeeRepository>(
+    () => EmployeeRepositoryImpl(getIt<EmployeeRemoteDataSource>()),
+  );
+  getIt.registerLazySingleton<GetEmployeesUseCase>(
+    () => GetEmployeesUseCase(getIt<EmployeeRepository>()),
+  );
+  getIt.registerLazySingleton<CreateEmployeeUseCase>(
+    () => CreateEmployeeUseCase(getIt<EmployeeRepository>()),
+  );
+  getIt.registerLazySingleton<UpdateEmployeeUseCase>(
+    () => UpdateEmployeeUseCase(getIt<EmployeeRepository>()),
+  );
+  getIt.registerLazySingleton<ToggleEmployeeStatusUseCase>(
+    () => ToggleEmployeeStatusUseCase(getIt<EmployeeRepository>()),
+  );
+  getIt.registerLazySingleton<EmployeeListViewModel>(
+    () => EmployeeListViewModel(
+      getEmployeesUseCase: getIt<GetEmployeesUseCase>(),
+      createEmployeeUseCase: getIt<CreateEmployeeUseCase>(),
+      updateEmployeeUseCase: getIt<UpdateEmployeeUseCase>(),
+      toggleEmployeeStatusUseCase: getIt<ToggleEmployeeStatusUseCase>(),
     ),
   );
 }

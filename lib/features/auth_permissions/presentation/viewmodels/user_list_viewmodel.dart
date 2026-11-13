@@ -1,13 +1,16 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../app/di/get_it.dart';
+import '../../../../core/usecases/usecase.dart';
+import '../../../employees/domain/entities/employee.dart';
+import '../../../employees/domain/usecases/get_employees_usecase.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/user_role.dart';
-import '../../domain/usecases/get_all_users.dart';
 import '../../domain/usecases/create_user_usecase.dart';
-import '../../domain/usecases/update_user_usecase.dart';
-import '../../domain/usecases/toggle_user_disabled_usecase.dart';
+import '../../domain/usecases/get_all_users.dart';
 import '../../domain/usecases/reset_password_temporary_usecase.dart';
-import '../../../../core/usecases/usecase.dart';
+import '../../domain/usecases/toggle_user_disabled_usecase.dart';
+import '../../domain/usecases/update_user_usecase.dart';
 
 class UserListViewModel extends ChangeNotifier {
   UserListViewModel({
@@ -16,20 +19,29 @@ class UserListViewModel extends ChangeNotifier {
     required UpdateUserUseCase updateUserUseCase,
     required ToggleUserDisabledUseCase toggleUserDisabledUseCase,
     required ResetPasswordTemporaryUseCase resetPasswordTemporaryUseCase,
+    GetEmployeesUseCase? getEmployeesUseCase,
   })  : _getAllUsersUseCase = getAllUsersUseCase,
         _createUserUseCase = createUserUseCase,
         _updateUserUseCase = updateUserUseCase,
         _toggleUserDisabledUseCase = toggleUserDisabledUseCase,
-        _resetPasswordTemporaryUseCase = resetPasswordTemporaryUseCase;
+        _resetPasswordTemporaryUseCase = resetPasswordTemporaryUseCase,
+        _getEmployeesUseCase = getEmployeesUseCase ??
+            (getIt.isRegistered<GetEmployeesUseCase>()
+                ? getIt<GetEmployeesUseCase>()
+                : null);
 
   final GetAllUsersUseCase _getAllUsersUseCase;
   final CreateUserUseCase _createUserUseCase;
   final UpdateUserUseCase _updateUserUseCase;
   final ToggleUserDisabledUseCase _toggleUserDisabledUseCase;
   final ResetPasswordTemporaryUseCase _resetPasswordTemporaryUseCase;
+  final GetEmployeesUseCase? _getEmployeesUseCase;
 
   List<AppUser> _users = [];
   List<AppUser> get users => _users;
+
+  List<Employee> _employees = [];
+  List<Employee> get employees => _employees;
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
@@ -56,6 +68,13 @@ class UserListViewModel extends ChangeNotifier {
 
     try {
       _users = await _getAllUsersUseCase(const NoParams());
+      if (_getEmployeesUseCase != null) {
+        try {
+          _employees = await _getEmployeesUseCase(
+            const GetEmployeesParams(onlyActive: true),
+          );
+        } catch (_) {}
+      }
     } catch (e) {
       _errorMessage = e.toString();
     } finally {
@@ -70,6 +89,7 @@ class UserListViewModel extends ChangeNotifier {
     required String password,
     required UserRole role,
     Set<String> permissions = const {},
+    int? employeeId,
   }) async {
     _isSaving = true;
     _errorMessage = '';
@@ -83,6 +103,7 @@ class UserListViewModel extends ChangeNotifier {
         password: password,
         role: role,
         permissions: permissions,
+        employeeId: employeeId,
       ));
       _successMessage = 'Usuario "$username" creado con contraseña temporal.';
       _isSaving = false;
@@ -103,6 +124,7 @@ class UserListViewModel extends ChangeNotifier {
     UserRole? role,
     String? newPassword,
     Set<String>? permissions,
+    int? employeeId,
   }) async {
     _isSaving = true;
     _errorMessage = '';
@@ -116,6 +138,7 @@ class UserListViewModel extends ChangeNotifier {
         role: role,
         newPassword: newPassword,
         permissions: permissions,
+        employeeId: employeeId,
       ));
       _successMessage = 'Usuario actualizado correctamente.';
       _isSaving = false;

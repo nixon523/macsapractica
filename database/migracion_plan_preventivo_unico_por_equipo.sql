@@ -213,7 +213,7 @@ BEGIN
 
         -- 7. Registrar evento en Kardex
         INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (@CreatedByUserId, @CreatedByUserName, 'PREVENTIVE_PLAN_CREATED', 'PREVENTIVE_SCHEDULES', @id,
+        VALUES (@CreatedByUserId, @CreatedByUserName, 'PREVENTIVE_PLAN_CREATED', 'PREVENTIVE', @id,
                 CONCAT(N'Plan Preventivo ', @id, N' creado para el equipo ', @AssetCode, N' (', @AssetName, N') con ', 
                        (SELECT COUNT(*) FROM dbo.PlanPreventivoActividad WHERE PlanId = @id), N' componentes configurados.'));
 
@@ -229,3 +229,4 @@ GO
 
 PRINT N'Restricción de 1 Plan Preventivo por Equipo Principal creada exitosamente.';
 GO
+

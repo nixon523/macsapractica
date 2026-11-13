@@ -1,3 +1,4 @@
+import '../../../../core/utils/text_sanitizer.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/entities/user_role.dart';
 
@@ -11,6 +12,9 @@ class AppUserModel extends AppUser {
     super.disabled,
     super.mustChangePassword,
     super.passwordResetRequested,
+    super.employeeId,
+    super.employeePosition,
+    super.employeeAreaName,
   });
 
   factory AppUserModel.fromJson(Map<String, dynamic> map, [String? docId]) {
@@ -38,10 +42,19 @@ class AppUserModel extends AppUser {
           .toSet();
     }
 
+    final rawEmpId = map['employeeId'] ?? map['EmployeeId'] ?? map['EmpleadoId'];
+    final int? parsedEmployeeId = rawEmpId == null
+        ? null
+        : (rawEmpId is int ? rawEmpId : int.tryParse(rawEmpId.toString()));
+
+    final rawDisplay = map['displayName'] ?? map['DisplayName'];
+    final rawEmpPos = map['employeePosition'] ?? map['EmployeePosition'];
+    final rawEmpArea = map['employeeAreaName'] ?? map['EmployeeAreaName'];
+
     return AppUserModel(
       userId: id,
       username: (map['username'] ?? map['Username'] ?? '').toString(),
-      displayName: (map['displayName'] ?? map['DisplayName'])?.toString(),
+      displayName: rawDisplay != null ? TextSanitizer.fixEncoding(rawDisplay.toString()) : null,
       role: UserRole.fromCode(roleStr),
       permissions: perms,
       disabled: (map['disabled'] ?? map['Disabled']) == true ||
@@ -52,6 +65,11 @@ class AppUserModel extends AppUser {
       passwordResetRequested: (map['passwordResetRequested'] ??
               map['PasswordResetRequested']) ==
           true,
+      employeeId: parsedEmployeeId,
+      employeePosition:
+          rawEmpPos != null ? TextSanitizer.fixEncoding(rawEmpPos.toString()) : null,
+      employeeAreaName:
+          rawEmpArea != null ? TextSanitizer.fixEncoding(rawEmpArea.toString()) : null,
     );
   }
 

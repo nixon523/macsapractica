@@ -147,6 +147,7 @@ class ReportBreakdownViewModel extends ChangeNotifier {
   Future<bool> submit({
     required String userId,
     required String userName,
+    String? imageData,
   }) async {
     _errorMessage = '';
 
@@ -183,6 +184,7 @@ class ReportBreakdownViewModel extends ChangeNotifier {
           severity: _severity,
           reportedByUserId: userId,
           reportedByUserName: userName,
+          imageData: imageData,
         ),
       );
       _reset();
