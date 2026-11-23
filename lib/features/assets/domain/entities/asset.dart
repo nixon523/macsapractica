@@ -84,6 +84,7 @@ class Asset {
   final Map<String, dynamic> dynamicAttributes;
   final String? imageData;
   final String? serial;
+  final String? observations;
   final List<AssetStatusPeriod> statusHistory;
   final DateTime? createdAt;
   /// Indica si este activo de primer nivel es un equipo de proceso
@@ -105,6 +106,7 @@ class Asset {
     required this.dynamicAttributes,
     this.imageData,
     this.serial,
+    this.observations,
     this.statusHistory = const [],
     this.createdAt,
     this.esEquipoProceso = false,
@@ -124,6 +126,7 @@ class Asset {
     String? transferredToId,
     Map<String, dynamic>? dynamicAttributes,
     String? imageData,
+    String? observations,
     List<AssetStatusPeriod>? statusHistory,
     DateTime? createdAt,
     bool? esEquipoProceso,
@@ -144,6 +147,7 @@ class Asset {
       dynamicAttributes: dynamicAttributes ?? this.dynamicAttributes,
       imageData: imageData ?? this.imageData,
       serial: serial,
+      observations: observations ?? this.observations,
       statusHistory: statusHistory ?? this.statusHistory,
       createdAt: createdAt ?? this.createdAt,
       esEquipoProceso: esEquipoProceso ?? this.esEquipoProceso,
@@ -226,11 +230,13 @@ class Asset {
           status == other.status &&
           transferredToId == other.transferredToId &&
           imageData == other.imageData &&
-          serial == other.serial;
+          serial == other.serial &&
+          observations == other.observations;
 
   @override
   int get hashCode => Object.hash(
         id, name, brand, model, areaId, stationId,
         parentAssetId, level, status, transferredToId, imageData, serial,
+        observations,
       );
 }

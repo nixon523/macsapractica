@@ -364,14 +364,6 @@ class _UserListViewState extends State<UserListView> {
                       )
                     : null;
 
-                final createIconBtn = canManage
-                    ? IconButton.filled(
-                        onPressed: _showCreateUserDialog,
-                        icon: const Icon(Icons.person_add, size: 18),
-                        tooltip: 'Crear Usuario',
-                      )
-                    : null;
-
                 if (isCompact) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1023,6 +1015,7 @@ class _UserFormDialogState extends State<_UserFormDialog> {
           : null;
       success = await vm.updateUser(
         userId: widget.editUser!.userId,
+        username: _usernameController.text.trim().toUpperCase(),
         displayName: _displayNameController.text.trim(),
         role: _selectedRole,
         newPassword: newPassword,
@@ -1268,17 +1261,22 @@ class _UserFormDialogState extends State<_UserFormDialog> {
 
                 TextFormField(
                   controller: _usernameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Nombre de Usuario *',
                     hintText: 'Ej: CHERNANDEZ',
-                    border: OutlineInputBorder(),
+                    border: const OutlineInputBorder(),
+                    helperText: isEditing
+                        ? 'Puedes modificar el nombre de usuario (debe ser único).'
+                        : null,
                   ),
                   textCapitalization: TextCapitalization.characters,
                   inputFormatters: [UpperCaseTextFormatter()],
-                  enabled: !isEditing,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'El nombre de usuario es obligatorio.';
+                    }
+                    if (value.trim().length < 3) {
+                      return 'El nombre de usuario debe tener al menos 3 caracteres.';
                     }
                     return null;
                   },

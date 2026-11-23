@@ -65,6 +65,16 @@ abstract class AssetRepository {
     required String userName,
   });
 
+  /// Clona la estructura completa de un árbol de activo a un área destino.
+  Future<Map<String, dynamic>> cloneAssetTree({
+    required String sourceAssetCode,
+    required String targetAreaId,
+    String? newRootName,
+    String? newSerial,
+    String? observations,
+    bool copyAttributes = true,
+  });
+
   /// Inactiva (fuera de servicio) o Reactiva un activo en su área actual,
   /// actualizando la bitácora cronológica de períodos de estado y registrando en Kardex.
   Future<void> toggleAssetActiveStatus({

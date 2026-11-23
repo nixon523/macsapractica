@@ -51,6 +51,7 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> updateUser({
     required String userId,
+    String? username,
     String? displayName,
     UserRole? role,
     String? newPassword,
@@ -59,6 +60,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }) {
     return _remoteDataSource.updateUser(
       userId: userId,
+      username: username,
       displayName: displayName,
       role: role,
       newPassword: newPassword,

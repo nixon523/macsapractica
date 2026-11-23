@@ -13,10 +13,19 @@ import '../../features/app_update/presentation/viewmodels/app_update_viewmodel.d
 import '../../features/assets/data/datasources/area_remote_datasource.dart';
 import '../../features/assets/data/datasources/asset_local_datasource.dart';
 import '../../features/assets/data/datasources/asset_remote_datasource.dart';
+import '../../features/assets/data/datasources/asset_template_remote_datasource.dart';
+import '../../features/assets/data/datasources/attribute_catalog_remote_datasource.dart';
 import '../../features/assets/data/repositories/area_repository_impl.dart';
 import '../../features/assets/data/repositories/asset_repository_impl.dart';
+import '../../features/assets/data/repositories/asset_template_repository_impl.dart';
+import '../../features/assets/data/repositories/attribute_catalog_repository_impl.dart';
 import '../../features/assets/domain/repositories/area_repository.dart';
 import '../../features/assets/domain/repositories/asset_repository.dart';
+import '../../features/assets/domain/repositories/asset_template_repository.dart';
+import '../../features/assets/domain/repositories/attribute_catalog_repository.dart';
+import '../../features/assets/domain/usecases/asset_template_usecases.dart';
+import '../../features/assets/domain/usecases/attribute_catalog_usecases.dart';
+import '../../features/assets/domain/usecases/clone_asset_tree_usecase.dart';
 import '../../features/assets/domain/usecases/create_area_usecase.dart';
 import '../../features/assets/domain/usecases/create_asset_usecase.dart';
 import '../../features/assets/domain/usecases/delete_area_usecase.dart';
@@ -37,7 +46,9 @@ import '../../features/assets/presentation/viewmodels/area_list_viewmodel.dart';
 import '../../features/assets/presentation/viewmodels/asset_create_edit_viewmodel.dart';
 import '../../features/assets/presentation/viewmodels/asset_detail_viewmodel.dart';
 import '../../features/assets/presentation/viewmodels/asset_list_viewmodel.dart';
+import '../../features/assets/presentation/viewmodels/asset_template_viewmodel.dart';
 import '../../features/assets/presentation/viewmodels/asset_transfer_viewmodel.dart';
+import '../../features/assets/presentation/viewmodels/attribute_catalog_viewmodel.dart';
 import '../../features/asset_deletion/data/datasources/asset_delete_remote_datasource.dart';
 import '../../features/asset_deletion/data/repositories/asset_delete_repository_impl.dart';
 import '../../features/asset_deletion/domain/repositories/asset_delete_repository.dart';
@@ -166,6 +177,22 @@ Future<void> configureDependencies() async {
       localDataSource: getIt<AssetLocalDataSource>(),
     ),
   );
+  getIt.registerLazySingleton<AttributeCatalogRemoteDataSource>(
+    () => AttributeCatalogRemoteDataSource(getIt<ApiClient>()),
+  );
+  getIt.registerLazySingleton<AttributeCatalogRepository>(
+    () => AttributeCatalogRepositoryImpl(
+      remoteDataSource: getIt<AttributeCatalogRemoteDataSource>(),
+    ),
+  );
+  getIt.registerLazySingleton<AssetTemplateRemoteDataSource>(
+    () => AssetTemplateRemoteDataSource(getIt<ApiClient>()),
+  );
+  getIt.registerLazySingleton<AssetTemplateRepository>(
+    () => AssetTemplateRepositoryImpl(
+      remoteDataSource: getIt<AssetTemplateRemoteDataSource>(),
+    ),
+  );
   getIt.registerLazySingleton<AuthRepository>(
     () => AuthRepositoryImpl(getIt<AuthRemoteDataSource>()),
   );
@@ -244,6 +271,33 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton(
     () => DeleteAreaUseCase(getIt<AreaRepository>()),
   );
+  getIt.registerLazySingleton(
+    () => GetAttributeCatalogUseCase(getIt<AttributeCatalogRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => SaveAttributeDefinitionUseCase(getIt<AttributeCatalogRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => DeleteAttributeDefinitionUseCase(getIt<AttributeCatalogRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => GetUnitsOfMeasureUseCase(getIt<AttributeCatalogRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => SaveUnitOfMeasureUseCase(getIt<AttributeCatalogRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => DeleteUnitOfMeasureUseCase(getIt<AttributeCatalogRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => GetBrandsUseCase(getIt<AttributeCatalogRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => SaveBrandUseCase(getIt<AttributeCatalogRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => DeleteBrandUseCase(getIt<AttributeCatalogRepository>()),
+  );
 
   getIt.registerLazySingleton(
     () => CreateAssetUseCase(getIt<AssetRepository>()),
@@ -256,6 +310,21 @@ Future<void> configureDependencies() async {
   );
   getIt.registerLazySingleton(
     () => UpdateAssetUseCase(getIt<AssetRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => CloneAssetTreeUseCase(getIt<AssetRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => GetAssetTemplatesUseCase(getIt<AssetTemplateRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => SaveAssetTemplateUseCase(getIt<AssetTemplateRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => InstantiateAssetTemplateUseCase(getIt<AssetTemplateRepository>()),
+  );
+  getIt.registerLazySingleton(
+    () => DeleteAssetTemplateUseCase(getIt<AssetTemplateRepository>()),
   );
   getIt.registerLazySingleton(
     () => LoginUseCase(getIt<AuthRepository>()),
@@ -369,6 +438,15 @@ Future<void> configureDependencies() async {
       getAssetsByParentUseCase: getIt<GetAssetsByParentUseCase>(),
       reactivateAssetUseCase: getIt<ReactivateAssetUseCase>(),
       assetRepository: getIt<AssetRepository>(),
+      cloneAssetTreeUseCase: getIt<CloneAssetTreeUseCase>(),
+    ),
+  );
+  getIt.registerFactory<AssetTemplateViewModel>(
+    () => AssetTemplateViewModel(
+      getTemplatesUseCase: getIt<GetAssetTemplatesUseCase>(),
+      saveTemplateUseCase: getIt<SaveAssetTemplateUseCase>(),
+      instantiateTemplateUseCase: getIt<InstantiateAssetTemplateUseCase>(),
+      deleteTemplateUseCase: getIt<DeleteAssetTemplateUseCase>(),
     ),
   );
   getIt.registerLazySingleton<AssetTransferViewModel>(
@@ -389,6 +467,19 @@ Future<void> configureDependencies() async {
       getAreasUseCase: getIt<GetAreasUseCase>(),
       updateAreaUseCase: getIt<UpdateAreaUseCase>(),
       deleteAreaUseCase: getIt<DeleteAreaUseCase>(),
+    ),
+  );
+  getIt.registerLazySingleton<AttributeCatalogViewModel>(
+    () => AttributeCatalogViewModel(
+      getAttributeCatalogUseCase: getIt<GetAttributeCatalogUseCase>(),
+      saveAttributeDefinitionUseCase: getIt<SaveAttributeDefinitionUseCase>(),
+      deleteAttributeDefinitionUseCase: getIt<DeleteAttributeDefinitionUseCase>(),
+      getUnitsOfMeasureUseCase: getIt<GetUnitsOfMeasureUseCase>(),
+      saveUnitOfMeasureUseCase: getIt<SaveUnitOfMeasureUseCase>(),
+      deleteUnitOfMeasureUseCase: getIt<DeleteUnitOfMeasureUseCase>(),
+      getBrandsUseCase: getIt<GetBrandsUseCase>(),
+      saveBrandUseCase: getIt<SaveBrandUseCase>(),
+      deleteBrandUseCase: getIt<DeleteBrandUseCase>(),
     ),
   );
   getIt.registerFactory(

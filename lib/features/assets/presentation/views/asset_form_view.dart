@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -11,7 +10,9 @@ import '../../data/datasources/asset_remote_datasource.dart';
 import '../../domain/entities/asset.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../viewmodels/asset_create_edit_viewmodel.dart';
+import '../viewmodels/attribute_catalog_viewmodel.dart';
 import 'widgets/asset_image_widget.dart';
+import 'widgets/manage_attributes_dialog.dart';
 const _levelLabels = {
   AssetLevel.equipment: 'Equipo',
   AssetLevel.subEquipment: 'Sub-equipo',
@@ -105,6 +106,7 @@ class _AssetFormViewState extends State<AssetFormView> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      context.read<AttributeCatalogViewModel>().loadAll(forceRefresh: true);
       final vm = context.read<AssetCreateEditViewModel>();
       if (_isEditing) {
         vm.initEdit(asset!);
@@ -278,14 +280,7 @@ class _AssetFormViewState extends State<AssetFormView> {
                     (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _brandCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Marca',
-                  hintText: 'Ej: Siemens',
-                  border: OutlineInputBorder(),
-                ),
-              ),
+              _BrandSelectorField(controller: _brandCtrl),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _modelCtrl,
@@ -303,9 +298,10 @@ class _AssetFormViewState extends State<AssetFormView> {
                   isEditing: _isEditing,
                   checkState: vm.serialCheckState,
                   conflictAsset: vm.serialConflictAsset,
-                  onChanged: _isEditing
-                      ? null // El serial es inmutable: no se puede editar
-                      : (value) => vm.checkSerial(value),
+                  onChanged: (value) => vm.checkSerial(
+                    value,
+                    excludeAssetId: _isEditing ? widget.asset?.id : null,
+                  ),
                 ),
               ],
               const SizedBox(height: 16),
@@ -582,58 +578,52 @@ class _SerialField extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    Widget? suffixIcon;
-    if (!isEditing) {
-      suffixIcon = switch (checkState) {
-        SerialCheckState.checking => const Padding(
-            padding: EdgeInsets.all(12),
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+    final suffixIcon = switch (checkState) {
+      SerialCheckState.checking => const Padding(
+          padding: EdgeInsets.all(12),
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-        SerialCheckState.available =>
-          Icon(Icons.check_circle_outline, color: colors.primary, size: 22),
-        SerialCheckState.conflict =>
-          Icon(Icons.block, color: colors.error, size: 22),
-        SerialCheckState.idle => null,
-      };
-    }
+        ),
+      SerialCheckState.available =>
+        Icon(Icons.check_circle_outline, color: colors.primary, size: 22),
+      SerialCheckState.conflict =>
+        Icon(Icons.block, color: colors.error, size: 22),
+      SerialCheckState.idle => null,
+    };
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TextFormField(
           controller: controller,
-          readOnly: isEditing,
-          enabled: !isEditing,
           onChanged: onChanged,
           decoration: InputDecoration(
-            labelText: isEditing ? 'N° de Serie' : 'N° de Serie (opcional)',
-            hintText: isEditing ? null : 'Ej: SN-2023-00142',
-            helperText: isEditing
-                ? 'El número de serie no puede modificarse.'
-                : 'Tal como aparece en la placa física del equipo.',
+            labelText: 'N° de Serie (opcional)',
+            hintText: 'Ej: SN-2023-00142',
+            helperText: 'Tal como aparece en la placa física del equipo.',
             border: const OutlineInputBorder(),
             suffixIcon: suffixIcon,
           ),
         ),
-        if (!isEditing) ...[
+        if (checkState == SerialCheckState.available) ...[
           const SizedBox(height: 6),
-          if (checkState == SerialCheckState.available)
-            Row(
-              children: [
-                const SizedBox(width: 4),
-                Icon(Icons.check_circle, color: colors.primary, size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  'Serial disponible',
-                  style: theme.textTheme.bodySmall?.copyWith(color: colors.primary),
-                ),
-              ],
-            ),
-          if (checkState == SerialCheckState.conflict && conflictAsset != null) ...[
+          Row(
+            children: [
+              const SizedBox(width: 4),
+              Icon(Icons.check_circle, color: colors.primary, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                'Serial disponible',
+                style: theme.textTheme.bodySmall?.copyWith(color: colors.primary),
+              ),
+            ],
+          ),
+        ],
+        if (checkState == SerialCheckState.conflict && conflictAsset != null) ...[
+          const SizedBox(height: 6),
             Container(
               margin: const EdgeInsets.only(top: 4),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -691,8 +681,84 @@ class _SerialField extends StatelessWidget {
             ),
           ],
         ],
-      ],
+      );
+  }
+}
+
+class _BrandSelectorField extends StatefulWidget {
+  const _BrandSelectorField({
+    required this.controller,
+  });
+
+  final TextEditingController controller;
+
+  @override
+  State<_BrandSelectorField> createState() => _BrandSelectorFieldState();
+}
+
+class _BrandSelectorFieldState extends State<_BrandSelectorField> {
+  @override
+  Widget build(BuildContext context) {
+    final catalogVm = context.watch<AttributeCatalogViewModel>();
+    final brandNames = catalogVm.brands.map((b) => b.name).toList();
+
+    return Autocomplete<String>(
+      initialValue: TextEditingValue(text: widget.controller.text),
+      optionsBuilder: (TextEditingValue textEditingValue) {
+        if (textEditingValue.text.isEmpty) {
+          return brandNames;
+        }
+        final q = textEditingValue.text.toLowerCase();
+        return brandNames.where((name) => name.toLowerCase().contains(q));
+      },
+      onSelected: (String selection) {
+        widget.controller.text = selection;
+      },
+      fieldViewBuilder: (
+        BuildContext context,
+        TextEditingController textEditingController,
+        FocusNode focusNode,
+        VoidCallback onFieldSubmitted,
+      ) {
+        return TextFormField(
+          controller: textEditingController,
+          focusNode: focusNode,
+          onChanged: (val) {
+            widget.controller.text = val;
+          },
+          decoration: InputDecoration(
+            labelText: 'Marca',
+            hintText: 'Seleccionar o escribir marca (Ej: Siemens)',
+            prefixIcon: const Icon(Icons.verified_outlined, size: 20),
+            suffixIcon: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (textEditingController.text.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    tooltip: 'Limpiar marca',
+                    onPressed: () {
+                      textEditingController.clear();
+                      widget.controller.clear();
+                      setState(() {});
+                    },
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.tune, size: 18),
+                  tooltip: 'Catálogo de Marcas',
+                  onPressed: () => ManageAttributesDialog.show(
+                    context,
+                    initialTabIndex: 2,
+                  ),
+                ),
+              ],
+            ),
+            border: const OutlineInputBorder(),
+          ),
+        );
+      },
     );
   }
 }
+
 

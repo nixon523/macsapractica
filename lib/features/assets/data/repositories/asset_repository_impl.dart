@@ -143,6 +143,25 @@ class AssetRepositoryImpl implements AssetRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> cloneAssetTree({
+    required String sourceAssetCode,
+    required String targetAreaId,
+    String? newRootName,
+    String? newSerial,
+    String? observations,
+    bool copyAttributes = true,
+  }) {
+    return remoteDataSource.cloneAssetTree(
+      sourceAssetCode: sourceAssetCode,
+      targetAreaId: targetAreaId,
+      newRootName: newRootName,
+      newSerial: newSerial,
+      observations: observations,
+      copyAttributes: copyAttributes,
+    );
+  }
+
+  @override
   Future<void> toggleAssetActiveStatus({
     required String assetId,
     required AssetStatus newStatus,

@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
-import '../../../../app/widgets/app_dialog.dart';
 import '../../../../app/widgets/app_feedback.dart';
 import '../../../../app/widgets/app_info_row.dart';
 import '../../../asset_deletion/domain/entities/asset_delete_request.dart';
@@ -24,6 +22,8 @@ import 'asset_create_view.dart';
 import 'asset_edit_view.dart';
 import 'asset_transfer_view.dart';
 import 'widgets/asset_image_widget.dart';
+import 'widgets/asset_template_dialogs.dart';
+import 'widgets/clone_asset_tree_dialog.dart';
 
 const _statusLabels = {
   AssetStatus.active: 'Activo',
@@ -134,205 +134,39 @@ class _AssetDetailViewState extends State<AssetDetailView> {
     }
   }
 
+  Future<void> _openCloneTreeDialog() async {
+    final result = await CloneAssetTreeDialog.show(
+      context,
+      sourceAsset: _asset,
+    );
+    if (result != null && mounted) {
+      AppFeedback.showSuccess(
+        context,
+        'Estructura duplicada con éxito. Nuevo activo: ${result.newRootAssetCode} (${result.totalClonedNodes} nodos creados).',
+      );
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  Future<void> _openSaveTemplateDialog() async {
+    final ok = await SaveAssetTemplateDialog.show(
+      context,
+      sourceAsset: _asset,
+    );
+    if (ok == true && mounted) {
+      AppFeedback.showSuccess(
+        context,
+        'Plantilla guardada exitosamente en el catálogo.',
+      );
+    }
+  }
+
   void _openHistory() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => KardexListView(entityId: _asset.id),
       ),
     );
-  }
-
-  Future<void> _confirmReactivate() async {
-    final user = context.read<AuthViewModel>().currentUser;
-    if (user == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reactivar activo'),
-        content: const Text(
-          'Se reactivará este activo junto con toda su descendencia, '
-          'quedando disponible de nuevo para ser transferido. ¿Continuar?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Reactivar'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    final ok = await _viewModel.reactivate(
-      asset: _asset,
-      userId: user.userId,
-      userName: user.username,
-    );
-
-    if (!mounted) return;
-    if (ok) {
-      AppFeedback.showSuccess(context, 'Activo reactivado correctamente.');
-      Navigator.of(context).pop(true);
-    } else {
-      AppFeedback.showError(
-        context,
-        'Error: ${_viewModel.reactivationError ?? 'No se pudo reactivar'}',
-      );
-    }
-  }
-
-  Future<void> _openToggleStatus(AssetStatus newStatus) async {
-    final user = context.read<AuthViewModel>().currentUser;
-    if (user == null) return;
-
-    final isPausing = newStatus == AssetStatus.inactive;
-    final reasonCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              isPausing ? Icons.power_settings_new : Icons.play_circle_outline,
-              color: isPausing ? Colors.orange : Colors.green,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                isPausing
-                    ? 'Inactivar Activo / Fuera de Servicio'
-                    : 'Reactivar Activo Operativo',
-              ),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: responsiveDialogWidth(context, 440),
-          child: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isPausing ? Colors.orange.shade50 : Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isPausing ? Colors.orange.shade200 : Colors.green.shade200,
-                      ),
-                    ),
-                    child: Text(
-                      isPausing
-                          ? 'Al inactivar este activo se registrará como fuera de servicio en el área ${_asset.areaId} y se iniciará el conteo de tiempo de parada (Downtime).'
-                          : 'Al reactivar el activo volverá a estar disponible para operaciones y mantenimiento en el área ${_asset.areaId}.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isPausing ? Colors.orange.shade900 : Colors.green.shade900,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: reasonCtrl,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      labelText: 'Motivo de la ${isPausing ? "Inactivación" : "Reactivación"} *',
-                      hintText: isPausing
-                          ? 'Ej: Falla en rodamiento, en espera de repuesto...'
-                          : 'Ej: Reparación concluida, pruebas aprobadas...',
-                      border: const OutlineInputBorder(),
-                    ),
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Debes ingresar el motivo'
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: isPausing ? Colors.orange.shade800 : Colors.green.shade700,
-            ),
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(ctx, true);
-              }
-            },
-            child: Text(isPausing ? 'Confirmar Inactivación' : 'Confirmar Reactivación'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      final success = await _viewModel.toggleActiveStatus(
-        assetId: _asset.id,
-        newStatus: newStatus,
-        reason: reasonCtrl.text.trim(),
-        userId: user.userId,
-        userName: user.username,
-      );
-
-      if (success && mounted) {
-        final now = DateTime.now();
-        final updatedHistory = <AssetStatusPeriod>[];
-        for (final p in _asset.statusHistory) {
-          if (p.isCurrent) {
-            updatedHistory.add(AssetStatusPeriod(
-              status: p.status,
-              startedAt: p.startedAt,
-              endedAt: now,
-              areaId: p.areaId,
-              reason: p.reason,
-              userId: p.userId,
-              userName: p.userName,
-            ));
-          } else {
-            updatedHistory.add(p);
-          }
-        }
-        updatedHistory.add(AssetStatusPeriod(
-          status: newStatus,
-          startedAt: now,
-          areaId: _asset.areaId,
-          reason: reasonCtrl.text.trim(),
-          userId: user.userId,
-          userName: user.username,
-        ));
-
-        setState(() {
-          _asset = _asset.copyWith(
-            status: newStatus,
-            statusHistory: updatedHistory,
-          );
-        });
-
-        AppFeedback.showSuccess(
-          context,
-          newStatus == AssetStatus.inactive
-              ? 'Activo marcado como Inactivo / Fuera de Servicio.'
-              : 'Activo reactivado exitosamente.',
-        );
-      }
-    }
   }
 
   Future<void> _toggleProcessEquipment() async {
@@ -467,8 +301,6 @@ class _AssetDetailViewState extends State<AssetDetailView> {
     final canCreateChild = !_isLeaf &&
         asset.status == AssetStatus.active &&
         authVm.hasPermission('asset.create');
-    final canReactivate =
-        _isDeactivated && authVm.hasPermission('asset.transfer');
 
     return ChangeNotifierProvider<AssetDetailViewModel>.value(
       value: _viewModel,
@@ -476,8 +308,18 @@ class _AssetDetailViewState extends State<AssetDetailView> {
         value: _deletionViewModel,
         child: Scaffold(
         appBar: AppBar(
-          title: Text('${asset.id} - ${asset.name}'),
+          title: Text(
+            '${asset.id} - ${asset.name}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           actions: [
+            if (canCreateChild && _isEquipment)
+              IconButton(
+                icon: const Icon(Icons.bookmark_add_outlined),
+                tooltip: 'Guardar estructura como plantilla',
+                onPressed: _openSaveTemplateDialog,
+              ),
             IconButton(
               icon: const Icon(Icons.description_outlined),
               tooltip: 'Generar Ficha / Reporte (PDF / Excel)',
@@ -490,7 +332,7 @@ class _AssetDetailViewState extends State<AssetDetailView> {
             ),
             IconButton(
               icon: const Icon(Icons.analytics_outlined),
-              tooltip: 'Hoja de Vida y AnalÃ­tica (OTs, AverÃ­as, Piezas)',
+              tooltip: 'Hoja de Vida y Analítica (OTs, Averías, Piezas)',
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -537,87 +379,225 @@ class _AssetDetailViewState extends State<AssetDetailView> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                if (!_isDeactivated) ...[
-                  if (canEdit) ...[
-                    FilledButton.icon(
-                      onPressed: _openEdit,
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Editar activo'),
-                    ),
-                    const SizedBox(height: 10),
-                    if (_asset.isActive)
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.orange.shade900,
-                          side: BorderSide(color: Colors.orange.shade400),
-                        ),
-                        onPressed: () => _openToggleStatus(AssetStatus.inactive),
-                        icon: const Icon(Icons.power_settings_new, color: Colors.orange),
-                        label: const Text('Inactivar / Fuera de Servicio'),
-                      )
-                    else if (_asset.isInactive)
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.green.shade700,
-                        ),
-                        onPressed: () => _openToggleStatus(AssetStatus.active),
-                        icon: const Icon(Icons.play_circle_outline),
-                        label: const Text('Reactivar Activo Operativo'),
-                      ),
-                  ],
-                  if (canTransfer) ...[
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      onPressed: _openTransfer,
-                      icon: const Icon(Icons.swap_horiz),
-                      label: const Text('Transferir a otra área'),
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.blue.shade900,
-                      side: BorderSide(color: Colors.blue.shade300),
-                    ),
-                    onPressed: () => AssetReportFilterDialog.showSingleAsset(context, _asset),
-                    icon: const Icon(Icons.description_outlined),
-                    label: const Text('Generar Ficha Técnica / Reporte (PDF / Excel)'),
-                  ),
-                ],
                 Consumer<AssetDeletionRequestViewModel>(
                   builder: (context, deletionVm, _) {
                     if (deletionVm.pendingRequest != null) {
                       return Padding(
-                        padding: const EdgeInsets.only(top: 16),
+                        padding: const EdgeInsets.only(bottom: 16),
                         child: _PendingDeletionBanner(
                           request: deletionVm.pendingRequest!,
-                        ),
-                      );
-                    }
-                    if (canRequestDeletion) {
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: OutlinedButton.icon(
-                          onPressed: deletionVm.isRequesting
-                              ? null
-                              : _openDeleteRequest,
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('Solicitar eliminación'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: Theme.of(context).colorScheme.error,
-                          ),
                         ),
                       );
                     }
                     return const SizedBox.shrink();
                   },
                 ),
+                if (!_isDeactivated)
+                  Consumer<AssetDeletionRequestViewModel>(
+                    builder: (context, deletionVm, _) {
+                      return _AssetActionsCard(
+                        canEdit: canEdit,
+                        canTransfer: canTransfer,
+                        canCloneTree: canCreateChild && _isEquipment,
+                        canRequestDeletion:
+                            canRequestDeletion && deletionVm.pendingRequest == null,
+                        isRequestingDeletion: deletionVm.isRequesting,
+                        onEdit: _openEdit,
+                        onTransfer: _openTransfer,
+                        onCloneTree: _openCloneTreeDialog,
+                        onGenerateReport: () =>
+                            AssetReportFilterDialog.showSingleAsset(context, _asset),
+                        onRequestDeletion: _openDeleteRequest,
+                      );
+                    },
+                  ),
               ],
             );
           },
         ),
         ),
       ),
+    );
+  }
+}
+
+class _AssetActionsCard extends StatelessWidget {
+  const _AssetActionsCard({
+    required this.canEdit,
+    required this.canTransfer,
+    required this.canCloneTree,
+    required this.canRequestDeletion,
+    required this.isRequestingDeletion,
+    required this.onEdit,
+    required this.onTransfer,
+    required this.onCloneTree,
+    required this.onGenerateReport,
+    required this.onRequestDeletion,
+  });
+
+  final bool canEdit;
+  final bool canTransfer;
+  final bool canCloneTree;
+  final bool canRequestDeletion;
+  final bool isRequestingDeletion;
+  final VoidCallback? onEdit;
+  final VoidCallback? onTransfer;
+  final VoidCallback? onCloneTree;
+  final VoidCallback? onGenerateReport;
+  final VoidCallback? onRequestDeletion;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tune_rounded, size: 20, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Gestión del Activo',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (canEdit) ...[
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Editar activo'),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth >= 550;
+                final items = <Widget>[
+                  if (canTransfer)
+                    _ActionItemButton(
+                      icon: Icons.swap_horiz_rounded,
+                      label: 'Transferir a otra área',
+                      color: theme.colorScheme.primary,
+                      onPressed: onTransfer,
+                      isWide: isWide,
+                    ),
+                  if (canCloneTree)
+                    _ActionItemButton(
+                      icon: Icons.copy_all_rounded,
+                      label: 'Duplicar estructura / Clonar',
+                      color: Colors.indigo.shade700,
+                      onPressed: onCloneTree,
+                      isWide: isWide,
+                    ),
+                  _ActionItemButton(
+                    icon: Icons.description_outlined,
+                    label: 'Ficha Técnica / Reporte',
+                    color: Colors.teal.shade800,
+                    onPressed: onGenerateReport,
+                    isWide: isWide,
+                  ),
+                ];
+
+                if (isWide) {
+                  return Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: items,
+                  );
+                }
+
+                return Column(
+                  children: [
+                    for (int i = 0; i < items.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 8),
+                      items[i],
+                    ],
+                  ],
+                );
+              },
+            ),
+            if (canRequestDeletion) ...[
+              const SizedBox(height: 14),
+              const Divider(height: 1),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  onPressed: isRequestingDeletion ? null : onRequestDeletion,
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  label: const Text('Solicitar baja / eliminación'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActionItemButton extends StatelessWidget {
+  const _ActionItemButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onPressed,
+    required this.isWide,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onPressed;
+  final bool isWide;
+
+  @override
+  Widget build(BuildContext context) {
+    final btn = OutlinedButton.icon(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: color,
+        side: BorderSide(color: color.withValues(alpha: 0.35)),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+    );
+
+    if (isWide) {
+      return btn;
+    }
+    return SizedBox(
+      width: double.infinity,
+      child: btn,
     );
   }
 }
@@ -864,6 +844,8 @@ class _AssetInfoCard extends StatelessWidget {
       ('Nivel', _levelLabels[asset.level] ?? asset.level.name),
       ('Activo padre', asset.parentAssetId ?? '—'),
       ('Ruta jerárquica', asset.ancestors.isEmpty ? '—' : asset.ancestors.join(' → ')),
+      if (asset.observations != null && asset.observations!.trim().isNotEmpty)
+        ('Observaciones', asset.observations!.trim()),
     ];
 
     return Card(
@@ -978,7 +960,18 @@ class _ChildrenSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Sub-equipos / Partes', style: theme.textTheme.titleSmall),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Sub-equipos / Partes', style: theme.textTheme.titleSmall),
+            if (onCreateChild != null)
+              FilledButton.tonalIcon(
+                onPressed: onCreateChild,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Agregar hijo'),
+              ),
+          ],
+        ),
         const SizedBox(height: 8),
         switch (viewState) {
           DetailViewState.loading =>
@@ -999,15 +992,31 @@ class _ChildrenSection extends StatelessWidget {
                 ? Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.extension_off_outlined),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Este activo no tiene hijos. Puedes agregar uno para completar su estructura.',
-                            ),
+                          Row(
+                            children: const [
+                              Icon(Icons.extension_off_outlined),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Este activo no tiene hijos. Puedes agregar uno para completar su estructura.',
+                                ),
+                              ),
+                            ],
                           ),
+                          if (onCreateChild != null) ...[
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: FilledButton.icon(
+                                onPressed: onCreateChild,
+                                icon: const Icon(Icons.add),
+                                label: const Text('Agregar sub-equipo o parte'),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

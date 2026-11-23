@@ -95,6 +95,7 @@ class AuthRemoteDataSource {
 
   Future<void> updateUser({
     required String userId,
+    String? username,
     String? displayName,
     UserRole? role,
     String? newPassword,
@@ -104,6 +105,8 @@ class AuthRemoteDataSource {
     await _apiClient.put(
       ApiEndpoints.userById(userId),
       body: {
+        if (username != null && username.trim().isNotEmpty)
+          'username': username.trim().toUpperCase(),
         if (displayName != null) 'displayName': displayName.trim(),
         if (role != null) 'roleCode': role.code,
         if (newPassword != null && newPassword.isNotEmpty)

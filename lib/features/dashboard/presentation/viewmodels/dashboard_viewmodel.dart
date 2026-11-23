@@ -7,6 +7,7 @@ import '../../../preventive_schedules/domain/repositories/preventive_schedule_re
 import '../../../work_orders/domain/entities/work_order.dart';
 import '../../../work_orders/domain/usecases/get_all_work_orders.dart';
 import '../../data/dashboard_repository.dart';
+import '../../domain/entities/cost_center_maintenance_stats.dart';
 import '../../domain/entities/dashboard_stats.dart';
 
 /// Periodo temporal para el gráfico interactivo de balance operativo.
@@ -98,6 +99,43 @@ class DashboardViewModel extends ChangeNotifier {
   // Estado del gráfico interactivo
   DashboardChartPeriod _chartPeriod = DashboardChartPeriod.mes;
   DashboardChartPeriod get chartPeriod => _chartPeriod;
+
+  // Estado del reporte por Centro de Costo y Tipo de Mantenimiento
+  List<CostCenterMaintenanceStats> _costCenterStats = [];
+  List<CostCenterMaintenanceStats> get costCenterStats => _costCenterStats;
+
+  bool _isLoadingCostCenters = false;
+  bool get isLoadingCostCenters => _isLoadingCostCenters;
+
+  bool _onlyWithMaintenance = true;
+  bool get onlyWithMaintenance => _onlyWithMaintenance;
+
+  List<CostCenterMaintenanceDetail> _selectedCostCenterDetails = [];
+  List<CostCenterMaintenanceDetail> get selectedCostCenterDetails => _selectedCostCenterDetails;
+
+  bool _isLoadingDetails = false;
+  bool get isLoadingDetails => _isLoadingDetails;
+
+  int get totalCostCenterMaintenance =>
+      _costCenterStats.fold(0, (sum, c) => sum + c.totalMaintenance);
+
+  int get totalCostCenterCorrective =>
+      _costCenterStats.fold(0, (sum, c) => sum + c.corrective);
+
+  int get totalCostCenterPreventive =>
+      _costCenterStats.fold(0, (sum, c) => sum + c.preventive);
+
+  int get totalCostCenterPredictive =>
+      _costCenterStats.fold(0, (sum, c) => sum + c.predictive);
+
+  int get totalCostCenterImprovement =>
+      _costCenterStats.fold(0, (sum, c) => sum + c.improvement);
+
+  int get totalCostCenterOtherTypes =>
+      _costCenterStats.fold(0, (sum, c) => sum + c.otherTypes);
+
+  double get totalCostCenterHours =>
+      _costCenterStats.fold(0.0, (sum, c) => sum + c.totalRealHours);
 
   int? _selectedChartPointIndex;
   int? get selectedChartPointIndex => _selectedChartPointIndex;
@@ -230,6 +268,60 @@ class DashboardViewModel extends ChangeNotifier {
       _errorMessage = e.toString();
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+
+    // Cargar estadísticas por Centro de Costo en segundo plano
+    await loadCostCenterMaintenance();
+  }
+
+  Future<void> toggleOnlyWithMaintenance() async {
+    _onlyWithMaintenance = !_onlyWithMaintenance;
+    await loadCostCenterMaintenance();
+  }
+
+  Future<void> loadCostCenterMaintenance({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    _isLoadingCostCenters = true;
+    notifyListeners();
+    try {
+      _costCenterStats = await dashboardRepository.getMaintenanceByCostCenter(
+        startDate: startDate,
+        endDate: endDate,
+        onlyWithMaintenance: _onlyWithMaintenance,
+      );
+    } catch (e) {
+      debugPrint('Error cargando métricas de mantenimiento por centro de costo: $e');
+    } finally {
+      _isLoadingCostCenters = false;
+      notifyListeners();
+    }
+  }
+
+  Future<List<CostCenterMaintenanceDetail>> getCostCenterDetails({
+    String? costCenter,
+    String? areaId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    _isLoadingDetails = true;
+    notifyListeners();
+    try {
+      _selectedCostCenterDetails =
+          await dashboardRepository.getMaintenanceByCostCenterDetails(
+        costCenter: costCenter,
+        areaId: areaId,
+        startDate: startDate,
+        endDate: endDate,
+      );
+      return _selectedCostCenterDetails;
+    } catch (e) {
+      debugPrint('Error cargando detalle de órdenes por centro de costo: $e');
+      return [];
+    } finally {
+      _isLoadingDetails = false;
       notifyListeners();
     }
   }

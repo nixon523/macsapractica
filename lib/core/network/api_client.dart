@@ -25,9 +25,36 @@ class ApiClient {
 
   static const Duration defaultTimeout = Duration(seconds: 15);
 
+  /// =========================================================================
+  /// CONFIGURACIÓN DE CONEXIÓN CON EL SERVIDOR DE PRODUCCIÓN
+  /// IP interna de tu servidor para compilaciones de producción (Web y APK).
+  /// =========================================================================
+  static const String serverHost = '192.168.1.15';
+
   static String get defaultBaseUrl {
+    // 1. Variable de entorno explícita (ej: flutter run --dart-define=API_URL=http://...)
     const fromEnv = String.fromEnvironment('API_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
+
+    // 2. MODO DESARROLLO / LOCAL (flutter run):
+    // Se conecta automáticamente a tu API local en localhost:3000 sin tocar código.
+    if (kDebugMode) {
+      if (kIsWeb || defaultTargetPlatform == TargetPlatform.windows) {
+        return 'http://localhost:3000/api';
+      }
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        // En emulador Android, 10.0.2.2 es el alias hacia el localhost del PC
+        return 'http://10.0.2.2:3000/api';
+      }
+      return 'http://localhost:3000/api';
+    }
+
+    // 3. MODO PRODUCCIÓN (flutter build web --release / flutter build apk --release):
+    // Utiliza automáticamente la IP interna del servidor configurada en serverHost.
+    if (serverHost.trim().isNotEmpty && serverHost != 'TU_IP_INTERNA_AQUI') {
+      final cleanHost = serverHost.trim();
+      return 'http://$cleanHost:3000/api';
+    }
 
     if (kIsWeb) {
       final host = Uri.base.host;
@@ -94,15 +121,13 @@ class ApiClient {
     final uri = _buildUri(path, queryParameters);
     try {
       final response = await _httpClient
-          .get(
-            uri,
-            headers: _buildHeaders(extraHeaders: headers),
-          )
+          .get(uri, headers: _buildHeaders(extraHeaders: headers))
           .timeout(defaultTimeout);
       return _handleResponse(response);
     } on TimeoutException catch (_) {
       throw const ServerFailure(
-        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+        message:
+            'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
       );
     } on SocketException catch (_) {
       throw const ServerFailure(
@@ -133,7 +158,8 @@ class ApiClient {
       return _handleResponse(response);
     } on TimeoutException catch (_) {
       throw const ServerFailure(
-        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+        message:
+            'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
       );
     } on SocketException catch (_) {
       throw const ServerFailure(
@@ -164,7 +190,8 @@ class ApiClient {
       return _handleResponse(response);
     } on TimeoutException catch (_) {
       throw const ServerFailure(
-        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+        message:
+            'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
       );
     } on SocketException catch (_) {
       throw const ServerFailure(
@@ -195,7 +222,8 @@ class ApiClient {
       return _handleResponse(response);
     } on TimeoutException catch (_) {
       throw const ServerFailure(
-        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+        message:
+            'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
       );
     } on SocketException catch (_) {
       throw const ServerFailure(
@@ -226,7 +254,8 @@ class ApiClient {
       return _handleResponse(response);
     } on TimeoutException catch (_) {
       throw const ServerFailure(
-        message: 'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
+        message:
+            'Tiempo de espera agotado al conectar con el servidor (15 s). Verifica la red o la API.',
       );
     } on SocketException catch (_) {
       throw const ServerFailure(
@@ -275,12 +304,15 @@ class ApiClient {
       if (fields != null) {
         request.fields.addAll(fields);
       }
-      final streamedResponse = await _httpClient.send(request).timeout(defaultTimeout);
+      final streamedResponse = await _httpClient
+          .send(request)
+          .timeout(defaultTimeout);
       final response = await http.Response.fromStream(streamedResponse);
       return _handleResponse(response);
     } on TimeoutException catch (_) {
       throw const ServerFailure(
-        message: 'Tiempo de espera agotado al subir el archivo (15 s). Verifica tu conexión.',
+        message:
+            'Tiempo de espera agotado al subir el archivo (15 s). Verifica tu conexión.',
       );
     } on SocketException catch (_) {
       throw const ServerFailure(
@@ -290,6 +322,15 @@ class ApiClient {
       rethrow;
     } catch (e) {
       throw ServerFailure(message: 'Error de red: ${e.toString()}');
+    }
+  }
+
+  /// Notifica al backend la terminación de la sesión para liberar la sesión activa en BD.
+  Future<void> logout() async {
+    try {
+      await post('/autenticacion/logout');
+    } catch (_) {
+      // Ignorar errores de red en logout local
     }
   }
 
@@ -342,6 +383,7 @@ class ApiClient {
     }
 
     if (statusCode == 401) {
+      SessionManager.instance.notifySessionExpired(errorMessage);
       throw UnauthorizedFailure(message: errorMessage);
     } else if (statusCode == 403 || statusCode == 423) {
       throw ValidationFailure(message: errorMessage);

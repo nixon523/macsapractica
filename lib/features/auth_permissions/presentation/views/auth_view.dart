@@ -27,6 +27,15 @@ class _AuthViewState extends State<AuthView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authVm = context.read<AuthViewModel>();
+      if (authVm.isLoggedIn) {
+        if (authVm.mustChangePassword) {
+          Navigator.pushReplacementNamed(context, AppRouter.changeTemporaryPassword);
+        } else {
+          Navigator.pushReplacementNamed(context, AppRouter.main);
+        }
+        return;
+      }
       _checkAndroidUpdate();
     });
   }

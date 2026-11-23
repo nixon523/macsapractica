@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../app/di/get_it.dart';
+import '../../../../core/network/api_client.dart';
+import '../../../../core/network/session_manager.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/usecases/login.dart';
 import '../../domain/usecases/change_password_usecase.dart';
@@ -10,12 +13,17 @@ class AuthViewModel extends ChangeNotifier {
     required this.loginUseCase,
     required ChangePasswordUseCase changePasswordUseCase,
     required RequestPasswordResetUseCase requestPasswordResetUseCase,
+    SessionManager? sessionManager,
   })  : _changePasswordUseCase = changePasswordUseCase,
-        _requestPasswordResetUseCase = requestPasswordResetUseCase;
+        _requestPasswordResetUseCase = requestPasswordResetUseCase,
+        _sessionManager = sessionManager ?? SessionManager.instance {
+    _currentUser = _sessionManager.currentUser;
+  }
 
   final LoginUseCase loginUseCase;
   final ChangePasswordUseCase _changePasswordUseCase;
   final RequestPasswordResetUseCase _requestPasswordResetUseCase;
+  final SessionManager _sessionManager;
 
   AppUser? _currentUser;
   AppUser? get currentUser => _currentUser;
@@ -96,6 +104,7 @@ class AuthViewModel extends ChangeNotifier {
         disabled: _currentUser!.disabled,
         mustChangePassword: false,
       );
+      _sessionManager.updateUser(_currentUser!);
 
       _successMessage = 'Contraseña actualizada correctamente.';
       _isProcessing = false;
@@ -137,10 +146,19 @@ class AuthViewModel extends ChangeNotifier {
   }
 
   void logout() {
-    _currentUser = null;
-    _errorMessage = '';
-    _successMessage = '';
-    notifyListeners();
+    try {
+      _sessionManager.clear();
+      _currentUser = null;
+      _errorMessage = '';
+      _successMessage = '';
+      notifyListeners();
+    } finally {
+      try {
+        if (getIt.isRegistered<ApiClient>()) {
+          getIt<ApiClient>().logout();
+        }
+      } catch (_) {}
+    }
   }
 
   bool hasPermission(String permission) =>

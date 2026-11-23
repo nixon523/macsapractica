@@ -106,10 +106,11 @@ class AssetCreateEditViewModel extends ChangeNotifier {
   }
 
   /// Verifica en tiempo real si el [serial] ingresado ya existe globalmente.
+  /// Si se provee [excludeAssetId] (al editar), el activo actual no cuenta como conflicto.
   ///
-  /// Aplica un debounce de 600ms para evitar consultas excesivas a Firestore.
+  /// Aplica un debounce de 600ms para evitar consultas excesivas.
   /// Si el serial ya pertenece a otro activo, el registro queda BLOQUEADO.
-  void checkSerial(String serial) {
+  void checkSerial(String serial, {String? excludeAssetId}) {
     _serialDebounce?.cancel();
 
     if (serial.trim().isEmpty) {
@@ -127,7 +128,7 @@ class AssetCreateEditViewModel extends ChangeNotifier {
         final existing = await _findAssetBySerialUseCase(
           FindAssetBySerialParams(serial),
         );
-        if (existing != null) {
+        if (existing != null && (excludeAssetId == null || existing.id != excludeAssetId)) {
           _serialCheckState = SerialCheckState.conflict;
           _serialConflictAsset = existing;
         } else {
@@ -156,11 +157,14 @@ class AssetCreateEditViewModel extends ChangeNotifier {
     Map<String, dynamic>? dynamicAttributes,
     String? imageData,
     String? serial,
+    String? observations,
     required String userId,
     required String userName,
   }) async {
-    // Si hay un conflicto detectado en tiempo real, bloquea el guardado inmediatamente.
-    if (_serialCheckState == SerialCheckState.conflict && _serialConflictAsset != null) {
+    // Si hay un conflicto detectado en tiempo real con otro activo, bloquea el guardado inmediatamente.
+    if (_serialCheckState == SerialCheckState.conflict &&
+        _serialConflictAsset != null &&
+        _serialConflictAsset!.id != id) {
       _errorMessage =
           'No se puede registrar: el número de serie ya pertenece al activo ${_serialConflictAsset!.id} (${_serialConflictAsset!.name}).';
       notifyListeners();
@@ -187,19 +191,20 @@ class AssetCreateEditViewModel extends ChangeNotifier {
         dynamicAttributes: dynamicAttributes ?? {},
         imageData: imageData,
         serial: serial?.trim().isEmpty == true ? null : serial?.trim(),
+        observations: observations?.trim().isEmpty == true ? null : observations?.trim(),
       );
 
       if (_mode == AssetFormMode.create) {
-        await _createAssetUseCase(
+        final created = await _createAssetUseCase(
           CreateAssetParams(asset, userId: userId, userName: userName),
         );
+        _lastSaved = created;
       } else {
-        await _updateAssetUseCase(
+        final updated = await _updateAssetUseCase(
           UpdateAssetParams(asset, userId: userId, userName: userName),
         );
+        _lastSaved = updated;
       }
-
-      _lastSaved = asset;
       _success = true;
       _isLoading = false;
       notifyListeners();

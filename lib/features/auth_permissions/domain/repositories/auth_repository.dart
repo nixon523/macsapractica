@@ -22,6 +22,7 @@ abstract class AuthRepository {
   /// Actualiza displayName, rol y opcionalmente la contraseña.
   Future<void> updateUser({
     required String userId,
+    String? username,
     String? displayName,
     UserRole? role,
     String? newPassword,

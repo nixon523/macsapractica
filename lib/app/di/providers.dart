@@ -1,8 +1,10 @@
 import 'package:provider/provider.dart';
 import 'package:provider/single_child_widget.dart';
 
+import '../../features/assets/presentation/viewmodels/asset_template_viewmodel.dart';
 import '../../features/assets/presentation/viewmodels/asset_transfer_viewmodel.dart';
 import '../../features/assets/presentation/viewmodels/area_list_viewmodel.dart';
+import '../../features/assets/presentation/viewmodels/attribute_catalog_viewmodel.dart';
 import '../../features/auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../features/auth_permissions/presentation/viewmodels/user_list_viewmodel.dart';
 import '../../features/auth_permissions/presentation/viewmodels/password_reset_alerts_viewmodel.dart';
@@ -29,8 +31,14 @@ final List<SingleChildWidget> appProviders = [
   ChangeNotifierProvider<AssetTransferViewModel>(
     create: (_) => getIt<AssetTransferViewModel>(),
   ),
+  ChangeNotifierProvider<AssetTemplateViewModel>(
+    create: (_) => getIt<AssetTemplateViewModel>(),
+  ),
   ChangeNotifierProvider<AreaListViewModel>(
     create: (_) => getIt<AreaListViewModel>(),
+  ),
+  ChangeNotifierProvider<AttributeCatalogViewModel>(
+    create: (_) => getIt<AttributeCatalogViewModel>(),
   ),
   ChangeNotifierProvider<PreventiveScheduleViewModel>(
     create: (_) => getIt<PreventiveScheduleViewModel>(),

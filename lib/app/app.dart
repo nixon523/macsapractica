@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/network/session_manager.dart';
 import 'config/app_constants.dart';
 import 'di/providers.dart';
 import 'router/app_router.dart';
@@ -20,7 +21,9 @@ class MacsaApp extends StatelessWidget {
         darkTheme: AppTheme.dark,
         themeMode: ThemeMode.light,
         onGenerateRoute: AppRouter.generateRoute,
-        initialRoute: AppRouter.login,
+        initialRoute: SessionManager.instance.isAuthenticated
+            ? AppRouter.main
+            : AppRouter.login,
       ),
     );
   }

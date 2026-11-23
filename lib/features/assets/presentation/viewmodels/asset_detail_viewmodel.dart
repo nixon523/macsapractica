@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/asset.dart';
 import '../../domain/repositories/asset_repository.dart';
+import '../../domain/usecases/clone_asset_tree_usecase.dart';
 import '../../domain/usecases/get_assets_by_parent.dart';
 import '../../domain/usecases/reactivate_asset_usecase.dart';
 
@@ -12,13 +13,16 @@ class AssetDetailViewModel extends ChangeNotifier {
     required GetAssetsByParentUseCase getAssetsByParentUseCase,
     required ReactivateAssetUseCase reactivateAssetUseCase,
     required AssetRepository assetRepository,
+    CloneAssetTreeUseCase? cloneAssetTreeUseCase,
   })  : _getAssetsByParentUseCase = getAssetsByParentUseCase,
         _reactivateAssetUseCase = reactivateAssetUseCase,
-        _assetRepository = assetRepository;
+        _assetRepository = assetRepository,
+        _cloneAssetTreeUseCase = cloneAssetTreeUseCase;
 
   final GetAssetsByParentUseCase _getAssetsByParentUseCase;
   final ReactivateAssetUseCase _reactivateAssetUseCase;
   final AssetRepository _assetRepository;
+  final CloneAssetTreeUseCase? _cloneAssetTreeUseCase;
 
   DetailViewState _viewState = DetailViewState.initial;
   DetailViewState get viewState => _viewState;
@@ -86,6 +90,44 @@ class AssetDetailViewModel extends ChangeNotifier {
       _isReactivating = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<CloneAssetTreeResult?> cloneTree({
+    required String sourceAssetCode,
+    required String targetAreaId,
+    String? newRootName,
+    String? newSerial,
+    String? observations,
+    bool copyAttributes = true,
+  }) async {
+    if (_cloneAssetTreeUseCase == null) {
+      _errorMessage = 'Caso de uso de clonación no configurado.';
+      notifyListeners();
+      return null;
+    }
+
+    _viewState = DetailViewState.loading;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      final result = await _cloneAssetTreeUseCase(CloneAssetTreeParams(
+        sourceAssetCode: sourceAssetCode,
+        targetAreaId: targetAreaId,
+        newRootName: newRootName,
+        newSerial: newSerial,
+        observations: observations,
+        copyAttributes: copyAttributes,
+      ));
+      _viewState = DetailViewState.success;
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _viewState = DetailViewState.error;
+      notifyListeners();
+      return null;
     }
   }
 

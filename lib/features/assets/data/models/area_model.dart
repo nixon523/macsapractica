@@ -17,8 +17,8 @@ class AreaModel extends Area {
 
     return AreaModel(
       id: areaId,
-      name: (map['name'] ?? map['Name'] ?? '').toString(),
-      costCenter: (map['costCenter'] ?? map['CostCenter'] ?? '').toString(),
+      name: (map['name'] ?? map['Name'] ?? map['nombre'] ?? map['Nombre'] ?? '').toString(),
+      costCenter: (map['costCenter'] ?? map['CostCenter'] ?? map['centroCosto'] ?? map['CentroCosto'] ?? '').toString(),
       assetCounter: assetCounter is int
           ? assetCounter
           : int.tryParse(assetCounter.toString()) ?? 0,

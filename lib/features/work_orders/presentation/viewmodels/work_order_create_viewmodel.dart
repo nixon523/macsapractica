@@ -219,6 +219,8 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
       _assetId = report.assetId;
       _assetName = report.assetName;
       _areaId = report.areaId;
+      final matchedArea = _areas.where((a) => a.id == report.areaId).firstOrNull;
+      _areaName = matchedArea?.name ?? '';
       _description = report.description;
       _requestedWorkTypes.clear();
       _requestedWorkTypes.add('corrective');
@@ -417,15 +419,19 @@ class WorkOrderCreateViewModel extends ChangeNotifier {
         ),
       );
 
-      if (_report != null) {
-        await _linkBreakdownToWorkOrderUseCase(
-          LinkBreakdownToWorkOrderParams(
-            reportId: _report!.id,
-            workOrderId: created.id,
-            userId: userId,
-            userName: userName,
-          ),
-        );
+      if (_report != null && created.id.isNotEmpty) {
+        try {
+          await _linkBreakdownToWorkOrderUseCase(
+            LinkBreakdownToWorkOrderParams(
+              reportId: _report!.id,
+              workOrderId: created.id,
+              userId: userId,
+              userName: userName,
+            ),
+          );
+        } catch (_) {
+          // El reporte ya queda vinculado automáticamente en la transacción de creación de la OT
+        }
       }
 
       if (_preventiveSchedule != null) {

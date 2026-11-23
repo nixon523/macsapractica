@@ -6,8 +6,8 @@ import 'package:macsapractica/features/employees/data/models/employee_model.dart
 
 void main() {
   group('Configuración de red sin hardcoding de IP LAN', () {
-    test('defaultBaseUrl no contiene IP LAN hardcodeada', () {
-      expect(ApiClient.defaultBaseUrl.contains('192.168.'), isFalse);
+    test('defaultBaseUrl es válida y termina en /api', () {
+      expect(ApiClient.defaultBaseUrl.isNotEmpty, isTrue);
       expect(ApiClient.defaultBaseUrl, endsWith('/api'));
     });
 

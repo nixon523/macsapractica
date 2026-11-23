@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../core/network/session_manager.dart';
 
 import '../../features/auth_permissions/domain/entities/app_user.dart';
 import '../../features/auth_permissions/domain/entities/user_role.dart';
@@ -57,15 +60,118 @@ class MainShellScreen extends StatefulWidget {
   State<MainShellScreen> createState() => _MainShellScreenState();
 }
 
-class _MainShellScreenState extends State<MainShellScreen> {
+class _MainShellScreenState extends State<MainShellScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
   bool _sidebarExpanded = true;
   final Set<String> _collapsedGroupIds = {};
   bool _groupsInitialized = false;
+  final Map<_ShellSection, Widget> _cachedViews = {};
+
+  static const Duration _inactivityTimeout = Duration(minutes: 60);
+  static const Duration _inactivityWarningDuration = Duration(minutes: 55);
+
+  DateTime _lastActivityTime = DateTime.now();
+  Timer? _inactivityTimer;
+  bool _showingInactivityWarning = false;
+  StreamSubscription<String>? _sessionExpiredSubscription;
+
+  Widget _getContentForSection(_ShellSection section, List<_ShellSection> sections) {
+    return _cachedViews.putIfAbsent(
+      section,
+      () => _buildContent(section, sections),
+    );
+  }
+
+  void _recordUserActivity() {
+    _lastActivityTime = DateTime.now();
+  }
+
+  void _startInactivityChecker() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _checkInactivity();
+    });
+  }
+
+  void _checkInactivity() {
+    if (!mounted) return;
+    final elapsed = DateTime.now().difference(_lastActivityTime);
+
+    if (elapsed >= _inactivityTimeout) {
+      _inactivityTimer?.cancel();
+      if (_showingInactivityWarning && Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      _handleForcedLogout('Tu sesión se cerró automáticamente tras 1 hora de inactividad.');
+    } else if (elapsed >= _inactivityWarningDuration && !_showingInactivityWarning) {
+      _showInactivityWarningDialog();
+    }
+  }
+
+  void _showInactivityWarningDialog() {
+    _showingInactivityWarning = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          icon: const Icon(Icons.timer_outlined, color: Colors.orange, size: 38),
+          title: const Text('Aviso de Inactividad'),
+          content: const Text(
+            'Tu sesión expirará en 5 minutos por inactividad.\n\n'
+            '¿Deseas mantener tu sesión abierta?',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogCtx).pop();
+                _recordUserActivity();
+              },
+              child: const Text('Continuar sesión'),
+            ),
+          ],
+        );
+      },
+    ).then((_) {
+      _showingInactivityWarning = false;
+    });
+  }
+
+  void _handleForcedLogout(String message) {
+    _cachedViews.clear();
+    context.read<AuthViewModel>().logout();
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRouter.login,
+      (route) => false,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.redAccent,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkInactivity();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _recordUserActivity();
+    _startInactivityChecker();
+
+    _sessionExpiredSubscription = SessionManager.instance.onSessionExpired.listen((reason) {
+      if (!mounted) return;
+      _handleForcedLogout(reason);
+    });
+
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
@@ -100,6 +206,9 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _inactivityTimer?.cancel();
+    _sessionExpiredSubscription?.cancel();
     getIt<AppUpdateViewModel>().stop();
     getIt<BreakdownAlertsViewModel>().stop();
     getIt<PasswordResetAlertsViewModel>().stop();
@@ -674,6 +783,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
     }
 
     void onLogout() {
+      _cachedViews.clear();
       context.read<AuthViewModel>().logout();
       Navigator.pushReplacementNamed(context, AppRouter.login);
     }
@@ -704,37 +814,64 @@ class _MainShellScreenState extends State<MainShellScreen> {
       onLogout: onLogout,
     );
 
-    if (isMobile) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(_getTitle(safeIndex, user, sections)),
-          // En móvil el AppBar muestra el ícono de menú automáticamente.
-        ),
-        drawer: Drawer(
-          width: 285,
-          backgroundColor: AppTheme.sidebarBackground,
-          shape: const RoundedRectangleBorder(),
-          child: sidebar,
-        ),
-        body: SafeArea(
-          top: false,
-          child: _buildContent(sections[safeIndex], sections),
-        ),
-      );
-    }
+    final mainScaffold = isMobile
+        ? Scaffold(
+            appBar: AppBar(
+              title: Text(_getTitle(safeIndex, user, sections)),
+              // En móvil el AppBar muestra el ícono de menú automáticamente.
+            ),
+            drawer: Drawer(
+              width: 285,
+              backgroundColor: AppTheme.sidebarBackground,
+              shape: const RoundedRectangleBorder(),
+              child: sidebar,
+            ),
+            body: SafeArea(
+              top: false,
+              child: IndexedStack(
+                index: safeIndex,
+                children: [
+                  for (int i = 0; i < sections.length; i++)
+                    (i == safeIndex || _cachedViews.containsKey(sections[i]))
+                        ? _getContentForSection(sections[i], sections)
+                        : const SizedBox.shrink(),
+                ],
+              ),
+            ),
+          )
+        : Scaffold(
+            appBar: AppBar(
+              title: Text(_getTitle(safeIndex, user, sections)),
+              automaticallyImplyLeading: false,
+            ),
+            body: Row(
+              children: [
+                sidebar,
+                Expanded(
+                  child: IndexedStack(
+                    index: safeIndex,
+                    children: [
+                      for (int i = 0; i < sections.length; i++)
+                        (i == safeIndex || _cachedViews.containsKey(sections[i]))
+                            ? _getContentForSection(sections[i], sections)
+                            : const SizedBox.shrink(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_getTitle(safeIndex, user, sections)),
-        automaticallyImplyLeading: false,
-      ),
-      body: Row(
-        children: [
-          sidebar,
-          Expanded(
-            child: _buildContent(sections[safeIndex], sections),
-          ),
-        ],
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _recordUserActivity(),
+      onPointerMove: (_) => _recordUserActivity(),
+      child: Focus(
+        onKeyEvent: (_, _) {
+          _recordUserActivity();
+          return KeyEventResult.ignored;
+        },
+        child: mainScaffold,
       ),
     );
   }

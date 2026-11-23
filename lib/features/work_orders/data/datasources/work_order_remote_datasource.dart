@@ -98,8 +98,8 @@ class WorkOrderRemoteDataSource {
       body: {
         'assetCode': assetId,
         'assetName': assetName,
-        'areaId': areaId ?? '',
-        'areaName': areaName,
+        'areaId': (areaId != null && areaId.trim().isNotEmpty) ? areaId.trim() : null,
+        'areaName': (areaName != null && areaName.trim().isNotEmpty) ? areaName.trim() : null,
         'description': description.trim(),
         'priority': priority.name,
         'workTypes': requestedWorkTypes,
@@ -126,7 +126,9 @@ class WorkOrderRemoteDataSource {
 
     String newNumber = '';
     if (response is Map<String, dynamic>) {
-      newNumber = (response['WorkOrderNumber'] ??
+      newNumber = (response['WorkOrderId'] ??
+              response['workOrderId'] ??
+              response['WorkOrderNumber'] ??
               response['workOrderNumber'] ??
               response['id'] ??
               '')

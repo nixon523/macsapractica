@@ -7,6 +7,7 @@ import '../../../preventive_schedules/domain/entities/preventive_schedule.dart';
 import '../../../work_orders/domain/entities/work_order.dart';
 import '../../../work_orders/presentation/reports/work_order_report_filter_dialog.dart';
 import '../../../work_orders/presentation/views/work_order_detail_view.dart';
+import '../../domain/entities/cost_center_maintenance_stats.dart';
 import '../../domain/entities/dashboard_stats.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 import 'widgets/dashboard_interactive_chart.dart';
@@ -106,6 +107,10 @@ class _DashboardViewState extends State<DashboardView> {
                     );
                   },
                 ),
+                const SizedBox(height: 24),
+
+                // 4. Mantenimientos por Centro de Costo y Tipo
+                _buildCostCenterMaintenanceSection(context, vm),
               ],
             ],
           ),
@@ -1034,6 +1039,547 @@ class _DashboardViewState extends State<DashboardView> {
           ],
         ),
       ),
+    );
+  }
+
+  // --------------------------------------------------------------------------
+  // 4. SECCIÓN: MANTENIMIENTOS POR CENTRO DE COSTO Y TIPO
+  // --------------------------------------------------------------------------
+
+  Widget _buildCostCenterMaintenanceSection(BuildContext context, DashboardViewModel vm) {
+    final stats = vm.costCenterStats;
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cabecera de la sección
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.analytics_outlined, color: Color(0xFF0055A5), size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Mantenimientos por Centro de Costo',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Historial consolidado por Centro de Costo (CC) y tipos de intervención (Correctivo, Preventivo, Predictivo, Mejoras, Otros)',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                    ],
+                  ),
+                ),
+                Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    FilterChip(
+                      label: Text(
+                        vm.onlyWithMaintenance ? 'Solo con actividad' : 'Todos los CC',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: vm.onlyWithMaintenance ? const Color(0xFF0055A5) : const Color(0xFF475569),
+                        ),
+                      ),
+                      selected: vm.onlyWithMaintenance,
+                      onSelected: (_) => vm.toggleOnlyWithMaintenance(),
+                      avatar: Icon(
+                        vm.onlyWithMaintenance ? Icons.filter_alt : Icons.filter_alt_outlined,
+                        size: 14,
+                        color: vm.onlyWithMaintenance ? const Color(0xFF0055A5) : const Color(0xFF64748B),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 18),
+                      tooltip: 'Actualizar centros de costo',
+                      onPressed: vm.isLoadingCostCenters ? null : () => vm.loadCostCenterMaintenance(),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+
+          // Resumen rápido de KPIs
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 700;
+                final items = [
+                  _buildCostCenterMetricChip(
+                    label: 'Total Trabajos',
+                    value: '${vm.totalCostCenterMaintenance}',
+                    color: const Color(0xFF0F172A),
+                    bg: const Color(0xFFF1F5F9),
+                    icon: Icons.assignment_outlined,
+                  ),
+                  _buildCostCenterMetricChip(
+                    label: 'Correctivos',
+                    value: '${vm.totalCostCenterCorrective}',
+                    color: const Color(0xFFDC2626),
+                    bg: const Color(0xFFFEE2E2),
+                    icon: Icons.warning_amber_rounded,
+                  ),
+                  _buildCostCenterMetricChip(
+                    label: 'Preventivos',
+                    value: '${vm.totalCostCenterPreventive}',
+                    color: const Color(0xFF0284C7),
+                    bg: const Color(0xFFE0F2FE),
+                    icon: Icons.calendar_today_outlined,
+                  ),
+                  _buildCostCenterMetricChip(
+                    label: 'Predictivos / Mejoras',
+                    value: '${vm.totalCostCenterPredictive + vm.totalCostCenterImprovement}',
+                    color: const Color(0xFF7C3AED),
+                    bg: const Color(0xFFF3E8FF),
+                    icon: Icons.trending_up_outlined,
+                  ),
+                  _buildCostCenterMetricChip(
+                    label: 'Horas Reales',
+                    value: '${vm.totalCostCenterHours.toStringAsFixed(1)} h',
+                    color: const Color(0xFF059669),
+                    bg: const Color(0xFFD1FAE5),
+                    icon: Icons.access_time_outlined,
+                  ),
+                ];
+
+                if (isCompact) {
+                  return Wrap(spacing: 8, runSpacing: 8, children: items);
+                }
+                return Row(
+                  children: items
+                      .map((w) => Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: w,
+                            ),
+                          ))
+                      .toList(),
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1),
+
+          // Contenido: Lista / Tabla
+          if (vm.isLoadingCostCenters && stats.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(40),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (stats.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(32),
+              child: Center(
+                child: Text(
+                  vm.onlyWithMaintenance
+                      ? 'No hay registros de mantenimiento para los centros de costo con filtros actuales.'
+                      : 'No se encontraron áreas ni centros de costo registrados.',
+                  style: const TextStyle(color: Color(0xFF64748B)),
+                ),
+              ),
+            )
+          else
+            _buildCostCenterTable(context, stats, vm),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCostCenterMetricChip({
+    required String label,
+    required String value,
+    required Color color,
+    required Color bg,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: color.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCostCenterTable(
+    BuildContext context,
+    List<CostCenterMaintenanceStats> stats,
+    DashboardViewModel vm,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: DataTable(
+              headingRowColor: WidgetStateProperty.all(const Color(0xFFF8FAFC)),
+              headingTextStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF64748B),
+              ),
+              dataTextStyle: const TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF1E293B),
+              ),
+              horizontalMargin: 16,
+              columnSpacing: 18,
+              dataRowMinHeight: 48,
+              dataRowMaxHeight: 56,
+              columns: const [
+                DataColumn(label: Text('Centro Costo')),
+                DataColumn(label: Text('Área / Ubicación')),
+                DataColumn(label: Text('Total OTs')),
+                DataColumn(label: Text('Tipos de Mantenimiento')),
+                DataColumn(label: Text('Estado Trabajos')),
+                DataColumn(label: Text('Horas Invertidas')),
+                DataColumn(label: Text('Detalle')),
+              ],
+              rows: stats.map((item) {
+                return DataRow(
+                  cells: [
+                    DataCell(
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: Text(
+                          item.costCenter.isNotEmpty ? item.costCenter : 'S/CC',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        '${item.areaId} · ${item.areaName}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        '${item.totalMaintenance}',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                    DataCell(
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          if (item.corrective > 0)
+                            _buildMaintenanceTypeBadge(
+                              'Correctivo: ${item.corrective}',
+                              const Color(0xFFDC2626),
+                              const Color(0xFFFEE2E2),
+                            ),
+                          if (item.preventive > 0)
+                            _buildMaintenanceTypeBadge(
+                              'Preventivo: ${item.preventive}',
+                              const Color(0xFF0284C7),
+                              const Color(0xFFE0F2FE),
+                            ),
+                          if (item.predictive > 0)
+                            _buildMaintenanceTypeBadge(
+                              'Predictivo: ${item.predictive}',
+                              const Color(0xFF7C3AED),
+                              const Color(0xFFF3E8FF),
+                            ),
+                          if (item.improvement > 0)
+                            _buildMaintenanceTypeBadge(
+                              'Mejora: ${item.improvement}',
+                              const Color(0xFF0D9488),
+                              const Color(0xFFCCFBF1),
+                            ),
+                          if (item.otherTypes > 0)
+                            _buildMaintenanceTypeBadge(
+                              'Otros: ${item.otherTypes}',
+                              const Color(0xFF64748B),
+                              const Color(0xFFF1F5F9),
+                            ),
+                          if (item.totalMaintenance == 0)
+                            const Text('—', style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        '${item.completed} completadas · ${item.inProgress} en proceso',
+                        style: const TextStyle(fontSize: 11.5, color: Color(0xFF475569)),
+                      ),
+                    ),
+                    DataCell(
+                      Text(
+                        '${item.totalRealHours.toStringAsFixed(1)} h',
+                        style: const TextStyle(fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    DataCell(
+                      IconButton(
+                        icon: const Icon(Icons.visibility_outlined, size: 18, color: Color(0xFF0055A5)),
+                        tooltip: 'Ver órdenes de trabajo asociadas',
+                        onPressed: item.totalMaintenance > 0
+                            ? () => _showCostCenterDetailDialog(context, item, vm)
+                            : null,
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMaintenanceTypeBadge(String text, Color color, Color bg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
+  }
+
+  Future<void> _showCostCenterDetailDialog(
+    BuildContext context,
+    CostCenterMaintenanceStats stat,
+    DashboardViewModel vm,
+  ) async {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return FutureBuilder<List<CostCenterMaintenanceDetail>>(
+          future: vm.getCostCenterDetails(
+            costCenter: stat.costCenter.isNotEmpty ? stat.costCenter : null,
+            areaId: stat.areaId,
+          ),
+          builder: (dialogCtx, snapshot) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              titlePadding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0055A5).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.receipt_long_outlined, color: Color(0xFF0055A5), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Órdenes en ${stat.costCenter.isNotEmpty ? stat.costCenter : "Área"} · ${stat.areaName}',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '${stat.totalMaintenance} órdenes de trabajo registradas',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(dialogCtx).pop(),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 720,
+                height: 400,
+                child: snapshot.connectionState == ConnectionState.waiting
+                    ? const Center(child: CircularProgressIndicator())
+                    : (snapshot.data == null || snapshot.data!.isEmpty)
+                        ? const Center(
+                            child: Text(
+                              'No se encontraron detalles para este centro de costo.',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: snapshot.data!.length,
+                            separatorBuilder: (_, _) => const Divider(height: 1),
+                            itemBuilder: (itemCtx, index) {
+                              final d = snapshot.data![index];
+                              final dateStr = d.createdAt != null
+                                  ? d.createdAt!.toIso8601String().substring(0, 10)
+                                  : '—';
+
+                              return ListTile(
+                                dense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                leading: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                                  ),
+                                  child: Text(
+                                    d.workOrderId,
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                title: Text(
+                                  '${d.assetCode} · ${d.assetName}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      d.description,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Fecha: $dateStr',
+                                          style: const TextStyle(fontSize: 11, color: Colors.black54),
+                                        ),
+                                        if (d.actualHours != null && d.actualHours! > 0) ...[
+                                          const Text(' · ', style: TextStyle(color: Colors.black54)),
+                                          Text(
+                                            'Horas: ${d.actualHours!.toStringAsFixed(1)} h',
+                                            style: const TextStyle(fontSize: 11, color: Colors.black54),
+                                          ),
+                                        ],
+                                        if (d.assignedTo != null && d.assignedTo!.isNotEmpty) ...[
+                                          const Text(' · ', style: TextStyle(color: Colors.black54)),
+                                          Text(
+                                            'Resp: ${d.assignedTo}',
+                                            style: const TextStyle(fontSize: 11, color: Colors.black54),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                trailing: _buildMaintenanceTypeBadge(
+                                  d.mainMaintenanceType == 'preventive'
+                                      ? 'Preventivo'
+                                      : (d.mainMaintenanceType == 'corrective'
+                                          ? 'Correctivo'
+                                          : 'Otro'),
+                                  d.mainMaintenanceType == 'preventive'
+                                      ? const Color(0xFF0284C7)
+                                      : (d.mainMaintenanceType == 'corrective'
+                                          ? const Color(0xFFDC2626)
+                                          : const Color(0xFF64748B)),
+                                  d.mainMaintenanceType == 'preventive'
+                                      ? const Color(0xFFE0F2FE)
+                                      : (d.mainMaintenanceType == 'corrective'
+                                          ? const Color(0xFFFEE2E2)
+                                          : const Color(0xFFF1F5F9)),
+                                ),
+                              );
+                            },
+                          ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogCtx).pop(),
+                  child: const Text('Cerrar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

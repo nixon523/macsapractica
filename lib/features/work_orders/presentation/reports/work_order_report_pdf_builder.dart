@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -10,11 +11,10 @@ import '../../domain/entities/work_order.dart';
 /// Diseñado con estética ejecutiva institucional de Grupo Macsa,
 /// métricas en tarjetas, tabla paginada y bloque formal de validación y firmas.
 class WorkOrderReportPdfBuilder {
-  static const _primaryBlue = PdfColor(0.0, 0.33, 0.65); // #0055A5
-  static const _darkBlue = PdfColor(0.08, 0.22, 0.38);
-  static const _lightBlueBg = PdfColor(0.94, 0.96, 0.99);
-  static const _tableHeaderBg = PdfColor(0.92, 0.95, 0.98);
-  static const _zebraBg = PdfColor(0.98, 0.99, 1.0);
+  static const _primaryBlue = PdfColor(0.012, 0.255, 0.651); // #0341A6
+  static const _darkBlue = PdfColor(0.0, 0.15, 0.45);
+  static const _lightBlueBg = PdfColor(0.95, 0.97, 1.0);
+  static const _zebraBg = PdfColor(0.97, 0.985, 1.0);
   static const _borderColor = PdfColor(0.80, 0.84, 0.90);
 
   static Future<Uint8List> buildPdf({
@@ -25,7 +25,17 @@ class WorkOrderReportPdfBuilder {
     String? dateFilterLabel,
     String? areaFilterLabel,
     String issuedByName = 'Administración de Mantenimiento',
+    Uint8List? logoBytes,
   }) async {
+    if (logoBytes == null) {
+      try {
+        final byteData = await rootBundle.load('assets/images/macsa_logo.png');
+        logoBytes = byteData.buffer.asUint8List();
+      } catch (_) {
+        logoBytes = null;
+      }
+    }
+
     final pdf = pw.Document();
 
     final totalCount = workOrders.length;
@@ -62,23 +72,33 @@ class WorkOrderReportPdfBuilder {
                 children: [
                   pw.Row(
                     children: [
-                      pw.Container(
-                        width: 38,
-                        height: 38,
-                        decoration: pw.BoxDecoration(
-                          color: _primaryBlue,
-                          borderRadius: pw.BorderRadius.circular(6),
-                        ),
-                        alignment: pw.Alignment.center,
-                        child: pw.Text(
-                          'M',
-                          style: pw.TextStyle(
-                            color: PdfColors.white,
-                            fontSize: 22,
-                            fontWeight: pw.FontWeight.bold,
+                      if (logoBytes != null && logoBytes.isNotEmpty)
+                        pw.Container(
+                          width: 42,
+                          height: 42,
+                          child: pw.Image(
+                            pw.MemoryImage(logoBytes),
+                            fit: pw.BoxFit.contain,
+                          ),
+                        )
+                      else
+                        pw.Container(
+                          width: 38,
+                          height: 38,
+                          decoration: pw.BoxDecoration(
+                            color: _primaryBlue,
+                            borderRadius: pw.BorderRadius.circular(6),
+                          ),
+                          alignment: pw.Alignment.center,
+                          child: pw.Text(
+                            'M',
+                            style: pw.TextStyle(
+                              color: PdfColors.white,
+                              fontSize: 22,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ),
                       pw.SizedBox(width: 10),
                       pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -337,9 +357,9 @@ class WorkOrderReportPdfBuilder {
       border: pw.TableBorder.all(color: _borderColor, width: 0.5),
       columnWidths: columnWidths,
       children: [
-        // Fila Encabezado
+        // Fila Encabezado con Azul Corporativo y texto blanco
         pw.TableRow(
-          decoration: const pw.BoxDecoration(color: _tableHeaderBg),
+          decoration: const pw.BoxDecoration(color: _primaryBlue),
           children: tableHeaders.map((h) {
             return pw.Padding(
               padding: pw.EdgeInsets.symmetric(
@@ -351,7 +371,7 @@ class WorkOrderReportPdfBuilder {
                 style: pw.TextStyle(
                   fontSize: headerFontSize,
                   fontWeight: pw.FontWeight.bold,
-                  color: _darkBlue,
+                  color: PdfColors.white,
                 ),
                 textAlign: pw.TextAlign.center,
               ),

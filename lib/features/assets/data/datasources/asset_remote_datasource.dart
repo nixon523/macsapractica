@@ -149,9 +149,12 @@ class AssetRemoteDataSource {
 
     String newCode = asset.id;
     if (response is Map<String, dynamic>) {
-      newCode = (response['NewAssetCode'] ??
-              response['newAssetCode'] ??
+      newCode = (response['CodigoActivo'] ??
+              response['codigoActivo'] ??
               response['assetCode'] ??
+              response['AssetCode'] ??
+              response['NewAssetCode'] ??
+              response['newAssetCode'] ??
               newCode)
           .toString();
     }
@@ -218,6 +221,33 @@ class AssetRemoteDataSource {
     await _apiClient.post(
       ApiEndpoints.reactivateAsset(asset.id),
     );
+  }
+
+  Future<Map<String, dynamic>> cloneAssetTree({
+    required String sourceAssetCode,
+    required String targetAreaId,
+    String? newRootName,
+    String? newSerial,
+    String? observations,
+    bool copyAttributes = true,
+  }) async {
+    final response = await _apiClient.post(
+      ApiEndpoints.cloneAssetTree(sourceAssetCode),
+      body: {
+        'targetAreaId': targetAreaId,
+        if (newRootName != null && newRootName.trim().isNotEmpty)
+          'newRootName': newRootName.trim(),
+        if (newSerial != null && newSerial.trim().isNotEmpty)
+          'newSerial': newSerial.trim(),
+        if (observations != null && observations.trim().isNotEmpty)
+          'observations': observations.trim(),
+        'copyAttributes': copyAttributes,
+      },
+    );
+    if (response is Map<String, dynamic>) {
+      return response;
+    }
+    return <String, dynamic>{};
   }
 
   Future<void> toggleAssetActiveStatus({

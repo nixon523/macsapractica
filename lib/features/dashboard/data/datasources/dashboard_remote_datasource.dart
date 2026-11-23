@@ -1,6 +1,8 @@
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/api_endpoints.dart';
+import '../../domain/entities/cost_center_maintenance_stats.dart';
 import '../../domain/entities/dashboard_stats.dart';
+import '../models/cost_center_maintenance_stats_model.dart';
 
 /// DataSource remoto de Dashboard contra la API REST (SQL Server).
 class DashboardRemoteDataSource {
@@ -58,5 +60,55 @@ class DashboardRemoteDataSource {
       overdueSchedules: 0,
       pmComplianceRate: 100.0,
     );
+  }
+
+  Future<List<CostCenterMaintenanceStats>> getMaintenanceByCostCenter({
+    DateTime? startDate,
+    DateTime? endDate,
+    bool onlyWithMaintenance = false,
+  }) async {
+    final params = <String, String>{};
+    if (startDate != null) params['startDate'] = startDate.toIso8601String();
+    if (endDate != null) params['endDate'] = endDate.toIso8601String();
+    if (onlyWithMaintenance) params['onlyWithMaintenance'] = 'true';
+
+    final query = params.isNotEmpty
+        ? '?${params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}'
+        : '';
+
+    final response = await _apiClient.get('${ApiEndpoints.maintenanceByCostCenter}$query');
+    if (response is List) {
+      return response
+          .map((item) => CostCenterMaintenanceStatsModel.fromJson(
+              Map<String, dynamic>.from(item as Map)))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<List<CostCenterMaintenanceDetail>> getMaintenanceByCostCenterDetails({
+    String? costCenter,
+    String? areaId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final params = <String, String>{};
+    if (costCenter != null && costCenter.isNotEmpty) params['costCenter'] = costCenter;
+    if (areaId != null && areaId.isNotEmpty) params['areaId'] = areaId;
+    if (startDate != null) params['startDate'] = startDate.toIso8601String();
+    if (endDate != null) params['endDate'] = endDate.toIso8601String();
+
+    final query = params.isNotEmpty
+        ? '?${params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&')}'
+        : '';
+
+    final response = await _apiClient.get('${ApiEndpoints.maintenanceByCostCenterDetails}$query');
+    if (response is List) {
+      return response
+          .map((item) => CostCenterMaintenanceDetailModel.fromJson(
+              Map<String, dynamic>.from(item as Map)))
+          .toList();
+    }
+    return [];
   }
 }

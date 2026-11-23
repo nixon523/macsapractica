@@ -51,7 +51,6 @@ class WorkOrderReportFilterDialog extends StatefulWidget {
 
 class _WorkOrderReportFilterDialogState extends State<WorkOrderReportFilterDialog> {
   List<Area> _areas = [];
-  bool _isLoadingAreas = false;
 
   List<WorkOrder> _allLoadedOrders = [];
   bool _isLoadingOrders = false;
@@ -109,7 +108,6 @@ class _WorkOrderReportFilterDialogState extends State<WorkOrderReportFilterDialo
   }
 
   Future<void> _loadAreas() async {
-    setState(() => _isLoadingAreas = true);
     try {
       final getAreas = getIt<GetAreasUseCase>();
       final areas = await getAreas(const NoParams());
@@ -123,7 +121,6 @@ class _WorkOrderReportFilterDialogState extends State<WorkOrderReportFilterDialo
         });
       }
     } catch (_) {}
-    if (mounted) setState(() => _isLoadingAreas = false);
   }
 
   Future<void> _fetchWorkOrders() async {

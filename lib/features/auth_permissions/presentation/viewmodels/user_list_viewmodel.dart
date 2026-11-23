@@ -120,6 +120,7 @@ class UserListViewModel extends ChangeNotifier {
 
   Future<bool> updateUser({
     required String userId,
+    String? username,
     String? displayName,
     UserRole? role,
     String? newPassword,
@@ -134,6 +135,7 @@ class UserListViewModel extends ChangeNotifier {
     try {
       await _updateUserUseCase(UpdateUserParams(
         userId: userId,
+        username: username,
         displayName: displayName,
         role: role,
         newPassword: newPassword,

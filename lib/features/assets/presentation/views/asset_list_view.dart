@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/di/get_it.dart';
+import '../../../../app/widgets/app_feedback.dart';
 import '../../domain/entities/asset.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../reports/asset_report_filter_dialog.dart';
@@ -13,6 +14,7 @@ import 'asset_create_view.dart';
 import 'asset_detail_view.dart';
 import 'asset_edit_view.dart';
 import 'widgets/asset_card_widget.dart';
+import 'widgets/asset_template_dialogs.dart';
 
 /// Cantidad de activos mostrados por página.
 const _pageSize = 10;
@@ -209,6 +211,20 @@ class _AssetListViewState extends State<AssetListView> {
     }
   }
 
+  Future<void> _openTemplateCatalog() async {
+    final result = await AssetTemplateCatalogDialog.show(
+      context,
+      targetAreaId: widget.areaId,
+    );
+    if (result != null && mounted) {
+      _refresh(forceRefresh: true);
+      AppFeedback.showSuccess(
+        context,
+        'Equipo creado exitosamente desde plantilla: ${result.newRootAssetCode} (${result.totalInstantiatedNodes} componentes).',
+      );
+    }
+  }
+
   Future<void> _editAsset(Asset asset) async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -240,6 +256,12 @@ class _AssetListViewState extends State<AssetListView> {
         appBar: AppBar(
           title: const Text('Activos del Área'),
           actions: [
+            if (canCreate)
+              IconButton(
+                icon: const Icon(Icons.auto_awesome_motion_outlined),
+                tooltip: 'Catálogo de Plantillas de Activos',
+                onPressed: _openTemplateCatalog,
+              ),
             IconButton(
               icon: const Icon(Icons.description_outlined),
               tooltip: 'Generar Reporte / Inventario (PDF / Excel)',
@@ -256,11 +278,28 @@ class _AssetListViewState extends State<AssetListView> {
           ],
         ),
         floatingActionButton: canCreate
-            ? FloatingActionButton.extended(
-                tooltip: 'Crear equipo',
-                onPressed: _createChild,
-                icon: const Icon(Icons.add),
-                label: const Text('Nuevo Equipo'),
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  FloatingActionButton.extended(
+                    heroTag: 'fab_template',
+                    tooltip: 'Crear equipo desde plantilla',
+                    backgroundColor: Colors.teal.shade700,
+                    foregroundColor: Colors.white,
+                    onPressed: _openTemplateCatalog,
+                    icon: const Icon(Icons.auto_awesome_motion),
+                    label: const Text('Desde Plantilla'),
+                  ),
+                  const SizedBox(height: 10),
+                  FloatingActionButton.extended(
+                    heroTag: 'fab_new_equipment',
+                    tooltip: 'Crear equipo en blanco',
+                    onPressed: _createChild,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Nuevo Equipo'),
+                  ),
+                ],
               )
             : null,
         body: Consumer<AssetListViewModel>(

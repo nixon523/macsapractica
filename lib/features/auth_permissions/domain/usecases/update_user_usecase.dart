@@ -5,6 +5,7 @@ import '../repositories/auth_repository.dart';
 class UpdateUserParams {
   const UpdateUserParams({
     required this.userId,
+    this.username,
     this.displayName,
     this.role,
     this.newPassword,
@@ -13,6 +14,7 @@ class UpdateUserParams {
   });
 
   final String userId;
+  final String? username;
   final String? displayName;
   final UserRole? role;
   final String? newPassword;
@@ -29,6 +31,7 @@ class UpdateUserUseCase implements UseCase<void, UpdateUserParams> {
   Future<void> call(UpdateUserParams params) {
     return _repository.updateUser(
       userId: params.userId,
+      username: params.username,
       displayName: params.displayName,
       role: params.role,
       newPassword: params.newPassword,

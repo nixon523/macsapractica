@@ -35,6 +35,15 @@ abstract final class ApiEndpoints {
       '/activos/${Uri.encodeComponent(assetCode)}/reactivar';
   static String toggleAssetStatus(String assetCode) =>
       '/activos/${Uri.encodeComponent(assetCode)}/estado';
+  static String cloneAssetTree(String assetCode) =>
+      '/activos/${Uri.encodeComponent(assetCode)}/clonar-arbol';
+
+  // Plantillas de Activos (Estructuras Jerárquicas)
+  static const String assetTemplates = '/plantillas-activos';
+  static String assetTemplateById(dynamic id) => '/plantillas-activos/$id';
+  static const String saveAssetTemplate = '/plantillas-activos/desde-activo';
+  static String instantiateAssetTemplate(dynamic id) =>
+      '/plantillas-activos/$id/instanciar';
 
   // Solicitudes de Baja
   static const String deletionRequests = '/solicitudes-baja';
@@ -102,10 +111,20 @@ abstract final class ApiEndpoints {
   static const String employeePositions = '/empleados/puestos';
   static String employeePositionById(dynamic id) => '/empleados/puestos/$id';
 
-  // Catálogos dinámicos (Roles, Permisos, Puestos, Enums)
+  // Catálogos dinámicos (Roles, Permisos, Puestos, Atributos, Unidades, Marcas, Enums)
   static const String catalogs = '/catalogos';
+  static const String unitsOfMeasure = '/catalogos/unidades';
+  static String unitOfMeasureById(dynamic id) => '/catalogos/unidades/$id';
+  static const String attributeCatalog = '/catalogos/atributos';
+  static String attributeCatalogById(dynamic id) => '/catalogos/atributos/$id';
+  static const String brands = '/catalogos/marcas';
+  static String brandById(dynamic id) => '/catalogos/marcas/$id';
 
   // Analítica & Reportería de Mantenimiento / OEE
+  static const String maintenanceByCostCenter =
+      '/dashboard/mantenimientos-centro-costo';
+  static const String maintenanceByCostCenterDetails =
+      '/dashboard/mantenimientos-centro-costo/detalle';
   static String analyticsAssetHistory(String assetCode) =>
       '/reportes-operacion/analitica/historial-activo/${Uri.encodeComponent(assetCode)}';
   static const String analyticsSeasonality =
