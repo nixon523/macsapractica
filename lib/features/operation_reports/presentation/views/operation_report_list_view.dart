@@ -196,7 +196,7 @@ class _OperationReportListViewState extends State<OperationReportListView> {
 }
 
 // ---------------------------------------------------------------------------
-// Selector de Área Tipo Tarjeta Buscable (Sin Checkboxes)
+// Selector de Área
 // ---------------------------------------------------------------------------
 class _AreaHeaderSelector extends StatelessWidget {
   const _AreaHeaderSelector({
@@ -211,129 +211,51 @@ class _AreaHeaderSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme  = Theme.of(context);
+    final colors = theme.colorScheme;
 
     return Container(
-      color: colors.primaryContainer.withValues(alpha: 0.2),
+      color: colors.surfaceContainer,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isCompact = constraints.maxWidth < 460;
-          if (isCompact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.factory_outlined, color: colors.primary, size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'ÁREA DE PROCESO',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: colors.primary,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            selectedAreaId != null
-                                ? '$selectedAreaId - ${selectedAreaName ?? ''}'
-                                : 'Seleccionar Área...',
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: onOpenSearch,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                Text(
+                  'Área de proceso',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.onSurface.withValues(alpha: 0.5),
+                    letterSpacing: 0.5,
                   ),
-                  icon: const Icon(Icons.search, size: 16),
-                  label: const Text('Buscar y Cambiar Área'),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  selectedAreaId != null
+                      ? '$selectedAreaId – ${selectedAreaName ?? ''}'
+                      : 'Seleccionar área...',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
-            );
-          }
-
-          return Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colors.primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.factory_outlined, color: colors.primary, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'ÁREA DE PROCESO',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: colors.primary,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      selectedAreaId != null
-                          ? '$selectedAreaId - ${selectedAreaName ?? ''}'
-                          : 'Seleccionar Área...',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: onOpenSearch,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                icon: const Icon(Icons.search, size: 16),
-                label: const Text('Buscar Área'),
-              ),
-            ],
-          );
-        },
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: onOpenSearch,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: const Icon(Icons.search, size: 16),
+            label: const Text('Cambiar área'),
+          ),
+        ],
       ),
     );
   }
@@ -607,21 +529,21 @@ class _WeeklyGrid extends StatelessWidget {
   final String areaId;
   final List<String> dias;
 
-  Color _colorFromDisp(double pct) {
-    if (pct >= 85) return const Color(0xFF2ECC71);
-    if (pct >= 60) return const Color(0xFFF39C12);
-    return const Color(0xFFE74C3C);
+  Color _colorFromDisp(double pct, ColorScheme colors) {
+    if (pct >= 85) return colors.primary;
+    if (pct >= 60) return colors.tertiary;
+    return colors.error;
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme  = Theme.of(context);
     final colors = theme.colorScheme;
-    final authVm = context.watch<AuthViewModel>();
+    final authVm  = context.watch<AuthViewModel>();
     final canEdit = authVm.hasPermission(AppPermissions.operationReportEdit) ||
         authVm.hasPermission(AppPermissions.assetEdit);
     final equipos = vm.weeklyReports.keys.toList();
-    final monday = vm.currentMonday;
+    final monday  = vm.currentMonday;
 
     return SingleChildScrollView(
       scrollDirection: Axis.vertical,
@@ -629,7 +551,7 @@ class _WeeklyGrid extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: DataTable(
           headingRowColor: WidgetStateProperty.all(
-            colors.primaryContainer.withValues(alpha: 0.4),
+            colors.surfaceContainerHighest,
           ),
           columnSpacing: 12,
           columns: [
@@ -651,7 +573,9 @@ class _WeeklyGrid extends StatelessWidget {
                     Text(
                       '${d.day}/${d.month}',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: isToday ? colors.primary : colors.onSurface.withValues(alpha: 0.6),
+                        color: isToday
+                            ? colors.primary
+                            : colors.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
                   ],
@@ -670,7 +594,7 @@ class _WeeklyGrid extends StatelessWidget {
             double totalOp = 0, totalJornada = 0;
             for (final r in reportes) {
               if (r.tieneReporte) {
-                totalOp += r.horasOperacion;
+                totalOp      += r.horasOperacion;
                 totalJornada += r.horasTotalesJornada;
               }
             }
@@ -682,9 +606,9 @@ class _WeeklyGrid extends StatelessWidget {
               cells: [
                 DataCell(
                   Tooltip(
-                    message: '$codigo - $nombre',
+                    message: '$codigo – $nombre',
                     child: SizedBox(
-                      width: 250,
+                      width: 220,
                       child: Text(
                         nombre,
                         style: const TextStyle(fontWeight: FontWeight.w600),
@@ -695,32 +619,34 @@ class _WeeklyGrid extends StatelessWidget {
                   ),
                 ),
                 ...List.generate(7, (i) {
-                  final dia = monday.add(Duration(days: i));
+                  final dia     = monday.add(Duration(days: i));
                   final reporte = reportes.cast<OperationReport?>().firstWhere(
                         (r) => r != null && _sameDay(r.fechaOperacion, dia),
                         orElse: () => null,
                       );
                   final tieneReporte = reporte?.tieneReporte ?? false;
+                  final dispColor    = tieneReporte
+                      ? _colorFromDisp(reporte!.disponibilidad, colors)
+                      : colors.outline;
 
                   return DataCell(
                     InkWell(
                       onTap: canEdit
                           ? () => _openForm(context, codigo, nombre, dia, reporte, areaId)
                           : null,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6),
                       child: Container(
-                        width: 60,
-                        height: 44,
+                        width: 58,
+                        height: 42,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                           color: tieneReporte
-                              ? _colorFromDisp(reporte!.disponibilidad).withValues(alpha: 0.15)
-                              : colors.surfaceContainerHighest.withValues(alpha: 0.5),
+                              ? dispColor.withValues(alpha: 0.1)
+                              : null,
                           border: Border.all(
                             color: tieneReporte
-                                ? _colorFromDisp(reporte!.disponibilidad)
-                                : colors.outline.withValues(alpha: 0.3),
-                            width: 1,
+                                ? dispColor.withValues(alpha: 0.5)
+                                : colors.outlineVariant.withValues(alpha: 0.4),
                           ),
                         ),
                         child: Center(
@@ -730,43 +656,30 @@ class _WeeklyGrid extends StatelessWidget {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: _colorFromDisp(reporte.disponibilidad),
+                                    color: dispColor,
                                   ),
                                 )
                               : (canEdit
-                                  ? Icon(
-                                      Icons.add_circle_outline,
-                                      size: 18,
-                                      color: colors.outline,
-                                    )
-                                  : Text(
-                                      '—',
+                                  ? Icon(Icons.add, size: 16, color: colors.outlineVariant)
+                                  : Text('—',
                                       style: TextStyle(
-                                        fontSize: 13,
-                                        color: colors.outline,
-                                      ),
-                                    )),
+                                          color: colors.outlineVariant))),
                         ),
                       ),
                     ),
                   );
                 }),
+                // % semanal
                 DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: _colorFromDisp(dispSemana).withValues(alpha: 0.15),
-                    ),
-                    child: Text(
-                      '${dispSemana.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _colorFromDisp(dispSemana),
-                      ),
+                  Text(
+                    '${dispSemana.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: _colorFromDisp(dispSemana, colors),
                     ),
                   ),
                 ),
+                // Métricas
                 DataCell(
                   IconButton(
                     icon: const Icon(Icons.bar_chart_rounded, size: 18),
@@ -836,16 +749,16 @@ class _MonthlyGrid extends StatelessWidget {
   final OperationReportViewModel vm;
   final String areaId;
 
-  Color _colorFromDisp(double pct) {
-    if (pct >= 85) return const Color(0xFF2ECC71);
-    if (pct >= 60) return const Color(0xFFF39C12);
-    return const Color(0xFFE74C3C);
+  Color _colorFromDisp(double pct, ColorScheme colors) {
+    if (pct >= 85) return colors.primary;
+    if (pct >= 60) return colors.tertiary;
+    return colors.error;
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
+    final theme     = Theme.of(context);
+    final colors    = theme.colorScheme;
     final summaries = vm.monthlySummaries;
 
     return SingleChildScrollView(
@@ -853,32 +766,31 @@ class _MonthlyGrid extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingRowColor: WidgetStateProperty.all(
-            colors.primaryContainer.withValues(alpha: 0.4),
-          ),
+          headingRowColor: WidgetStateProperty.all(colors.surfaceContainerHighest),
           columnSpacing: 14,
           columns: const [
             DataColumn(label: Text('Equipo')),
-            DataColumn(label: Text('Días Reportados')),
-            DataColumn(label: Text('Horas Jornada')),
-            DataColumn(label: Text('Horas Operación')),
-            DataColumn(label: Text('Paros Falla')),
-            DataColumn(label: Text('Paros Mant.')),
-            DataColumn(label: Text('Paros Plan./Ext.')),
-            DataColumn(label: Text('% Disp. Mensual')),
+            DataColumn(label: Text('Días')),
+            DataColumn(label: Text('Jornada')),
+            DataColumn(label: Text('Operación')),
+            DataColumn(label: Text('Falla')),
+            DataColumn(label: Text('Mant.')),
+            DataColumn(label: Text('Plan./Ext.')),
+            DataColumn(label: Text('% Disp.')),
             DataColumn(label: Text('')),
           ],
           rows: summaries.map((s) {
-            final parosMant = s.horasParoMantPrev + s.horasParoMantCorr;
+            final parosMant    = s.horasParoMantPrev + s.horasParoMantCorr;
             final parosPlanExt = s.horasParoPlanificado + s.horasParoExterno;
+            final dispColor    = _colorFromDisp(s.disponibilidadPct, colors);
 
             return DataRow(
               cells: [
                 DataCell(
                   Tooltip(
-                    message: '${s.codigoActivo} - ${s.nombreActivo}',
+                    message: '${s.codigoActivo} – ${s.nombreActivo}',
                     child: SizedBox(
-                      width: 250,
+                      width: 220,
                       child: Text(
                         s.nombreActivo,
                         style: const TextStyle(fontWeight: FontWeight.w600),
@@ -888,12 +800,8 @@ class _MonthlyGrid extends StatelessWidget {
                     ),
                   ),
                 ),
-                DataCell(
-                  Text('${s.reportesRegistrados} / ${s.diasDelMes} días'),
-                ),
-                DataCell(
-                  Text('${s.horasTotalesJornada.toStringAsFixed(1)} h'),
-                ),
+                DataCell(Text('${s.reportesRegistrados}/${s.diasDelMes}')),
+                DataCell(Text('${s.horasTotalesJornada.toStringAsFixed(0)} h')),
                 DataCell(
                   Text(
                     '${s.horasOperacion.toStringAsFixed(1)} h',
@@ -904,29 +812,18 @@ class _MonthlyGrid extends StatelessWidget {
                   Text(
                     '${s.horasParoFalla.toStringAsFixed(1)} h',
                     style: TextStyle(
-                      color: s.horasParoFalla > 0 ? Colors.red.shade700 : null,
+                      color: s.horasParoFalla > 0 ? colors.error : null,
                     ),
                   ),
                 ),
+                DataCell(Text('${parosMant.toStringAsFixed(1)} h')),
+                DataCell(Text('${parosPlanExt.toStringAsFixed(1)} h')),
                 DataCell(
-                  Text('${parosMant.toStringAsFixed(1)} h'),
-                ),
-                DataCell(
-                  Text('${parosPlanExt.toStringAsFixed(1)} h'),
-                ),
-                DataCell(
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: _colorFromDisp(s.disponibilidadPct).withValues(alpha: 0.15),
-                    ),
-                    child: Text(
-                      '${s.disponibilidadPct.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: _colorFromDisp(s.disponibilidadPct),
-                      ),
+                  Text(
+                    '${s.disponibilidadPct.toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: dispColor,
                     ),
                   ),
                 ),

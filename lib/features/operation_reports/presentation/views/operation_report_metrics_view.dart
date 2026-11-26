@@ -144,10 +144,10 @@ class _MetricsBody extends StatelessWidget {
   final DateTime desde;
   final DateTime hasta;
 
-  Color _dispColor(double pct) {
-    if (pct >= 85) return const Color(0xFF2ECC71);
-    if (pct >= 60) return const Color(0xFFF39C12);
-    return const Color(0xFFE74C3C);
+  Color _dispColor(double pct, ColorScheme colors) {
+    if (pct >= 85) return colors.primary;
+    if (pct >= 60) return colors.tertiary;
+    return colors.error;
   }
 
   @override
@@ -176,16 +176,16 @@ class _MetricsBody extends StatelessWidget {
                   '${m.disponibilidadPct.toStringAsFixed(1)}%',
                   style: theme.textTheme.headlineLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: _dispColor(m.disponibilidadPct),
+                    color: _dispColor(m.disponibilidadPct, colors),
                     fontSize: 56,
                   ),
                 ),
                 const SizedBox(height: 8),
                 LinearProgressIndicator(
                   value: m.disponibilidadPct / 100,
-                  backgroundColor: _dispColor(m.disponibilidadPct).withValues(alpha: 0.15),
+                  backgroundColor: _dispColor(m.disponibilidadPct, colors).withValues(alpha: 0.12),
                   valueColor: AlwaysStoppedAnimation<Color>(
-                      _dispColor(m.disponibilidadPct)),
+                      _dispColor(m.disponibilidadPct, colors)),
                   minHeight: 12,
                   borderRadius: BorderRadius.circular(6),
                 ),
@@ -213,7 +213,7 @@ class _MetricsBody extends StatelessWidget {
                     label: 'MTBF',
                     subtitle: 'Tiempo medio entre fallos',
                     value: '${m.mtbfHoras!.toStringAsFixed(1)}h',
-                    color: const Color(0xFF3498DB),
+                    color: colors.primary,
                     icon: Icons.timer_outlined,
                   ),
                 ),
@@ -224,7 +224,7 @@ class _MetricsBody extends StatelessWidget {
                     label: 'MTTR',
                     subtitle: 'Tiempo medio de reparación',
                     value: '${m.mttrHoras!.toStringAsFixed(1)}h',
-                    color: const Color(0xFFE74C3C),
+                    color: colors.error,
                     icon: Icons.build_circle_outlined,
                   ),
                 ),
@@ -243,11 +243,11 @@ class _MetricsBody extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Column(
             children: [
-              _ParoRow('Por falla / avería', m.totalParoFalla, const Color(0xFFE74C3C)),
-              _ParoRow('Mantenimiento preventivo', m.totalParoMantPrev, const Color(0xFF3498DB)),
-              _ParoRow('Mantenimiento correctivo', m.totalParoMantCorr, const Color(0xFF9B59B6)),
-              _ParoRow('Paro planificado', m.totalParoPlanificado, const Color(0xFFF39C12)),
-              _ParoRow('Causa externa', m.totalParoExterno, const Color(0xFF95A5A6), isLast: true),
+              _ParoRow('Por falla / avería',         m.totalParoFalla,        colors.error,    colors),
+              _ParoRow('Mantenimiento preventivo',   m.totalParoMantPrev,     colors.primary,  colors),
+              _ParoRow('Mantenimiento correctivo',   m.totalParoMantCorr,     colors.tertiary, colors),
+              _ParoRow('Paro planificado',           m.totalParoPlanificado,  colors.secondary, colors),
+              _ParoRow('Causa externa',              m.totalParoExterno,      colors.outline,  colors, isLast: true),
             ],
           ),
         ),
@@ -311,10 +311,11 @@ class _KpiCard extends StatelessWidget {
 }
 
 class _ParoRow extends StatelessWidget {
-  const _ParoRow(this.label, this.horas, this.color, {this.isLast = false});
+  const _ParoRow(this.label, this.horas, this.color, this.colors, {this.isLast = false});
   final String label;
   final double horas;
   final Color color;
+  final ColorScheme colors;
   final bool isLast;
 
   @override
@@ -323,11 +324,15 @@ class _ParoRow extends StatelessWidget {
       children: [
         ListTile(
           dense: true,
-          leading: CircleAvatar(
-            radius: 6,
-            backgroundColor: color,
+          leading: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-          title: Text(label),
+          title: Text(label, style: const TextStyle(fontSize: 13)),
           trailing: Text(
             '${horas.toStringAsFixed(1)} h',
             style: TextStyle(fontWeight: FontWeight.bold, color: color),
@@ -338,7 +343,7 @@ class _ParoRow extends StatelessWidget {
               height: 1,
               indent: 32,
               endIndent: 16,
-              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2)),
+              color: colors.outline.withValues(alpha: 0.15)),
       ],
     );
   }
