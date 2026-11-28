@@ -165,11 +165,23 @@ class WorkOrderRemoteDataSource {
     required WorkOrderStatus status,
     required String userId,
     required String userName,
+    String? motivoPausa,
+    String? motivoReprogramacion,
+    DateTime? fechaReprogramacion,
+    double? horasReales,
+    String? trabajoRealizado,
+    String? observaciones,
   }) async {
     await _apiClient.patch(
       ApiEndpoints.updateWorkOrderStatus(workOrderId),
       body: {
         'newStatus': status.name,
+        if (motivoPausa != null) 'motivoPausa': motivoPausa,
+        if (motivoReprogramacion != null) 'motivoReprogramacion': motivoReprogramacion,
+        if (fechaReprogramacion != null) 'fechaReprogramacion': fechaReprogramacion.toIso8601String(),
+        if (horasReales != null) 'horasReales': horasReales,
+        if (trabajoRealizado != null) 'trabajoRealizado': trabajoRealizado,
+        if (observaciones != null) 'observaciones': observaciones,
       },
     );
   }

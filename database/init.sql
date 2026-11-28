@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- MACSA CMMS - SISTEMA DE GESTIÓN DE MANTENIMIENTO (GRUPO MACSA)
 -- SCRIPT MAESTRO DE INICIALIZACIÓN Y DESPLIEGUE A PRODUCCIÓN
 -- Fecha de Generación: 2026-11-13
@@ -332,53 +332,6 @@ CREATE NONCLUSTERED INDEX IX_Empleado_Area
     ON dbo.Empleado (AreaId);
 GO
 
--- 5.7.1 Catálogo de Unidades de Medida
-CREATE TABLE dbo.UnidadMedida (
-    UnidadMedidaId INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_UnidadMedida PRIMARY KEY,
-    Codigo         NVARCHAR(20) NOT NULL CONSTRAINT UQ_UnidadMedida_Codigo UNIQUE,
-    Nombre         NVARCHAR(100) NOT NULL,
-    Activo         BIT NOT NULL CONSTRAINT DF_UnidadMedida_Activo DEFAULT (1),
-    CreadoEn       DATETIME2(3) NOT NULL CONSTRAINT DF_UnidadMedida_CreadoEn DEFAULT (SYSUTCDATETIME()),
-    ActualizadoEn  DATETIME2(3) NOT NULL CONSTRAINT DF_UnidadMedida_ActualizadoEn DEFAULT (SYSUTCDATETIME())
-);
-GO
-
-CREATE NONCLUSTERED INDEX IX_UnidadMedida_Activo_Codigo
-    ON dbo.UnidadMedida (Activo, Codigo);
-GO
-
--- 5.7.2 Catálogo de Atributos Técnicos para Activos
-CREATE TABLE dbo.AtributoCatalogo (
-    AtributoId            INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_AtributoCatalogo PRIMARY KEY,
-    Nombre                NVARCHAR(100) NOT NULL CONSTRAINT UQ_AtributoCatalogo_Nombre UNIQUE,
-    Descripcion           NVARCHAR(255) NULL,
-    UnidadMedidaIdDefecto INT NULL CONSTRAINT FK_AtributoCatalogo_UnidadMedida
-                          REFERENCES dbo.UnidadMedida (UnidadMedidaId),
-    Activo                BIT NOT NULL CONSTRAINT DF_AtributoCatalogo_Activo DEFAULT (1),
-    CreadoEn              DATETIME2(3) NOT NULL CONSTRAINT DF_AtributoCatalogo_CreadoEn DEFAULT (SYSUTCDATETIME()),
-    ActualizadoEn         DATETIME2(3) NOT NULL CONSTRAINT DF_AtributoCatalogo_ActualizadoEn DEFAULT (SYSUTCDATETIME())
-);
-GO
-
-CREATE NONCLUSTERED INDEX IX_AtributoCatalogo_Activo_Nombre
-    ON dbo.AtributoCatalogo (Activo, Nombre);
-GO
-
--- 5.7.3 Catálogo de Marcas para Activos
-CREATE TABLE dbo.Marca (
-    MarcaId       INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Marca PRIMARY KEY,
-    Nombre        NVARCHAR(100) NOT NULL CONSTRAINT UQ_Marca_Nombre UNIQUE,
-    Descripcion   NVARCHAR(250) NULL,
-    Activo        BIT NOT NULL CONSTRAINT DF_Marca_Activo DEFAULT (1),
-    CreadoEn      DATETIME2(3) NOT NULL CONSTRAINT DF_Marca_CreadoEn DEFAULT (SYSUTCDATETIME()),
-    ActualizadoEn DATETIME2(3) NOT NULL CONSTRAINT DF_Marca_ActualizadoEn DEFAULT (SYSUTCDATETIME())
-);
-GO
-
-CREATE NONCLUSTERED INDEX IX_Marca_Activo_Nombre
-    ON dbo.Marca (Activo, Nombre);
-GO
-
 -- 5.8 Tabla de Usuarios
 CREATE TABLE dbo.Usuario (
     UsuarioId                 INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Usuario PRIMARY KEY,
@@ -440,28 +393,6 @@ CREATE NONCLUSTERED INDEX IX_SRP_Estado_Fecha
     ON dbo.SolicitudReinicioPassword (Estado, SolicitadoEn DESC);
 GO
 
--- 5.11 Tabla de Sesiones de Usuario (Control de Concurrencia - Máximo 2 Simultáneas)
-CREATE TABLE dbo.SesionUsuario (
-    SesionId          BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT PK_SesionUsuario PRIMARY KEY,
-    UsuarioId         INT NOT NULL,
-    TokenId           NVARCHAR(64) NOT NULL,
-    IpOrigen          NVARCHAR(45) NULL,
-    UserAgent         NVARCHAR(255) NULL,
-    CreadoEn          DATETIME2(3) NOT NULL CONSTRAINT DF_SesionUsuario_CreadoEn DEFAULT (SYSUTCDATETIME()),
-    UltimaActividad   DATETIME2(3) NOT NULL CONSTRAINT DF_SesionUsuario_UltimaActividad DEFAULT (SYSUTCDATETIME()),
-    Activa            BIT NOT NULL CONSTRAINT DF_SesionUsuario_Activa DEFAULT (1),
-    CONSTRAINT FK_SesionUsuario_Usuario FOREIGN KEY (UsuarioId) REFERENCES dbo.Usuario(UsuarioId) ON DELETE CASCADE
-);
-GO
-
-CREATE NONCLUSTERED INDEX IX_SesionUsuario_Usuario_Activa
-    ON dbo.SesionUsuario (UsuarioId, Activa, CreadoEn DESC);
-GO
-
-CREATE UNIQUE NONCLUSTERED INDEX UX_SesionUsuario_TokenId
-    ON dbo.SesionUsuario (TokenId);
-GO
-
 -- ----------------------------------------------------------------------------
 -- 6. MÓDULO DE ACTIVOS Y JERARQUÍA
 -- ----------------------------------------------------------------------------
@@ -480,7 +411,6 @@ CREATE TABLE dbo.Activo (
     Serie                      NVARCHAR(100) NULL,
     AtributosDinamicos         NVARCHAR(MAX) NULL,
     DatosImagen                NVARCHAR(500) NULL,
-    Observaciones              NVARCHAR(MAX) NULL,
     EsEquipoProceso            BIT           NOT NULL CONSTRAINT DF_Activo_EsEquipoProceso DEFAULT (0),
     ContadorHijos              INT           NOT NULL CONSTRAINT DF_Activo_ContadorHijos DEFAULT (0),
     EliminadoEn                DATETIME2(3)  NULL,
@@ -518,41 +448,6 @@ GO
 CREATE NONCLUSTERED INDEX IX_Activo_TextoBusqueda
     ON dbo.Activo (TextoBusqueda)
     INCLUDE (AreaId, Estado, Nivel);
-GO
-
--- 5.11.1 Tablas de Plantillas de Activos
-CREATE TABLE dbo.PlantillaActivo (
-    PlantillaId    INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PlantillaActivo PRIMARY KEY,
-    Nombre         NVARCHAR(150) NOT NULL CONSTRAINT UQ_PlantillaActivo_Nombre UNIQUE,
-    Descripcion    NVARCHAR(255) NULL,
-    NivelRaiz      NVARCHAR(20)  NOT NULL CONSTRAINT DF_PlantillaActivo_NivelRaiz DEFAULT ('equipment'),
-    TotalNodos     INT           NOT NULL CONSTRAINT DF_PlantillaActivo_TotalNodos DEFAULT (1),
-    Activo         BIT           NOT NULL CONSTRAINT DF_PlantillaActivo_Activo DEFAULT (1),
-    CreadoEn       DATETIME2(3)  NOT NULL CONSTRAINT DF_PlantillaActivo_CreadoEn DEFAULT (SYSUTCDATETIME()),
-    ActualizadoEn  DATETIME2(3)  NOT NULL CONSTRAINT DF_PlantillaActivo_ActualizadoEn DEFAULT (SYSUTCDATETIME())
-);
-GO
-
-CREATE NONCLUSTERED INDEX IX_PlantillaActivo_Activo_Nombre
-    ON dbo.PlantillaActivo (Activo, Nombre);
-GO
-
-CREATE TABLE dbo.PlantillaActivoNodo (
-    NodoId             INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PlantillaActivoNodo PRIMARY KEY,
-    PlantillaId        INT NOT NULL CONSTRAINT FK_PlantillaNodo_Plantilla REFERENCES dbo.PlantillaActivo (PlantillaId) ON DELETE CASCADE,
-    NodoPadreId        INT NULL CONSTRAINT FK_PlantillaNodo_Padre REFERENCES dbo.PlantillaActivoNodo (NodoId),
-    Nombre             NVARCHAR(200) NOT NULL,
-    Marca              NVARCHAR(100) NULL,
-    Modelo             NVARCHAR(100) NULL,
-    Nivel              NVARCHAR(20)  NOT NULL,
-    Orden              INT           NOT NULL CONSTRAINT DF_PlantillaNodo_Orden DEFAULT (1),
-    AtributosDinamicos NVARCHAR(MAX) NULL,
-    Observaciones      NVARCHAR(MAX) NULL
-);
-GO
-
-CREATE NONCLUSTERED INDEX IX_PlantillaNodo_Plantilla_Padre
-    ON dbo.PlantillaActivoNodo (PlantillaId, NodoPadreId);
 GO
 
 CREATE TABLE dbo.HistorialEstadoActivo (
@@ -666,6 +561,14 @@ CREATE TABLE dbo.OrdenTrabajo (
     EstaCompletada              BIT           NULL,
     MotivoIncumplimiento        NVARCHAR(500) NULL,
     FechaReprogramacion         DATETIME2(3)  NULL,
+    FechaInicioReal             DATETIME2(3)  NULL,
+    FechaFinReal                DATETIME2(3)  NULL,
+    MinutosPausaAcumulados      INT           NOT NULL CONSTRAINT DF_OT_MinutosPausa DEFAULT (0),
+    FechaUltimaPausa            DATETIME2(3)  NULL,
+    MotivoPausa                 NVARCHAR(500) NULL,
+    AprobadoPorUsuarioId        INT           NULL,
+    AprobadoPorNombreUsuario    NVARCHAR(100) NULL,
+    AprobadoEn                  DATETIME2(3)  NULL,
     ResponsableAccHaccp         NVARCHAR(200) NULL,
     ResponsableMantenimiento    NVARCHAR(200) NULL,
     ResponsableJefeArea         NVARCHAR(200) NULL,
@@ -678,7 +581,7 @@ CREATE TABLE dbo.OrdenTrabajo (
     ActualizadoEn               DATETIME2(3)  NULL,
     CreadoEn                    DATETIME2(3)  NOT NULL CONSTRAINT DF_OT_CreadoEn DEFAULT (SYSUTCDATETIME()),
     VersionFila                 ROWVERSION,
-    CONSTRAINT CK_OT_Estado      CHECK (Estado IN ('pending','inProgress','completed','cancelled','unfulfilled')),
+    CONSTRAINT CK_OT_Estado      CHECK (Estado IN ('pending','inProgress','paused','reviewPending','completed','cancelled','unfulfilled','rescheduled')),
     CONSTRAINT CK_OT_Prioridad   CHECK (Prioridad IN ('low','medium','high')),
     CONSTRAINT CK_OT_Descripcion CHECK (LTRIM(Descripcion) <> ''),
     CONSTRAINT FK_OT_Activo    FOREIGN KEY (CodigoActivo)       REFERENCES dbo.Activo(CodigoActivo),
@@ -901,7 +804,7 @@ BEGIN
     SET NOCOUNT ON;
     UPDATE dbo.Usuario
        SET IntentosFallidos = IntentosFallidos + 1,
-           BloqueadoHasta   = CASE WHEN IntentosFallidos + 1 >= 5 THEN DATEADD(MINUTE, 15, SYSUTCDATETIME()) ELSE BloqueadoHasta END,
+           BloqueadoHasta   = CASE WHEN IntentosFallidos + 1 >= 5 THEN DATEADD(MINUTE, 5, SYSUTCDATETIME()) ELSE BloqueadoHasta END,
            ActualizadoEn    = SYSUTCDATETIME()
      WHERE UsuarioId = @UserId;
 END;
@@ -934,83 +837,6 @@ BEGIN
            IteracionesPassword = @Iterations,
            ActualizadoEn       = SYSUTCDATETIME()
      WHERE UsuarioId = @UserId;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspSesionRegistrar
-    @UsuarioId INT,
-    @TokenId   NVARCHAR(64),
-    @IpOrigen  NVARCHAR(45) = NULL,
-    @UserAgent NVARCHAR(255) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        -- Insertar nueva sesión como activa
-        INSERT INTO dbo.SesionUsuario (UsuarioId, TokenId, IpOrigen, UserAgent, CreadoEn, UltimaActividad, Activa)
-        VALUES (@UsuarioId, @TokenId, @IpOrigen, @UserAgent, SYSUTCDATETIME(), SYSUTCDATETIME(), 1);
-
-        -- Desplazar sesiones anteriores que superen el límite de 2 activas (FIFO)
-        ;WITH SesionesOrdenadas AS (
-            SELECT SesionId,
-                   ROW_NUMBER() OVER (ORDER BY CreadoEn DESC, SesionId DESC) AS Fila
-              FROM dbo.SesionUsuario
-             WHERE UsuarioId = @UsuarioId
-               AND Activa = 1
-        )
-        UPDATE s
-           SET Activa = 0
-          FROM dbo.SesionUsuario s
-          JOIN SesionesOrdenadas o ON s.SesionId = o.SesionId
-         WHERE o.Fila > 2;
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspSesionVerificar
-    @UsuarioId INT,
-    @TokenId   NVARCHAR(64)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    DECLARE @Activa BIT = 0;
-
-    SELECT TOP (1) @Activa = Activa
-      FROM dbo.SesionUsuario
-     WHERE UsuarioId = @UsuarioId
-       AND TokenId = @TokenId;
-
-    IF @Activa = 1
-    BEGIN
-        UPDATE dbo.SesionUsuario
-           SET UltimaActividad = SYSUTCDATETIME()
-         WHERE UsuarioId = @UsuarioId
-           AND TokenId = @TokenId;
-    END;
-
-    SELECT ISNULL(@Activa, 0) AS Activa;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspSesionCerrar
-    @UsuarioId INT,
-    @TokenId   NVARCHAR(64)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    UPDATE dbo.SesionUsuario
-       SET Activa = 0,
-           UltimaActividad = SYSUTCDATETIME()
-     WHERE UsuarioId = @UsuarioId
-       AND TokenId = @TokenId;
 END;
 GO
 
@@ -1393,461 +1219,6 @@ BEGIN
       FROM dbo.Puesto
      WHERE Activo = 1
      ORDER BY Nombre ASC;
-
-    -- 5. Unidades de Medida Activas
-    SELECT UnidadMedidaId AS id, Codigo AS code, Nombre AS name
-      FROM dbo.UnidadMedida
-     WHERE Activo = 1
-     ORDER BY Codigo ASC;
-
-    -- 6. Atributos de Catálogo Activos
-    SELECT a.AtributoId AS id, a.Nombre AS name, a.Descripcion AS description,
-           a.UnidadMedidaIdDefecto AS defaultUnitId, u.Codigo AS defaultUnitCode
-      FROM dbo.AtributoCatalogo a
-      LEFT JOIN dbo.UnidadMedida u ON a.UnidadMedidaIdDefecto = u.UnidadMedidaId
-     WHERE a.Activo = 1
-     ORDER BY a.Nombre ASC;
-
-    -- 7. Marcas Activas
-    SELECT MarcaId AS id, Nombre AS name, Descripcion AS description
-      FROM dbo.Marca
-     WHERE Activo = 1
-     ORDER BY Nombre ASC;
-END;
-GO
-
--- ----------------------------------------------------------------------------
--- 12.1 PROCEDIMIENTOS ALMACENADOS: UNIDADES DE MEDIDA Y ATRIBUTOS DE CATÁLOGO
--- ----------------------------------------------------------------------------
-
-CREATE OR ALTER PROCEDURE dbo.uspUnidadMedidaListar
-    @IncludeInactive BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT
-        UnidadMedidaId AS id,
-        UnidadMedidaId,
-        Codigo AS code,
-        Codigo,
-        Nombre AS name,
-        Nombre,
-        Activo AS isActive,
-        Activo,
-        CreadoEn AS createdAt,
-        ActualizadoEn AS updatedAt
-    FROM dbo.UnidadMedida
-    WHERE (@IncludeInactive = 1 OR Activo = 1)
-    ORDER BY Codigo ASC;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspUnidadMedidaCrear
-    @Codigo NVARCHAR(20),
-    @Nombre NVARCHAR(100)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        DECLARE @CleanCode NVARCHAR(20) = LTRIM(RTRIM(@Codigo));
-        DECLARE @CleanName NVARCHAR(100) = LTRIM(RTRIM(@Nombre));
-
-        IF @CleanCode IS NULL OR @CleanCode = N''
-            RAISERROR(N'El código o símbolo de la unidad de medida es obligatorio.', 16, 1);
-        IF @CleanName IS NULL OR @CleanName = N''
-            RAISERROR(N'El nombre de la unidad de medida es obligatorio.', 16, 1);
-
-        IF EXISTS (SELECT 1 FROM dbo.UnidadMedida WHERE UPPER(Codigo) = UPPER(@CleanCode))
-        BEGIN
-            UPDATE dbo.UnidadMedida
-               SET Nombre = @CleanName,
-                   Activo = 1,
-                   ActualizadoEn = SYSUTCDATETIME()
-             WHERE UPPER(Codigo) = UPPER(@CleanCode);
-
-            SELECT UnidadMedidaId AS id, UnidadMedidaId, Codigo AS code, Codigo, Nombre AS name, Nombre, Activo AS isActive
-              FROM dbo.UnidadMedida
-             WHERE UPPER(Codigo) = UPPER(@CleanCode);
-            RETURN;
-        END;
-
-        INSERT INTO dbo.UnidadMedida (Codigo, Nombre, Activo, CreadoEn, ActualizadoEn)
-        VALUES (@CleanCode, @CleanName, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
-
-        DECLARE @NewId INT = SCOPE_IDENTITY();
-        SELECT UnidadMedidaId AS id, UnidadMedidaId, Codigo AS code, Codigo, Nombre AS name, Nombre, Activo AS isActive
-          FROM dbo.UnidadMedida
-         WHERE UnidadMedidaId = @NewId;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspUnidadMedidaActualizar
-    @UnidadMedidaId INT,
-    @Codigo NVARCHAR(20),
-    @Nombre NVARCHAR(100),
-    @Activo BIT = 1
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        DECLARE @CleanCode NVARCHAR(20) = LTRIM(RTRIM(@Codigo));
-        DECLARE @CleanName NVARCHAR(100) = LTRIM(RTRIM(@Nombre));
-
-        IF NOT EXISTS (SELECT 1 FROM dbo.UnidadMedida WHERE UnidadMedidaId = @UnidadMedidaId)
-            RAISERROR(N'La unidad de medida especificada no existe.', 16, 1);
-
-        IF @CleanCode IS NULL OR @CleanCode = N''
-            RAISERROR(N'El código o símbolo de la unidad de medida es obligatorio.', 16, 1);
-        IF @CleanName IS NULL OR @CleanName = N''
-            RAISERROR(N'El nombre de la unidad de medida es obligatorio.', 16, 1);
-
-        IF EXISTS (SELECT 1 FROM dbo.UnidadMedida WHERE UPPER(Codigo) = UPPER(@CleanCode) AND UnidadMedidaId <> @UnidadMedidaId)
-            RAISERROR(N'Ya existe otra unidad de medida con el código especificado.', 16, 1);
-
-        UPDATE dbo.UnidadMedida
-           SET Codigo = @CleanCode,
-               Nombre = @CleanName,
-               Activo = COALESCE(@Activo, Activo),
-               ActualizadoEn = SYSUTCDATETIME()
-         WHERE UnidadMedidaId = @UnidadMedidaId;
-
-        SELECT UnidadMedidaId AS id, UnidadMedidaId, Codigo AS code, Codigo, Nombre AS name, Nombre, Activo AS isActive
-          FROM dbo.UnidadMedida
-         WHERE UnidadMedidaId = @UnidadMedidaId;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspUnidadMedidaEliminar
-    @UnidadMedidaId INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        IF NOT EXISTS (SELECT 1 FROM dbo.UnidadMedida WHERE UnidadMedidaId = @UnidadMedidaId)
-            RAISERROR(N'La unidad de medida no existe.', 16, 1);
-
-        IF EXISTS (SELECT 1 FROM dbo.AtributoCatalogo WHERE UnidadMedidaIdDefecto = @UnidadMedidaId AND Activo = 1)
-        BEGIN
-            UPDATE dbo.UnidadMedida
-               SET Activo = 0,
-                   ActualizadoEn = SYSUTCDATETIME()
-             WHERE UnidadMedidaId = @UnidadMedidaId;
-
-            SELECT 1 AS success, N'La unidad de medida fue desactivada porque está vinculada a atributos del catálogo.' AS message;
-            RETURN;
-        END;
-
-        UPDATE dbo.UnidadMedida
-           SET Activo = 0,
-               ActualizadoEn = SYSUTCDATETIME()
-         WHERE UnidadMedidaId = @UnidadMedidaId;
-
-        SELECT 1 AS success, N'Unidad de medida eliminada exitosamente.' AS message;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspAtributoCatalogoListar
-    @IncludeInactive BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT
-        a.AtributoId AS id,
-        a.AtributoId,
-        a.Nombre AS name,
-        a.Nombre,
-        a.Descripcion AS description,
-        a.Descripcion,
-        a.UnidadMedidaIdDefecto AS defaultUnitId,
-        a.UnidadMedidaIdDefecto,
-        u.Codigo AS defaultUnitCode,
-        u.Nombre AS defaultUnitName,
-        a.Activo AS isActive,
-        a.Activo,
-        a.CreadoEn AS createdAt,
-        a.ActualizadoEn AS updatedAt
-    FROM dbo.AtributoCatalogo a
-    LEFT JOIN dbo.UnidadMedida u ON a.UnidadMedidaIdDefecto = u.UnidadMedidaId
-    WHERE (@IncludeInactive = 1 OR a.Activo = 1)
-    ORDER BY a.Nombre ASC;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspAtributoCatalogoCrear
-    @Nombre NVARCHAR(100),
-    @Descripcion NVARCHAR(255) = NULL,
-    @UnidadMedidaIdDefecto INT = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        DECLARE @CleanName NVARCHAR(100) = LTRIM(RTRIM(@Nombre));
-        DECLARE @CleanDesc NVARCHAR(255) = NULLIF(LTRIM(RTRIM(@Descripcion)), N'');
-
-        IF @CleanName IS NULL OR @CleanName = N''
-            RAISERROR(N'El nombre del atributo es obligatorio.', 16, 1);
-
-        IF @UnidadMedidaIdDefecto IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.UnidadMedida WHERE UnidadMedidaId = @UnidadMedidaIdDefecto)
-            SET @UnidadMedidaIdDefecto = NULL;
-
-        IF EXISTS (SELECT 1 FROM dbo.AtributoCatalogo WHERE UPPER(Nombre) = UPPER(@CleanName))
-        BEGIN
-            UPDATE dbo.AtributoCatalogo
-               SET Descripcion = @CleanDesc,
-                   UnidadMedidaIdDefecto = @UnidadMedidaIdDefecto,
-                   Activo = 1,
-                   ActualizadoEn = SYSUTCDATETIME()
-             WHERE UPPER(Nombre) = UPPER(@CleanName);
-
-            SELECT a.AtributoId AS id, a.AtributoId, a.Nombre AS name, a.Nombre, a.Descripcion AS description,
-                   a.UnidadMedidaIdDefecto AS defaultUnitId, u.Codigo AS defaultUnitCode, a.Activo AS isActive
-              FROM dbo.AtributoCatalogo a
-              LEFT JOIN dbo.UnidadMedida u ON a.UnidadMedidaIdDefecto = u.UnidadMedidaId
-             WHERE UPPER(a.Nombre) = UPPER(@CleanName);
-            RETURN;
-        END;
-
-        INSERT INTO dbo.AtributoCatalogo (Nombre, Descripcion, UnidadMedidaIdDefecto, Activo, CreadoEn, ActualizadoEn)
-        VALUES (@CleanName, @CleanDesc, @UnidadMedidaIdDefecto, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
-
-        DECLARE @NewId INT = SCOPE_IDENTITY();
-        SELECT a.AtributoId AS id, a.AtributoId, a.Nombre AS name, a.Nombre, a.Descripcion AS description,
-               a.UnidadMedidaIdDefecto AS defaultUnitId, u.Codigo AS defaultUnitCode, a.Activo AS isActive
-          FROM dbo.AtributoCatalogo a
-          LEFT JOIN dbo.UnidadMedida u ON a.UnidadMedidaIdDefecto = u.UnidadMedidaId
-         WHERE a.AtributoId = @NewId;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspAtributoCatalogoActualizar
-    @AtributoId INT,
-    @Nombre NVARCHAR(100),
-    @Descripcion NVARCHAR(255) = NULL,
-    @UnidadMedidaIdDefecto INT = NULL,
-    @Activo BIT = 1
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        DECLARE @CleanName NVARCHAR(100) = LTRIM(RTRIM(@Nombre));
-        DECLARE @CleanDesc NVARCHAR(255) = NULLIF(LTRIM(RTRIM(@Descripcion)), N'');
-
-        IF NOT EXISTS (SELECT 1 FROM dbo.AtributoCatalogo WHERE AtributoId = @AtributoId)
-            RAISERROR(N'El atributo especificado no existe.', 16, 1);
-
-        IF @CleanName IS NULL OR @CleanName = N''
-            RAISERROR(N'El nombre del atributo es obligatorio.', 16, 1);
-
-        IF EXISTS (SELECT 1 FROM dbo.AtributoCatalogo WHERE UPPER(Nombre) = UPPER(@CleanName) AND AtributoId <> @AtributoId)
-            RAISERROR(N'Ya existe otro atributo con el nombre especificado.', 16, 1);
-
-        IF @UnidadMedidaIdDefecto IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.UnidadMedida WHERE UnidadMedidaId = @UnidadMedidaIdDefecto)
-            SET @UnidadMedidaIdDefecto = NULL;
-
-        UPDATE dbo.AtributoCatalogo
-           SET Nombre = @CleanName,
-               Descripcion = @CleanDesc,
-               UnidadMedidaIdDefecto = @UnidadMedidaIdDefecto,
-               Activo = COALESCE(@Activo, Activo),
-               ActualizadoEn = SYSUTCDATETIME()
-         WHERE AtributoId = @AtributoId;
-
-        SELECT a.AtributoId AS id, a.AtributoId, a.Nombre AS name, a.Nombre, a.Descripcion AS description,
-               a.UnidadMedidaIdDefecto AS defaultUnitId, u.Codigo AS defaultUnitCode, a.Activo AS isActive
-          FROM dbo.AtributoCatalogo a
-          LEFT JOIN dbo.UnidadMedida u ON a.UnidadMedidaIdDefecto = u.UnidadMedidaId
-         WHERE a.AtributoId = @AtributoId;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspAtributoCatalogoEliminar
-    @AtributoId INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        IF NOT EXISTS (SELECT 1 FROM dbo.AtributoCatalogo WHERE AtributoId = @AtributoId)
-            RAISERROR(N'El atributo no existe.', 16, 1);
-
-        UPDATE dbo.AtributoCatalogo
-           SET Activo = 0,
-               ActualizadoEn = SYSUTCDATETIME()
-         WHERE AtributoId = @AtributoId;
-
-        SELECT 1 AS success, N'Atributo retirado del catálogo exitosamente.' AS message;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
-END;
-GO
-
--- ----------------------------------------------------------------------------
--- 12.3 PROCEDIMIENTOS ALMACENADOS: CATÁLOGO DE MARCAS
--- ----------------------------------------------------------------------------
-
-CREATE OR ALTER PROCEDURE dbo.uspMarcaListar
-    @IncludeInactive BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT MarcaId AS id,
-           MarcaId,
-           Nombre AS name,
-           Nombre,
-           Descripcion AS description,
-           Descripcion,
-           Activo AS isActive,
-           Activo,
-           CreadoEn,
-           ActualizadoEn,
-           (SELECT COUNT(*) FROM dbo.Activo WHERE UPPER(LTRIM(RTRIM(Marca))) = UPPER(LTRIM(RTRIM(m.Nombre))) AND Estado <> 'deleted') AS TotalActivosAsociados
-      FROM dbo.Marca m
-     WHERE (@IncludeInactive = 1 OR Activo = 1)
-     ORDER BY Nombre ASC;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspMarcaCrear
-    @Nombre      NVARCHAR(100),
-    @Descripcion NVARCHAR(250) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        DECLARE @CleanName NVARCHAR(100) = LTRIM(RTRIM(@Nombre));
-        IF @CleanName IS NULL OR @CleanName = ''
-            RAISERROR(N'El nombre de la marca es obligatorio.', 16, 1);
-
-        IF EXISTS (SELECT 1 FROM dbo.Marca WHERE UPPER(Nombre) = UPPER(@CleanName))
-            RAISERROR(N'Ya existe una marca con ese nombre.', 16, 1);
-
-        INSERT INTO dbo.Marca (Nombre, Descripcion, Activo, CreadoEn, ActualizadoEn)
-        VALUES (@CleanName, NULLIF(LTRIM(RTRIM(@Descripcion)), ''), 1, SYSUTCDATETIME(), SYSUTCDATETIME());
-
-        DECLARE @NewId INT = SCOPE_IDENTITY();
-        SELECT MarcaId AS id, MarcaId, Nombre AS name, Nombre, Descripcion AS description, Descripcion, Activo AS isActive, Activo
-          FROM dbo.Marca
-         WHERE MarcaId = @NewId;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspMarcaActualizar
-    @MarcaId     INT,
-    @Nombre      NVARCHAR(100),
-    @Descripcion NVARCHAR(250) = NULL,
-    @Activo      BIT = 1
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        DECLARE @CleanName NVARCHAR(100) = LTRIM(RTRIM(@Nombre));
-        IF @CleanName IS NULL OR @CleanName = ''
-            RAISERROR(N'El nombre de la marca es obligatorio.', 16, 1);
-
-        IF NOT EXISTS (SELECT 1 FROM dbo.Marca WHERE MarcaId = @MarcaId)
-            RAISERROR(N'La marca no existe.', 16, 1);
-
-        IF EXISTS (SELECT 1 FROM dbo.Marca WHERE UPPER(Nombre) = UPPER(@CleanName) AND MarcaId <> @MarcaId)
-            RAISERROR(N'Ya existe otra marca con ese nombre.', 16, 1);
-
-        DECLARE @OldName NVARCHAR(100);
-        SELECT @OldName = Nombre FROM dbo.Marca WHERE MarcaId = @MarcaId;
-
-        UPDATE dbo.Marca
-           SET Nombre        = @CleanName,
-               Descripcion   = NULLIF(LTRIM(RTRIM(@Descripcion)), ''),
-               Activo        = @Activo,
-               ActualizadoEn = SYSUTCDATETIME()
-         WHERE MarcaId = @MarcaId;
-
-        IF @OldName <> @CleanName
-        BEGIN
-            UPDATE dbo.Activo
-               SET Marca = @CleanName
-             WHERE UPPER(LTRIM(RTRIM(Marca))) = UPPER(LTRIM(RTRIM(@OldName)));
-        END;
-
-        SELECT MarcaId AS id, MarcaId, Nombre AS name, Nombre, Descripcion AS description, Descripcion, Activo AS isActive, Activo
-          FROM dbo.Marca
-         WHERE MarcaId = @MarcaId;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspMarcaEliminar
-    @MarcaId INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        DECLARE @BrandName NVARCHAR(100);
-        SELECT @BrandName = Nombre FROM dbo.Marca WHERE MarcaId = @MarcaId;
-
-        IF @BrandName IS NULL
-            RAISERROR(N'La marca especificada no existe.', 16, 1);
-
-        DECLARE @ActivosEnUso INT = 0;
-        SELECT @ActivosEnUso = COUNT(*)
-          FROM dbo.Activo
-         WHERE UPPER(LTRIM(RTRIM(Marca))) = UPPER(LTRIM(RTRIM(@BrandName)))
-           AND Estado <> 'deleted';
-
-        IF @ActivosEnUso > 0
-        BEGIN
-            UPDATE dbo.Marca
-               SET Activo = 0,
-                   ActualizadoEn = SYSUTCDATETIME()
-             WHERE MarcaId = @MarcaId;
-
-            SELECT 1 AS success, 1 AS inactivatedOnly, @ActivosEnUso AS assetsCount,
-                   CONCAT(N'La marca está en uso por ', @ActivosEnUso, N' activo(s). Se ha desactivado del catálogo para preservar la integridad.') AS message;
-            RETURN;
-        END;
-
-        DELETE FROM dbo.Marca WHERE MarcaId = @MarcaId;
-
-        SELECT 1 AS success, 0 AS inactivatedOnly, 0 AS assetsCount, N'Marca eliminada correctamente.' AS message;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
 END;
 GO
 
@@ -2308,8 +1679,10 @@ BEGIN
             IF @UsuarioId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE UsuarioId = @UsuarioId) SET @UsuarioId = NULL;
         END;
 
+        DECLARE @UNameAudit NVARCHAR(100) = COALESCE(NULLIF(LTRIM(RTRIM(@NombreUsuario)), N''), N'SISTEMA');
+
         INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (@UsuarioId, @NombreUsuario, 'EMPLOYEE_CREATED', 'EMPLOYEES', CAST(@NuevoId AS NVARCHAR(20)),
+        VALUES (@UsuarioId, @UNameAudit, 'EMPLOYEE_CREATED', 'EMPLOYEES', CAST(@NuevoId AS NVARCHAR(20)),
                 CONCAT(N'Empleado registrado: ', @NombreLimpio, N' (Puesto: ', @PuestoLimpio, N').'));
 
         COMMIT TRANSACTION;
@@ -2479,8 +1852,10 @@ BEGIN
             IF @UsuarioId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE UsuarioId = @UsuarioId) SET @UsuarioId = NULL;
         END;
 
+        DECLARE @UNameAudit NVARCHAR(100) = COALESCE(NULLIF(LTRIM(RTRIM(@NombreUsuario)), N''), N'SISTEMA');
+
         INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (@UsuarioId, @NombreUsuario, 'EMPLOYEE_STATUS_CHANGED', 'EMPLOYEES', CAST(@EmpleadoId AS NVARCHAR(20)),
+        VALUES (@UsuarioId, @UNameAudit, 'EMPLOYEE_STATUS_CHANGED', 'EMPLOYEES', CAST(@EmpleadoId AS NVARCHAR(20)),
                 CONCAT(N'Estado de empleado ID ', @EmpleadoId, N' cambiado a: ', CASE WHEN @Activo = 1 THEN N'Activo' ELSE N'Inactivo' END, N'.'));
 
         COMMIT TRANSACTION;
@@ -2515,10 +1890,8 @@ BEGIN
            Serie, Serie AS [serial],
            AtributosDinamicos, AtributosDinamicos AS dynamicAttributes,
            DatosImagen, DatosImagen AS imageData,
-           ContadorHijos, ContadorHijos AS childCounter,
-           CreadoEn, CreadoEn AS createdAt,
-           ActualizadoEn, ActualizadoEn AS updatedAt,
-           EsEquipoProceso, EsEquipoProceso AS isProcessEquipment
+           ContadorHijos, CreadoEn, ActualizadoEn,
+           EsEquipoProceso
       FROM dbo.Activo
      WHERE AreaId = @AreaId
        AND CodigoActivoPadre IS NULL
@@ -2548,10 +1921,8 @@ BEGIN
            Serie, Serie AS [serial],
            AtributosDinamicos, AtributosDinamicos AS dynamicAttributes,
            DatosImagen, DatosImagen AS imageData,
-           ContadorHijos, ContadorHijos AS childCounter,
-           CreadoEn, CreadoEn AS createdAt,
-           ActualizadoEn, ActualizadoEn AS updatedAt,
-           EsEquipoProceso, EsEquipoProceso AS isProcessEquipment
+           ContadorHijos, CreadoEn, ActualizadoEn,
+           EsEquipoProceso
       FROM dbo.Activo
      WHERE (@TargetParent IS NULL AND CodigoActivoPadre IS NULL OR CodigoActivoPadre = @TargetParent)
        AND (@AreaId IS NULL OR AreaId = @AreaId)
@@ -2585,10 +1956,8 @@ BEGIN
            Serie, Serie AS [serial],
            AtributosDinamicos, AtributosDinamicos AS dynamicAttributes,
            DatosImagen, DatosImagen AS imageData,
-           ContadorHijos, ContadorHijos AS childCounter,
-           CreadoEn, CreadoEn AS createdAt,
-           ActualizadoEn, ActualizadoEn AS updatedAt,
-           EsEquipoProceso, EsEquipoProceso AS isProcessEquipment
+           ContadorHijos, CreadoEn, ActualizadoEn,
+           EsEquipoProceso
       FROM dbo.Activo
      WHERE (@AreaId IS NULL OR AreaId = @AreaId)
        AND (@Level IS NULL OR Nivel = @Level)
@@ -2622,10 +1991,8 @@ BEGIN
            Serie, Serie AS [serial],
            AtributosDinamicos, AtributosDinamicos AS dynamicAttributes,
            DatosImagen, DatosImagen AS imageData,
-           ContadorHijos, ContadorHijos AS childCounter,
-           CreadoEn, CreadoEn AS createdAt,
-           ActualizadoEn, ActualizadoEn AS updatedAt,
-           EsEquipoProceso, EsEquipoProceso AS isProcessEquipment
+           ContadorHijos, CreadoEn, ActualizadoEn,
+           EsEquipoProceso
       FROM dbo.Activo
      WHERE Serie = @Serial AND Estado <> 'deleted';
 END;
@@ -2643,7 +2010,6 @@ CREATE OR ALTER PROCEDURE dbo.uspActivoCrear
     @Serial NVARCHAR(100) = NULL,
     @DynamicAttributes NVARCHAR(MAX) = NULL,
     @ImageData NVARCHAR(500) = NULL,
-    @Observaciones NVARCHAR(MAX) = NULL,
     @UserId INT = NULL,
     @UserName NVARCHAR(100) = N''
 AS
@@ -2703,16 +2069,13 @@ BEGIN
                                       ELSE CONCAT(@parentAncestors, '/', @ParentAssetCode) END;
         END;
 
-        DECLARE @CleanStation NVARCHAR(100) = ISNULL(@StationId, '');
-
         INSERT INTO dbo.Activo
             (CodigoActivo, Nombre, Marca, Modelo, AreaId, EstacionId, CodigoActivoPadre,
              Nivel, RutaAncestros, Estado, Serie, AtributosDinamicos, DatosImagen,
-             Observaciones, ContadorHijos, CreadoEn)
+             ContadorHijos, CreadoEn)
         VALUES
-            (@NewAssetCode, @Name, @Brand, @Model, @AreaId, @CleanStation, @ParentAssetCode,
+            (@NewAssetCode, @Name, @Brand, @Model, @AreaId, @StationId, @ParentAssetCode,
              @Level, @AncestorsPath, @Status, NULLIF(@Serial, ''), @DynamicAttributes, @ImageData,
-             @Observaciones,
              0, SYSUTCDATETIME());
 
         IF @UserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE UsuarioId = @UserId)
@@ -2734,10 +2097,7 @@ BEGIN
                 CONCAT(N'Activo creado: ', @NewAssetCode, N' (', @Name, N') en área ', @AreaId, N'.'));
 
         COMMIT TRANSACTION;
-        SELECT @NewAssetCode AS CodigoActivo, 
-               @NewAssetCode AS assetCode, 
-               @NewAssetCode AS NewAssetCode,
-               @NewAssetCode AS newAssetCode;
+        SELECT @NewAssetCode AS CodigoActivo, @NewAssetCode AS assetCode, @NewAssetCode AS NewAssetCode;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -2748,17 +2108,16 @@ GO
 
 CREATE OR ALTER PROCEDURE dbo.uspActivoActualizar
     @CodigoActivo NVARCHAR(60) = NULL,
-    @AssetCode NVARCHAR(60) = NULL,
-    @Name NVARCHAR(200) = NULL,
+    @AssetCode NVARCHAR(60),
+    @Name NVARCHAR(200),
     @Brand NVARCHAR(100) = NULL,
     @Model NVARCHAR(100) = NULL,
-    @StationId NVARCHAR(100) = NULL,
+    @StationId NVARCHAR(100) = '',
     @Serial NVARCHAR(100) = NULL,
     @DynamicAttributes NVARCHAR(MAX) = NULL,
     @ImageData NVARCHAR(500) = NULL,
     @Status NVARCHAR(25) = NULL,
     @Estado NVARCHAR(25) = NULL,
-    @Observaciones NVARCHAR(MAX) = NULL,
     @UserId INT = NULL,
     @UserName NVARCHAR(100) = N''
 AS
@@ -2768,49 +2127,25 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        DECLARE @TargetCode NVARCHAR(60) = COALESCE(NULLIF(LTRIM(RTRIM(@AssetCode)), ''), NULLIF(LTRIM(RTRIM(@CodigoActivo)), ''));
-
-        IF @TargetCode IS NULL OR NOT EXISTS (SELECT 1 FROM dbo.Activo WHERE CodigoActivo = @TargetCode)
+        IF NOT EXISTS (SELECT 1 FROM dbo.Activo WHERE CodigoActivo = @AssetCode)
             RAISERROR(N'El activo no existe.', 16, 1);
 
-        DECLARE @currStatus NVARCHAR(25), @currArea NVARCHAR(15), @oldSerial NVARCHAR(100);
-        SELECT @currStatus = Estado, @currArea = AreaId, @oldSerial = Serie
-          FROM dbo.Activo WITH (UPDLOCK, HOLDLOCK)
-         WHERE CodigoActivo = @TargetCode;
-
-        DECLARE @NewCleanSerial NVARCHAR(100) = NULLIF(LTRIM(RTRIM(@Serial)), '');
-
-        -- Validar unicidad del número de serie
-        IF @NewCleanSerial IS NOT NULL
+        IF @Serial IS NOT NULL AND LTRIM(RTRIM(@Serial)) <> ''
         BEGIN
-            IF EXISTS (SELECT 1 FROM dbo.Activo WHERE Serie = @NewCleanSerial AND CodigoActivo <> @TargetCode AND Estado <> 'deleted')
+            IF EXISTS (SELECT 1 FROM dbo.Activo WHERE Serie = @Serial AND CodigoActivo <> @AssetCode AND Estado <> 'deleted')
                 RAISERROR(N'El número de serie ya está en uso por otro activo activo.', 16, 1);
         END;
 
-        DECLARE @DesiredStatus NVARCHAR(25) = COALESCE(NULLIF(LTRIM(RTRIM(@Status)), N''), NULLIF(LTRIM(RTRIM(@Estado)), N''));
-
         UPDATE dbo.Activo
-           SET Nombre             = COALESCE(@Name, Nombre),
+           SET Nombre             = @Name,
                Marca              = @Brand,
                Modelo             = @Model,
-               EstacionId         = COALESCE(@StationId, EstacionId, ''),
-               Serie              = @NewCleanSerial,
-               AtributosDinamicos = COALESCE(@DynamicAttributes, AtributosDinamicos),
+               EstacionId         = @StationId,
+               Serie              = NULLIF(@Serial, ''),
+               AtributosDinamicos = @DynamicAttributes,
                DatosImagen        = COALESCE(@ImageData, DatosImagen),
-               Observaciones      = COALESCE(@Observaciones, Observaciones),
-               Estado             = COALESCE(@DesiredStatus, Estado),
                ActualizadoEn      = SYSUTCDATETIME()
-         WHERE CodigoActivo = @TargetCode;
-
-        IF @DesiredStatus IS NOT NULL AND @DesiredStatus <> @currStatus
-        BEGIN
-            UPDATE dbo.HistorialEstadoActivo
-               SET FinalizadoEn = SYSUTCDATETIME()
-             WHERE CodigoActivo = @TargetCode AND FinalizadoEn IS NULL;
-
-            INSERT INTO dbo.HistorialEstadoActivo (CodigoActivo, Estado, IniciadoEn, AreaId, Motivo, UsuarioId, NombreUsuario)
-            VALUES (@TargetCode, @DesiredStatus, SYSUTCDATETIME(), @currArea, N'Modificación de estado en edición de activo', @UserId, COALESCE(NULLIF(LTRIM(RTRIM(@UserName)), N''), N'SISTEMA'));
-        END;
+         WHERE CodigoActivo = COALESCE(@AssetCode, @CodigoActivo);
 
         IF @UserId IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE UsuarioId = @UserId)
         BEGIN
@@ -2821,17 +2156,9 @@ BEGIN
 
         DECLARE @UNameAuditUpd NVARCHAR(100) = COALESCE(NULLIF(LTRIM(RTRIM(@UserName)), N''), N'SISTEMA');
 
-        -- Auditoría obligatoria en Bitácora Kardex si el número de serie cambió
-        IF ISNULL(@NewCleanSerial, N'') <> ISNULL(@oldSerial, N'')
-        BEGIN
-            INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-            VALUES (@UserId, @UNameAuditUpd, 'ASSET_SERIAL_CHANGED', 'ASSETS', @TargetCode,
-                    CONCAT(N'Número de serie del activo ', @TargetCode, N' modificado de "', ISNULL(@oldSerial, N'(sin serie)'), N'" a "', ISNULL(@NewCleanSerial, N'(sin serie)'), N'".'));
-        END;
-
         INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (@UserId, @UNameAuditUpd, 'ASSET_UPDATED', 'ASSETS', @TargetCode,
-                CONCAT(N'Activo actualizado: ', @TargetCode, N' (', COALESCE(@Name, @TargetCode), N').'));
+        VALUES (@UserId, @UNameAuditUpd, 'ASSET_UPDATED', 'ASSETS', @AssetCode,
+                CONCAT(N'Activo actualizado: ', @AssetCode, N' (', @Name, N').'));
 
         COMMIT TRANSACTION;
     END TRY
@@ -2940,32 +2267,31 @@ BEGIN
             RETURN;
         END;
 
-        -- Subárbol nuevo en destino (CTE Recursiva con COLLATE DATABASE_DEFAULT)
+        -- Subárbol nuevo en destino (CTE Recursiva)
         CREATE TABLE #ArbolOrigen (
-            OldCode       NVARCHAR(60) COLLATE DATABASE_DEFAULT PRIMARY KEY,
-            Nombre        NVARCHAR(200) COLLATE DATABASE_DEFAULT,
-            Marca         NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            Modelo        NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            EstacionId    NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            OldParentCode NVARCHAR(60) COLLATE DATABASE_DEFAULT,
-            Nivel         NVARCHAR(20) COLLATE DATABASE_DEFAULT,
-            RutaAncestros NVARCHAR(400) COLLATE DATABASE_DEFAULT,
-            Serie         NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            Atributos     NVARCHAR(MAX) COLLATE DATABASE_DEFAULT,
-            DatosImagen   NVARCHAR(500) COLLATE DATABASE_DEFAULT,
-            Observaciones NVARCHAR(MAX) COLLATE DATABASE_DEFAULT,
+            OldCode       NVARCHAR(60) PRIMARY KEY,
+            Nombre        NVARCHAR(200),
+            Marca         NVARCHAR(100),
+            Modelo        NVARCHAR(100),
+            EstacionId    NVARCHAR(100),
+            OldParentCode NVARCHAR(60),
+            Nivel         NVARCHAR(20),
+            RutaAncestros NVARCHAR(400),
+            Serie         NVARCHAR(100),
+            Atributos     NVARCHAR(MAX),
+            DatosImagen   NVARCHAR(500),
             Depth         INT,
             ChildOrder    INT,
-            NewCode       NVARCHAR(60) COLLATE DATABASE_DEFAULT,
-            NewParentCode NVARCHAR(60) COLLATE DATABASE_DEFAULT,
-            NewRuta       NVARCHAR(400) COLLATE DATABASE_DEFAULT
+            NewCode       NVARCHAR(60),
+            NewParentCode NVARCHAR(60),
+            NewRuta       NVARCHAR(400)
         );
 
         WITH SubTree AS (
             SELECT 
                 a.CodigoActivo, a.Nombre, a.Marca, a.Modelo, a.EstacionId,
                 a.CodigoActivoPadre, a.Nivel, a.RutaAncestros, a.Serie,
-                a.AtributosDinamicos, a.DatosImagen, a.Observaciones,
+                a.AtributosDinamicos, a.DatosImagen,
                 0 AS Depth,
                 1 AS ChildOrder
             FROM dbo.Activo a WITH (UPDLOCK, HOLDLOCK)
@@ -2976,7 +2302,7 @@ BEGIN
             SELECT 
                 c.CodigoActivo, c.Nombre, c.Marca, c.Modelo, c.EstacionId,
                 c.CodigoActivoPadre, c.Nivel, c.RutaAncestros, c.Serie,
-                c.AtributosDinamicos, c.DatosImagen, c.Observaciones,
+                c.AtributosDinamicos, c.DatosImagen,
                 p.Depth + 1 AS Depth,
                 CAST(ROW_NUMBER() OVER (PARTITION BY c.CodigoActivoPadre ORDER BY c.CodigoActivo) AS INT) AS ChildOrder
             FROM dbo.Activo c WITH (UPDLOCK, HOLDLOCK)
@@ -2985,11 +2311,11 @@ BEGIN
         )
         INSERT INTO #ArbolOrigen (
             OldCode, Nombre, Marca, Modelo, EstacionId, OldParentCode, Nivel,
-            RutaAncestros, Serie, Atributos, DatosImagen, Observaciones, Depth, ChildOrder
+            RutaAncestros, Serie, Atributos, DatosImagen, Depth, ChildOrder
         )
         SELECT 
             CodigoActivo, Nombre, Marca, Modelo, EstacionId, CodigoActivoPadre, Nivel,
-            RutaAncestros, Serie, AtributosDinamicos, DatosImagen, Observaciones, Depth, ChildOrder
+            RutaAncestros, Serie, AtributosDinamicos, DatosImagen, Depth, ChildOrder
         FROM SubTree;
 
         IF EXISTS (
@@ -3036,12 +2362,12 @@ BEGIN
             INSERT INTO dbo.Activo (
                 CodigoActivo, Nombre, Marca, Modelo, AreaId, EstacionId,
                 CodigoActivoPadre, Nivel, RutaAncestros, Estado, Serie,
-                AtributosDinamicos, DatosImagen, Observaciones, ContadorHijos, CreadoEn
+                AtributosDinamicos, DatosImagen, ContadorHijos, CreadoEn
             )
             SELECT 
                 o.NewCode, o.Nombre, o.Marca, o.Modelo, @TargetAreaId, o.EstacionId,
                 o.NewParentCode, o.Nivel, o.NewRuta, 'active', o.Serie,
-                o.Atributos, o.DatosImagen, o.Observaciones,
+                o.Atributos, o.DatosImagen,
                 (SELECT COUNT(*) FROM #ArbolOrigen c WHERE c.OldParentCode = o.OldCode),
                 SYSUTCDATETIME()
             FROM #ArbolOrigen o
@@ -3139,11 +2465,11 @@ GO
 CREATE OR ALTER PROCEDURE dbo.uspActivoAlternarEstado
     @AssetCode    NVARCHAR(60) = NULL,
     @CodigoActivo NVARCHAR(60) = NULL,
-    @NewStatus    NVARCHAR(25) = NULL,
-    @Status       NVARCHAR(25) = NULL,
-    @Reason       NVARCHAR(500) = NULL,
-    @UserId       INT = NULL,
-    @UserName     NVARCHAR(100) = N''
+    @NewStatus NVARCHAR(25) = NULL,
+    @Status    NVARCHAR(25) = NULL,
+    @Reason    NVARCHAR(500) = NULL,
+    @UserId    INT = NULL,
+    @UserName  NVARCHAR(100) = N''
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -3151,38 +2477,30 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        DECLARE @Code NVARCHAR(60) = COALESCE(NULLIF(LTRIM(RTRIM(@AssetCode)), N''), NULLIF(LTRIM(RTRIM(@CodigoActivo)), N''));
-        DECLARE @TargetStatus NVARCHAR(25) = COALESCE(NULLIF(LTRIM(RTRIM(@NewStatus)), N''), NULLIF(LTRIM(RTRIM(@Status)), N''));
-
-        IF @Code IS NULL
-            RAISERROR(N'Debe especificarse el código del activo.', 16, 1);
-
-        IF @TargetStatus IS NULL
-            RAISERROR(N'Debe especificarse el nuevo estado del activo.', 16, 1);
-
         DECLARE @currStatus NVARCHAR(25), @ar NVARCHAR(15), @nm NVARCHAR(200);
         SELECT @currStatus = Estado, @ar = AreaId, @nm = Nombre
           FROM dbo.Activo WITH (UPDLOCK, HOLDLOCK)
-         WHERE CodigoActivo = @Code;
+         WHERE CodigoActivo = COALESCE(@AssetCode, @CodigoActivo);
 
         IF @currStatus IS NULL
             RAISERROR(N'El activo no existe.', 16, 1);
 
+        DECLARE @TargetStatus NVARCHAR(25) = COALESCE(@NewStatus, @Status);
         UPDATE dbo.Activo
            SET Estado = @TargetStatus,
                ActualizadoEn = SYSUTCDATETIME()
-         WHERE CodigoActivo = @Code;
+         WHERE CodigoActivo = COALESCE(@AssetCode, @CodigoActivo);
 
         UPDATE dbo.HistorialEstadoActivo
            SET FinalizadoEn = SYSUTCDATETIME()
-         WHERE CodigoActivo = @Code AND FinalizadoEn IS NULL;
+         WHERE CodigoActivo = @AssetCode AND FinalizadoEn IS NULL;
 
         INSERT INTO dbo.HistorialEstadoActivo (CodigoActivo, Estado, IniciadoEn, AreaId, Motivo, UsuarioId, NombreUsuario)
-        VALUES (@Code, @TargetStatus, SYSUTCDATETIME(), @ar, @Reason, @UserId, COALESCE(NULLIF(LTRIM(RTRIM(@UserName)), N''), N'SISTEMA'));
+        VALUES (@AssetCode, @Status, SYSUTCDATETIME(), @ar, @Reason, @UserId, @UserName);
 
         INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (@UserId, COALESCE(NULLIF(LTRIM(RTRIM(@UserName)), N''), N'SISTEMA'), 'ASSET_STATUS_CHANGED', 'ASSETS', @Code,
-                CONCAT(N'Estado de ', @Code, N' cambiado a: ', @TargetStatus, N'.'));
+        VALUES (@UserId, @UserName, 'ASSET_STATUS_CHANGED', 'ASSETS', @AssetCode,
+                CONCAT(N'Estado de ', @AssetCode, N' cambiado a: ', @Status, N'.'));
 
         COMMIT TRANSACTION;
     END TRY
@@ -3212,690 +2530,6 @@ END;
 GO
 
 -- ----------------------------------------------------------------------------
--- 4. PROCEDIMIENTO TRANSACCIONAL: CLONAR ÁRBOL COMPLETO DE ACTIVO
--- ----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE dbo.uspActivoClonarArbol
-    @CodigoActivoOrigen NVARCHAR(60),
-    @AreaDestinoId      NVARCHAR(15),
-    @NuevoNombreRaiz    NVARCHAR(200) = NULL,
-    @NuevoSerialRaiz    NVARCHAR(100) = NULL,
-    @Observaciones      NVARCHAR(MAX) = NULL,
-    @CopiarAtributos    BIT = 1,
-    @UserId             INT = NULL,
-    @UserName           NVARCHAR(100) = N''
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- 1. Validar que exista el activo de origen
-        IF NOT EXISTS (SELECT 1 FROM dbo.Activo WHERE CodigoActivo = @CodigoActivoOrigen AND Estado <> 'deleted')
-            RAISERROR(N'El activo de origen no existe o se encuentra eliminado.', 16, 1);
-
-        -- 2. Validar que exista el área destino
-        IF NOT EXISTS (SELECT 1 FROM dbo.Area WHERE AreaId = @AreaDestinoId AND Activo = 1)
-            RAISERROR(N'El área destino especificada no existe o se encuentra inactiva.', 16, 1);
-
-        -- 3. Validar serial si fue especificado para la nueva raíz
-        IF @NuevoSerialRaiz IS NOT NULL AND LTRIM(RTRIM(@NuevoSerialRaiz)) <> ''
-        BEGIN
-            IF EXISTS (SELECT 1 FROM dbo.Activo WHERE Serie = @NuevoSerialRaiz AND Estado <> 'deleted')
-                RAISERROR(N'El número de serie indicado para la nueva raíz ya está en uso por otro activo activo.', 16, 1);
-        END;
-
-        -- 4. Obtener datos de la raíz de origen
-        DECLARE @OrigNombre NVARCHAR(200), @OrigMarca NVARCHAR(100), @OrigModelo NVARCHAR(100);
-        DECLARE @OrigNivel NVARCHAR(20), @OrigEstacion NVARCHAR(100), @OrigAtributos NVARCHAR(MAX);
-        DECLARE @OrigObservaciones NVARCHAR(MAX);
-
-        SELECT @OrigNombre = Nombre,
-               @OrigMarca = Marca,
-               @OrigModelo = Modelo,
-               @OrigNivel = Nivel,
-               @OrigEstacion = EstacionId,
-               @OrigAtributos = AtributosDinamicos,
-               @OrigObservaciones = Observaciones
-          FROM dbo.Activo
-         WHERE CodigoActivo = @CodigoActivoOrigen;
-
-        -- 5. Generar código correlativo para la nueva raíz en el área destino
-        DECLARE @acTable TABLE (val INT NOT NULL);
-        UPDATE dbo.Area WITH (UPDLOCK, HOLDLOCK)
-           SET ContadorActivos += 1
-         OUTPUT inserted.ContadorActivos INTO @acTable(val)
-          WHERE AreaId = @AreaDestinoId;
-
-        DECLARE @ac INT; SELECT @ac = val FROM @acTable;
-        DECLARE @NuevoCodigoRaiz NVARCHAR(60) = CONCAT(@AreaDestinoId, '-', FORMAT(@ac, '000'));
-
-        DECLARE @NombreFinalRaiz NVARCHAR(200) = COALESCE(NULLIF(LTRIM(RTRIM(@NuevoNombreRaiz)), N''), @OrigNombre);
-        DECLARE @ObsFinalRaiz NVARCHAR(MAX) = COALESCE(@Observaciones, @OrigObservaciones);
-        DECLARE @AtributosRaiz NVARCHAR(MAX) = CASE WHEN @CopiarAtributos = 1 THEN @OrigAtributos ELSE NULL END;
-
-        -- 6. Insertar activo raíz clonado (sin imagen y con serial opcional)
-        INSERT INTO dbo.Activo (
-            CodigoActivo, Nombre, Marca, Modelo, AreaId, EstacionId, CodigoActivoPadre,
-            Nivel, RutaAncestros, Estado, Serie, AtributosDinamicos, DatosImagen,
-            Observaciones, ContadorHijos, CreadoEn
-        )
-        VALUES (
-            @NuevoCodigoRaiz, @NombreFinalRaiz, @OrigMarca, @OrigModelo, @AreaDestinoId,
-            @OrigEstacion, NULL, @OrigNivel, '', 'active', NULLIF(@NuevoSerialRaiz, ''),
-            @AtributosRaiz, NULL, @ObsFinalRaiz, 0, SYSUTCDATETIME()
-        );
-
-        -- Tabla de mapeo de códigos Origen -> Nuevo
-        DECLARE @Mapeo TABLE (
-            CodigoOrigen NVARCHAR(60) COLLATE DATABASE_DEFAULT PRIMARY KEY,
-            CodigoNuevo  NVARCHAR(60) COLLATE DATABASE_DEFAULT NOT NULL,
-            RutaAncestros NVARCHAR(400) COLLATE DATABASE_DEFAULT NOT NULL
-        );
-        INSERT INTO @Mapeo (CodigoOrigen, CodigoNuevo, RutaAncestros)
-        VALUES (@CodigoActivoOrigen, @NuevoCodigoRaiz, '');
-
-        -- Tabla temporal de descendientes con COLLATE DATABASE_DEFAULT
-        CREATE TABLE #Descendientes (
-            Orden         INT IDENTITY(1,1),
-            CodigoOrigen  NVARCHAR(60) COLLATE DATABASE_DEFAULT,
-            PadreOrigen   NVARCHAR(60) COLLATE DATABASE_DEFAULT,
-            Nombre        NVARCHAR(200) COLLATE DATABASE_DEFAULT,
-            Marca         NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            Modelo        NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            Nivel         NVARCHAR(20) COLLATE DATABASE_DEFAULT,
-            Observaciones NVARCHAR(MAX) COLLATE DATABASE_DEFAULT,
-            Atributos     NVARCHAR(MAX) COLLATE DATABASE_DEFAULT,
-            Profundidad   INT
-        );
-
-        -- Recorrido jerárquico por niveles de profundidad
-        WITH ArbolDesc AS (
-            SELECT CodigoActivo, CodigoActivoPadre, Nombre, Marca, Modelo, Nivel, Observaciones, AtributosDinamicos, 1 AS Profundidad
-              FROM dbo.Activo
-             WHERE CodigoActivoPadre = @CodigoActivoOrigen
-               AND Estado <> 'deleted'
-            UNION ALL
-            SELECT c.CodigoActivo, c.CodigoActivoPadre, c.Nombre, c.Marca, c.Modelo, c.Nivel, c.Observaciones, c.AtributosDinamicos, a.Profundidad + 1
-              FROM dbo.Activo c
-              INNER JOIN ArbolDesc a ON c.CodigoActivoPadre = a.CodigoActivo
-             WHERE c.Estado <> 'deleted'
-        )
-        INSERT INTO #Descendientes (CodigoOrigen, PadreOrigen, Nombre, Marca, Modelo, Nivel, Observaciones, Atributos, Profundidad)
-        SELECT CodigoActivo, CodigoActivoPadre, Nombre, Marca, Modelo, Nivel, Observaciones, AtributosDinamicos, Profundidad
-          FROM ArbolDesc
-         ORDER BY Profundidad ASC, CodigoActivo ASC;
-
-        -- Clonar cada descendiente asignándole su nuevo padre
-        DECLARE @MaxOrden INT = (SELECT ISNULL(MAX(Orden), 0) FROM #Descendientes);
-        DECLARE @i INT = 1;
-        DECLARE @TotalClonados INT = 1; -- contando la raíz
-
-        WHILE @i <= @MaxOrden
-        BEGIN
-            DECLARE @cOrigen NVARCHAR(60), @pOrigen NVARCHAR(60), @cNombre NVARCHAR(200);
-            DECLARE @cMarca NVARCHAR(100), @cModelo NVARCHAR(100), @cNivel NVARCHAR(20);
-            DECLARE @cObs NVARCHAR(MAX), @cAttr NVARCHAR(MAX);
-
-            SELECT @cOrigen = CodigoOrigen,
-                   @pOrigen = PadreOrigen,
-                   @cNombre = Nombre,
-                   @cMarca = Marca,
-                   @cModelo = Modelo,
-                   @cNivel = Nivel,
-                   @cObs = Observaciones,
-                   @cAttr = Atributos
-              FROM #Descendientes
-             WHERE Orden = @i;
-
-            DECLARE @NuevoPadreCode NVARCHAR(60);
-            DECLARE @RutaAncestrosPadre NVARCHAR(400);
-
-            SELECT @NuevoPadreCode = CodigoNuevo,
-                   @RutaAncestrosPadre = RutaAncestros
-              FROM @Mapeo
-             WHERE CodigoOrigen = @pOrigen;
-
-            IF @NuevoPadreCode IS NOT NULL
-            BEGIN
-                DECLARE @childCounterTable TABLE (cnt INT NOT NULL);
-                UPDATE dbo.Activo WITH (UPDLOCK, HOLDLOCK)
-                   SET ContadorHijos += 1
-                 OUTPUT inserted.ContadorHijos INTO @childCounterTable(cnt)
-                  WHERE CodigoActivo = @NuevoPadreCode;
-
-                DECLARE @chCnt INT; SELECT @chCnt = cnt FROM @childCounterTable;
-                DELETE FROM @childCounterTable;
-
-                DECLARE @NuevoCodigoHijo NVARCHAR(60) = CONCAT(@NuevoPadreCode, '-', FORMAT(@chCnt, '00'));
-                DECLARE @RutaAncestrosHijo NVARCHAR(400) = CASE 
-                    WHEN @RutaAncestrosPadre = '' THEN @NuevoPadreCode 
-                    ELSE CONCAT(@RutaAncestrosPadre, '/', @NuevoPadreCode) 
-                END;
-
-                DECLARE @AtributosHijo NVARCHAR(MAX) = CASE WHEN @CopiarAtributos = 1 THEN @cAttr ELSE NULL END;
-
-                INSERT INTO dbo.Activo (
-                    CodigoActivo, Nombre, Marca, Modelo, AreaId, EstacionId, CodigoActivoPadre,
-                    Nivel, RutaAncestros, Estado, Serie, AtributosDinamicos, DatosImagen,
-                    Observaciones, ContadorHijos, CreadoEn
-                )
-                VALUES (
-                    @NuevoCodigoHijo, @cNombre, @cMarca, @cModelo, @AreaDestinoId,
-                    '', @NuevoPadreCode, @cNivel, @RutaAncestrosHijo, 'active', NULL,
-                    @AtributosHijo, NULL, @cObs, 0, SYSUTCDATETIME()
-                );
-
-                INSERT INTO @Mapeo (CodigoOrigen, CodigoNuevo, RutaAncestros)
-                VALUES (@cOrigen, @NuevoCodigoHijo, @RutaAncestrosHijo);
-
-                SET @TotalClonados += 1;
-            END;
-
-            SET @i += 1;
-        END;
-
-        DROP TABLE #Descendientes;
-
-        -- Registrar en Historial y Bitácora Kardex
-        DECLARE @AuditUser INT = @UserId;
-        IF @AuditUser IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE UsuarioId = @AuditUser)
-            SET @AuditUser = NULL;
-        DECLARE @UName NVARCHAR(100) = COALESCE(NULLIF(LTRIM(RTRIM(@UserName)), N''), N'SISTEMA');
-
-        INSERT INTO dbo.HistorialEstadoActivo (
-            CodigoActivo, Estado, IniciadoEn, AreaId, Motivo, UsuarioId, NombreUsuario
-        )
-        SELECT CodigoNuevo, 'active', SYSUTCDATETIME(), @AreaDestinoId,
-               CONCAT(N'Clonado desde el activo ', CodigoOrigen), @AuditUser, @UName
-          FROM @Mapeo;
-
-        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (
-            @AuditUser, @UName, 'ASSET_TREE_CLONED', 'ASSETS', @NuevoCodigoRaiz,
-            CONCAT(N'Árbol completo clonado desde ', @CodigoActivoOrigen, N' hacia ', @NuevoCodigoRaiz, 
-                   N' en área ', @AreaDestinoId, N' con ', @TotalClonados, N' elementos en total.')
-        );
-
-        COMMIT TRANSACTION;
-
-        SELECT @NuevoCodigoRaiz AS CodigoActivo,
-               @NuevoCodigoRaiz AS assetCode,
-               @NuevoCodigoRaiz AS id,
-               @NombreFinalRaiz AS Nombre,
-               @AreaDestinoId   AS AreaId,
-               @TotalClonados   AS totalNodos;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#Descendientes') IS NOT NULL DROP TABLE #Descendientes;
-        THROW;
-    END CATCH
-END;
-GO
-
--- ----------------------------------------------------------------------------
--- 5. PROCEDIMIENTOS DE PLANTILLAS DE ACTIVOS
--- ----------------------------------------------------------------------------
-CREATE OR ALTER PROCEDURE dbo.uspPlantillaActivoListar
-    @IncludeInactive BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SELECT PlantillaId AS id,
-           PlantillaId,
-           Nombre AS name,
-           Nombre,
-           Descripcion AS description,
-           Descripcion,
-           NivelRaiz AS rootLevel,
-           NivelRaiz,
-           TotalNodos AS totalNodes,
-           TotalNodos,
-           Activo AS isActive,
-           Activo,
-           CreadoEn AS createdAt,
-           ActualizadoEn AS updatedAt
-      FROM dbo.PlantillaActivo
-     WHERE (@IncludeInactive = 1 OR Activo = 1)
-     ORDER BY Nombre ASC;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspPlantillaActivoObtenerDetalle
-    @PlantillaId INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    -- 1. Encabezado de la plantilla
-    SELECT PlantillaId AS id,
-           PlantillaId,
-           Nombre AS name,
-           Nombre,
-           Descripcion AS description,
-           Descripcion,
-           NivelRaiz AS rootLevel,
-           NivelRaiz,
-           TotalNodos AS totalNodes,
-           TotalNodos,
-           Activo AS isActive,
-           Activo,
-           CreadoEn AS createdAt,
-           ActualizadoEn AS updatedAt
-      FROM dbo.PlantillaActivo
-     WHERE PlantillaId = @PlantillaId;
-
-    -- 2. Nodos del árbol
-    SELECT NodoId AS id,
-           NodoId,
-           PlantillaId,
-           NodoPadreId AS parentNodeId,
-           NodoPadreId,
-           Nombre AS name,
-           Nombre,
-           Marca AS brand,
-           Marca,
-           Modelo AS model,
-           Modelo,
-           Nivel AS [level],
-           Nivel,
-           Orden AS [order],
-           Orden,
-           AtributosDinamicos AS dynamicAttributes,
-           AtributosDinamicos,
-           Observaciones AS observations,
-           Observaciones
-      FROM dbo.PlantillaActivoNodo
-     WHERE PlantillaId = @PlantillaId
-     ORDER BY Orden ASC, NodoId ASC;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspPlantillaActivoGuardarDesdeActivo
-    @CodigoActivoOrigen NVARCHAR(60),
-    @NombrePlantilla    NVARCHAR(150),
-    @Descripcion        NVARCHAR(255) = NULL,
-    @UserId             INT = NULL,
-    @UserName           NVARCHAR(100) = N''
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        DECLARE @CleanName NVARCHAR(150) = LTRIM(RTRIM(@NombrePlantilla));
-        IF @CleanName IS NULL OR @CleanName = N''
-            RAISERROR(N'El nombre de la plantilla es obligatorio.', 16, 1);
-
-        IF NOT EXISTS (SELECT 1 FROM dbo.Activo WHERE CodigoActivo = @CodigoActivoOrigen AND Estado <> 'deleted')
-            RAISERROR(N'El activo de origen no existe.', 16, 1);
-
-        IF EXISTS (SELECT 1 FROM dbo.PlantillaActivo WHERE UPPER(Nombre) = UPPER(@CleanName) AND Activo = 1)
-            RAISERROR(N'Ya existe una plantilla activa con ese nombre.', 16, 1);
-
-        DECLARE @OrigNivelRaiz NVARCHAR(20);
-        SELECT @OrigNivelRaiz = Nivel FROM dbo.Activo WHERE CodigoActivo = @CodigoActivoOrigen;
-
-        -- 1. Crear cabecera
-        INSERT INTO dbo.PlantillaActivo (Nombre, Descripcion, NivelRaiz, TotalNodos, Activo, CreadoEn, ActualizadoEn)
-        VALUES (@CleanName, NULLIF(LTRIM(RTRIM(@Descripcion)), N''), @OrigNivelRaiz, 1, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
-
-        DECLARE @NewPlantillaId INT = SCOPE_IDENTITY();
-
-        -- 2. Insertar nodo raíz de la plantilla
-        DECLARE @NodoRaizId INT;
-        INSERT INTO dbo.PlantillaActivoNodo (
-            PlantillaId, NodoPadreId, Nombre, Marca, Modelo, Nivel, Orden, AtributosDinamicos, Observaciones
-        )
-        SELECT @NewPlantillaId, NULL, Nombre, Marca, Modelo, Nivel, 1, AtributosDinamicos, Observaciones
-          FROM dbo.Activo
-         WHERE CodigoActivo = @CodigoActivoOrigen;
-
-        SET @NodoRaizId = SCOPE_IDENTITY();
-
-        -- Mapeo de CodigoActivo -> NodoId
-        DECLARE @MapeoNodos TABLE (
-            CodigoActivo NVARCHAR(60) COLLATE DATABASE_DEFAULT PRIMARY KEY,
-            NodoId       INT NOT NULL
-        );
-        INSERT INTO @MapeoNodos (CodigoActivo, NodoId) VALUES (@CodigoActivoOrigen, @NodoRaizId);
-
-        -- Tabla temporal de descendientes con COLLATE DATABASE_DEFAULT
-        CREATE TABLE #DescPlantilla (
-            Orden         INT IDENTITY(2,1),
-            CodigoActivo  NVARCHAR(60) COLLATE DATABASE_DEFAULT,
-            PadreCodigo   NVARCHAR(60) COLLATE DATABASE_DEFAULT,
-            Nombre        NVARCHAR(200) COLLATE DATABASE_DEFAULT,
-            Marca         NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            Modelo        NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            Nivel         NVARCHAR(20) COLLATE DATABASE_DEFAULT,
-            Atributos     NVARCHAR(MAX) COLLATE DATABASE_DEFAULT,
-            Observaciones NVARCHAR(MAX) COLLATE DATABASE_DEFAULT,
-            Profundidad   INT
-        );
-
-        WITH ArbolDesc AS (
-            SELECT CodigoActivo, CodigoActivoPadre, Nombre, Marca, Modelo, Nivel, AtributosDinamicos, Observaciones, 1 AS Profundidad
-              FROM dbo.Activo
-             WHERE CodigoActivoPadre = @CodigoActivoOrigen AND Estado <> 'deleted'
-            UNION ALL
-            SELECT c.CodigoActivo, c.CodigoActivoPadre, c.Nombre, c.Marca, c.Modelo, c.Nivel, c.AtributosDinamicos, c.Observaciones, a.Profundidad + 1
-              FROM dbo.Activo c
-              INNER JOIN ArbolDesc a ON c.CodigoActivoPadre = a.CodigoActivo
-             WHERE c.Estado <> 'deleted'
-        )
-        INSERT INTO #DescPlantilla (CodigoActivo, PadreCodigo, Nombre, Marca, Modelo, Nivel, Atributos, Observaciones, Profundidad)
-        SELECT CodigoActivo, CodigoActivoPadre, Nombre, Marca, Modelo, Nivel, AtributosDinamicos, Observaciones, Profundidad
-          FROM ArbolDesc
-         ORDER BY Profundidad ASC, CodigoActivo ASC;
-
-        DECLARE @MaxDesc INT = (SELECT ISNULL(MAX(Orden), 1) FROM #DescPlantilla);
-        DECLARE @curr INT = 2;
-        DECLARE @TotalNodos INT = 1;
-
-        WHILE @curr <= @MaxDesc
-        BEGIN
-            DECLARE @ca NVARCHAR(60), @cp NVARCHAR(60), @nm NVARCHAR(200);
-            DECLARE @mc NVARCHAR(100), @md NVARCHAR(100), @nv NVARCHAR(20);
-            DECLARE @at NVARCHAR(MAX), @ob NVARCHAR(MAX);
-
-            SELECT @ca = CodigoActivo, @cp = PadreCodigo, @nm = Nombre,
-                   @mc = Marca, @md = Modelo, @nv = Nivel,
-                   @at = Atributos, @ob = Observaciones
-              FROM #DescPlantilla
-             WHERE Orden = @curr;
-
-            DECLARE @ParentNodoId INT;
-            SELECT @ParentNodoId = NodoId FROM @MapeoNodos WHERE CodigoActivo = @cp;
-
-            IF @ParentNodoId IS NOT NULL
-            BEGIN
-                INSERT INTO dbo.PlantillaActivoNodo (
-                    PlantillaId, NodoPadreId, Nombre, Marca, Modelo, Nivel, Orden, AtributosDinamicos, Observaciones
-                )
-                VALUES (
-                    @NewPlantillaId, @ParentNodoId, @nm, @mc, @md, @nv, @curr, @at, @ob
-                );
-
-                DECLARE @NewNodoId INT = SCOPE_IDENTITY();
-                INSERT INTO @MapeoNodos (CodigoActivo, NodoId) VALUES (@ca, @NewNodoId);
-                SET @TotalNodos += 1;
-            END;
-
-            SET @curr += 1;
-        END;
-
-        DROP TABLE #DescPlantilla;
-
-        -- Actualizar contador total en la plantilla
-        UPDATE dbo.PlantillaActivo
-           SET TotalNodos = @TotalNodos,
-               ActualizadoEn = SYSUTCDATETIME()
-         WHERE PlantillaId = @NewPlantillaId;
-
-        -- Auditoría Kardex
-        DECLARE @AuditUser INT = @UserId;
-        IF @AuditUser IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE UsuarioId = @AuditUser)
-            SET @AuditUser = NULL;
-        DECLARE @UName NVARCHAR(100) = COALESCE(NULLIF(LTRIM(RTRIM(@UserName)), N''), N'SISTEMA');
-
-        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (
-            @AuditUser, @UName, 'TEMPLATE_CREATED', 'ASSETS', CAST(@NewPlantillaId AS NVARCHAR(30)),
-            CONCAT(N'Plantilla "', @CleanName, N'" guardada desde activo ', @CodigoActivoOrigen, N' con ', @TotalNodos, N' partes.')
-        );
-
-        COMMIT TRANSACTION;
-
-        SELECT PlantillaId AS id, PlantillaId, Nombre, TotalNodos, CreadoEn
-          FROM dbo.PlantillaActivo
-         WHERE PlantillaId = @NewPlantillaId;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#DescPlantilla') IS NOT NULL DROP TABLE #DescPlantilla;
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspPlantillaActivoInstanciar
-    @PlantillaId     INT,
-    @AreaDestinoId   NVARCHAR(15),
-    @NuevoNombreRaiz NVARCHAR(200) = NULL,
-    @NuevoSerialRaiz NVARCHAR(100) = NULL,
-    @Observaciones   NVARCHAR(MAX) = NULL,
-    @CopiarAtributos BIT = 1,
-    @UserId          INT = NULL,
-    @UserName        NVARCHAR(100) = N''
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        IF NOT EXISTS (SELECT 1 FROM dbo.PlantillaActivo WHERE PlantillaId = @PlantillaId AND Activo = 1)
-            RAISERROR(N'La plantilla especificada no existe o se encuentra inactiva.', 16, 1);
-
-        IF NOT EXISTS (SELECT 1 FROM dbo.Area WHERE AreaId = @AreaDestinoId AND Activo = 1)
-            RAISERROR(N'El área destino especificada no existe o se encuentra inactiva.', 16, 1);
-
-        IF @NuevoSerialRaiz IS NOT NULL AND LTRIM(RTRIM(@NuevoSerialRaiz)) <> ''
-        BEGIN
-            IF EXISTS (SELECT 1 FROM dbo.Activo WHERE Serie = @NuevoSerialRaiz AND Estado <> 'deleted')
-                RAISERROR(N'El número de serie indicado ya está en uso por otro activo activo.', 16, 1);
-        END;
-
-        -- 1. Obtener nodo raíz de la plantilla
-        DECLARE @RootNodoId INT, @RootNombre NVARCHAR(200), @RootMarca NVARCHAR(100), @RootModelo NVARCHAR(100);
-        DECLARE @RootNivel NVARCHAR(20), @RootAtributos NVARCHAR(MAX), @RootObs NVARCHAR(MAX);
-
-        SELECT @RootNodoId = NodoId,
-               @RootNombre = Nombre,
-               @RootMarca = Marca,
-               @RootModelo = Modelo,
-               @RootNivel = Nivel,
-               @RootAtributos = AtributosDinamicos,
-               @RootObs = Observaciones
-          FROM dbo.PlantillaActivoNodo
-         WHERE PlantillaId = @PlantillaId AND NodoPadreId IS NULL;
-
-        -- 2. Generar correlativo para la nueva raíz
-        DECLARE @acTable TABLE (val INT NOT NULL);
-        UPDATE dbo.Area WITH (UPDLOCK, HOLDLOCK)
-           SET ContadorActivos += 1
-         OUTPUT inserted.ContadorActivos INTO @acTable(val)
-          WHERE AreaId = @AreaDestinoId;
-
-        DECLARE @ac INT; SELECT @ac = val FROM @acTable;
-        DECLARE @NuevoCodigoRaiz NVARCHAR(60) = CONCAT(@AreaDestinoId, '-', FORMAT(@ac, '000'));
-
-        DECLARE @NombreFinalRaiz NVARCHAR(200) = COALESCE(NULLIF(LTRIM(RTRIM(@NuevoNombreRaiz)), N''), @RootNombre);
-        DECLARE @ObsFinalRaiz NVARCHAR(MAX) = COALESCE(@Observaciones, @RootObs);
-        DECLARE @AtributosRaiz NVARCHAR(MAX) = CASE WHEN @CopiarAtributos = 1 THEN @RootAtributos ELSE NULL END;
-
-        -- 3. Insertar raíz en dbo.Activo
-        INSERT INTO dbo.Activo (
-            CodigoActivo, Nombre, Marca, Modelo, AreaId, EstacionId, CodigoActivoPadre,
-            Nivel, RutaAncestros, Estado, Serie, AtributosDinamicos, DatosImagen,
-            Observaciones, ContadorHijos, CreadoEn
-        )
-        VALUES (
-            @NuevoCodigoRaiz, @NombreFinalRaiz, @RootMarca, @RootModelo, @AreaDestinoId,
-            '', NULL, @RootNivel, '', 'active', NULLIF(@NuevoSerialRaiz, ''),
-            @AtributosRaiz, NULL, @ObsFinalRaiz, 0, SYSUTCDATETIME()
-        );
-
-        -- Tabla de mapeo NodoId -> CodigoActivo
-        DECLARE @Mapeo TABLE (
-            NodoId        INT PRIMARY KEY,
-            CodigoActivo  NVARCHAR(60) COLLATE DATABASE_DEFAULT NOT NULL,
-            RutaAncestros NVARCHAR(400) COLLATE DATABASE_DEFAULT NOT NULL
-        );
-        INSERT INTO @Mapeo (NodoId, CodigoActivo, RutaAncestros)
-        VALUES (@RootNodoId, @NuevoCodigoRaiz, '');
-
-        -- Tabla temporal para procesar descendientes en orden con COLLATE DATABASE_DEFAULT
-        CREATE TABLE #NodosInstanciar (
-            Orden         INT IDENTITY(1,1),
-            NodoId        INT,
-            NodoPadreId   INT,
-            Nombre        NVARCHAR(200) COLLATE DATABASE_DEFAULT,
-            Marca         NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            Modelo        NVARCHAR(100) COLLATE DATABASE_DEFAULT,
-            Nivel         NVARCHAR(20) COLLATE DATABASE_DEFAULT,
-            Atributos     NVARCHAR(MAX) COLLATE DATABASE_DEFAULT,
-            Observaciones NVARCHAR(MAX) COLLATE DATABASE_DEFAULT,
-            Profundidad   INT
-        );
-
-        WITH ArbolNodos AS (
-            SELECT NodoId, NodoPadreId, Nombre, Marca, Modelo, Nivel, Orden, AtributosDinamicos, Observaciones, 1 AS Profundidad
-              FROM dbo.PlantillaActivoNodo
-             WHERE PlantillaId = @PlantillaId AND NodoPadreId = @RootNodoId
-            UNION ALL
-            SELECT c.NodoId, c.NodoPadreId, c.Nombre, c.Marca, c.Modelo, c.Nivel, c.Orden, c.AtributosDinamicos, c.Observaciones, a.Profundidad + 1
-              FROM dbo.PlantillaActivoNodo c
-              INNER JOIN ArbolNodos a ON c.NodoPadreId = a.NodoId
-             WHERE c.PlantillaId = @PlantillaId
-        )
-        INSERT INTO #NodosInstanciar (NodoId, NodoPadreId, Nombre, Marca, Modelo, Nivel, Atributos, Observaciones, Profundidad)
-        SELECT NodoId, NodoPadreId, Nombre, Marca, Modelo, Nivel, AtributosDinamicos, Observaciones, Profundidad
-          FROM ArbolNodos
-         ORDER BY Profundidad ASC, Orden ASC;
-
-        DECLARE @MaxNodos INT = (SELECT ISNULL(MAX(Orden), 0) FROM #NodosInstanciar);
-        DECLARE @k INT = 1;
-        DECLARE @TotalInstanciados INT = 1;
-
-        WHILE @k <= @MaxNodos
-        BEGIN
-            DECLARE @nId INT, @pId INT, @nName NVARCHAR(200);
-            DECLARE @nBrand NVARCHAR(100), @nModel NVARCHAR(100), @nLevel NVARCHAR(20);
-            DECLARE @nAttr NVARCHAR(MAX), @nObs NVARCHAR(MAX);
-
-            SELECT @nId = NodoId, @pId = NodoPadreId, @nName = Nombre,
-                   @nBrand = Marca, @nModel = Modelo, @nLevel = Nivel,
-                   @nAttr = Atributos, @nObs = Observaciones
-              FROM #NodosInstanciar
-             WHERE Orden = @k;
-
-            DECLARE @PadreCode NVARCHAR(60);
-            DECLARE @PadreRuta NVARCHAR(400);
-
-            SELECT @PadreCode = CodigoActivo,
-                   @PadreRuta = RutaAncestros
-              FROM @Mapeo
-             WHERE NodoId = @pId;
-
-            IF @PadreCode IS NOT NULL
-            BEGIN
-                DECLARE @chTable TABLE (cnt INT NOT NULL);
-                UPDATE dbo.Activo WITH (UPDLOCK, HOLDLOCK)
-                   SET ContadorHijos += 1
-                 OUTPUT inserted.ContadorHijos INTO @chTable(cnt)
-                  WHERE CodigoActivo = @PadreCode;
-
-                DECLARE @chCnt INT; SELECT @chCnt = cnt FROM @chTable;
-                DELETE FROM @chTable;
-
-                DECLARE @HijoCode NVARCHAR(60) = CONCAT(@PadreCode, '-', FORMAT(@chCnt, '00'));
-                DECLARE @HijoRuta NVARCHAR(400) = CASE 
-                    WHEN @PadreRuta = '' THEN @PadreCode 
-                    ELSE CONCAT(@PadreRuta, '/', @PadreCode) 
-                END;
-
-                DECLARE @HijoAttr NVARCHAR(MAX) = CASE WHEN @CopiarAtributos = 1 THEN @nAttr ELSE NULL END;
-
-                INSERT INTO dbo.Activo (
-                    CodigoActivo, Nombre, Marca, Modelo, AreaId, EstacionId, CodigoActivoPadre,
-                    Nivel, RutaAncestros, Estado, Serie, AtributosDinamicos, DatosImagen,
-                    Observaciones, ContadorHijos, CreadoEn
-                )
-                VALUES (
-                    @HijoCode, @nName, @nBrand, @nModel, @AreaDestinoId,
-                    '', @PadreCode, @nLevel, @HijoRuta, 'active', NULL,
-                    @HijoAttr, NULL, @nObs, 0, SYSUTCDATETIME()
-                );
-
-                INSERT INTO @Mapeo (NodoId, CodigoActivo, RutaAncestros)
-                VALUES (@nId, @HijoCode, @HijoRuta);
-
-                SET @TotalInstanciados += 1;
-            END;
-
-            SET @k += 1;
-        END;
-
-        DROP TABLE #NodosInstanciar;
-
-        -- Auditoría e historial
-        DECLARE @AuditUser INT = @UserId;
-        IF @AuditUser IS NOT NULL AND NOT EXISTS (SELECT 1 FROM dbo.Usuario WHERE UsuarioId = @AuditUser)
-            SET @AuditUser = NULL;
-        DECLARE @UName NVARCHAR(100) = COALESCE(NULLIF(LTRIM(RTRIM(@UserName)), N''), N'SISTEMA');
-
-        INSERT INTO dbo.HistorialEstadoActivo (
-            CodigoActivo, Estado, IniciadoEn, AreaId, Motivo, UsuarioId, NombreUsuario
-        )
-        SELECT CodigoActivo, 'active', SYSUTCDATETIME(), @AreaDestinoId,
-               CONCAT(N'Creado a partir de plantilla ID ', @PlantillaId), @AuditUser, @UName
-          FROM @Mapeo;
-
-        INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (
-            @AuditUser, @UName, 'ASSET_CREATED_FROM_TEMPLATE', 'ASSETS', @NuevoCodigoRaiz,
-            CONCAT(N'Activo ', @NuevoCodigoRaiz, N' y su estructura creados a partir de plantilla ID ', 
-                   @PlantillaId, N' en área ', @AreaDestinoId, N' con ', @TotalInstanciados, N' elementos.')
-        );
-
-        COMMIT TRANSACTION;
-
-        SELECT @NuevoCodigoRaiz AS CodigoActivo,
-               @NuevoCodigoRaiz AS assetCode,
-               @NuevoCodigoRaiz AS id,
-               @NombreFinalRaiz AS Nombre,
-               @AreaDestinoId   AS AreaId,
-               @TotalInstanciados AS totalNodos;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#NodosInstanciar') IS NOT NULL DROP TABLE #NodosInstanciar;
-        THROW;
-    END CATCH
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspPlantillaActivoEliminar
-    @PlantillaId INT,
-    @UserId      INT = NULL,
-    @UserName    NVARCHAR(100) = N''
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-    BEGIN TRY
-        IF NOT EXISTS (SELECT 1 FROM dbo.PlantillaActivo WHERE PlantillaId = @PlantillaId)
-            RAISERROR(N'La plantilla no existe.', 16, 1);
-
-        UPDATE dbo.PlantillaActivo
-           SET Activo = 0,
-               ActualizadoEn = SYSUTCDATETIME()
-         WHERE PlantillaId = @PlantillaId;
-
-        SELECT 1 AS success, N'Plantilla retirada exitosamente.' AS message;
-    END TRY
-    BEGIN CATCH
-        THROW;
-    END CATCH
-END;
-GO
-
--- ----------------------------------------------------------------------------
-
-
 -- 15. PROCEDIMIENTOS ALMACENADOS: SOLICITUDES Y GESTIÓN DE BAJAS
 -- ----------------------------------------------------------------------------
 
@@ -4276,14 +2910,6 @@ CREATE OR ALTER PROCEDURE dbo.uspReporteAveriaVincularOrdenTrabajo
 AS
 BEGIN
     SET NOCOUNT ON;
-
-    -- Validar que la orden de trabajo exista para evitar conflicto de clave foránea FK_RA_OrdenTrabajo
-    IF NOT EXISTS (SELECT 1 FROM dbo.OrdenTrabajo WHERE OrdenTrabajoId = @WorkOrderId)
-    BEGIN
-        -- Si la OT no existe, salimos sin error para no interrumpir el flujo del cliente
-        RETURN;
-    END;
-
     UPDATE dbo.ReporteAveria
        SET OrdenTrabajoId = @WorkOrderId,
            Estado = 'inWorkOrder'
@@ -4344,7 +2970,7 @@ END;
 GO
 
 CREATE OR ALTER PROCEDURE dbo.uspOrdenTrabajoObtenerTodas
-    @StatusFilter   NVARCHAR(15) = NULL,
+    @StatusFilter   NVARCHAR(20) = NULL,
     @AreaFilter     NVARCHAR(15) = NULL,
     @PriorityFilter NVARCHAR(10) = NULL,
     @Limit          INT = NULL,
@@ -4379,9 +3005,18 @@ BEGIN
            ot.CreadoPorUsuarioId AS CreatedByUserId,
            ot.CreadoPorNombreUsuario AS CreatedByUserName,
            ot.CreadoEn AS CreatedAt,
+           ot.FechaInicioReal,
+           ot.FechaFinReal,
+           ot.MinutosPausaAcumulados,
+           ot.FechaUltimaPausa,
+           ot.MotivoPausa,
+           ot.AprobadoPorUsuarioId,
+           ot.AprobadoPorNombreUsuario,
+           ot.AprobadoEn,
            ra.ImagenUrl AS BreakdownImageData,
            m.MaterialsJson,
            t.WorkTypesCsv,
+           -- Aliases de compatibilidad directa
            ot.OrdenTrabajoId,
            ot.CodigoActivo,
            ot.NombreActivo,
@@ -4398,26 +3033,26 @@ BEGIN
       FROM dbo.OrdenTrabajo ot
       LEFT JOIN dbo.Area ar ON ot.AreaId = ar.AreaId
       LEFT JOIN dbo.ReporteAveria ra ON ot.ReporteId = ra.ReporteId
-     OUTER APPLY (
-         SELECT (
-             SELECT NumeroLinea AS LineNum, Descripcion AS Description, Cantidad AS Quantity, Unidad AS Unit
-               FROM dbo.MaterialOrdenTrabajo
-              WHERE OrdenTrabajoId = ot.OrdenTrabajoId
-              ORDER BY NumeroLinea
-                FOR JSON PATH
-         ) AS MaterialsJson
-     ) m
-     OUTER APPLY (
-         SELECT STRING_AGG(TipoTrabajo, ',') AS WorkTypesCsv
-           FROM dbo.TipoTrabajoOrdenTrabajo
-          WHERE OrdenTrabajoId = ot.OrdenTrabajoId
-     ) t
+      OUTER APPLY (
+          SELECT (
+              SELECT NumeroLinea AS lineNum, Descripcion AS description, Cantidad AS quantity, Unidad AS unit
+                FROM dbo.MaterialOrdenTrabajo
+               WHERE OrdenTrabajoId = ot.OrdenTrabajoId
+               ORDER BY NumeroLinea ASC
+                 FOR JSON PATH
+          ) AS MaterialsJson
+      ) m
+      OUTER APPLY (
+          SELECT STRING_AGG(TipoTrabajo, ',') AS WorkTypesCsv
+            FROM dbo.TipoTrabajoOrdenTrabajo
+           WHERE OrdenTrabajoId = ot.OrdenTrabajoId
+      ) t
      WHERE (@StatusFilter IS NULL OR ot.Estado = @StatusFilter)
-       AND (@AreaFilter   IS NULL OR ot.AreaId = @AreaFilter)
+       AND (@AreaFilter IS NULL OR ot.AreaId = @AreaFilter)
        AND (@PriorityFilter IS NULL OR ot.Prioridad = @PriorityFilter)
      ORDER BY ot.CreadoEn DESC
-     OFFSET @Offset ROWS
-     FETCH NEXT CASE WHEN @Limit IS NULL OR @Limit <= 0 THEN 2147483647 ELSE @Limit END ROWS ONLY;
+    OFFSET @Offset ROWS
+    FETCH NEXT COALESCE(@Limit, 5000) ROWS ONLY;
 END;
 GO
 
@@ -4450,10 +3085,25 @@ BEGIN
            ot.CreadoPorUsuarioId,
            ot.CreadoPorNombreUsuario,
            ot.CreadoEn,
-           ra.ImagenUrl AS BreakdownImageData
+           ot.FechaInicioReal,
+           ot.FechaFinReal,
+           ot.MinutosPausaAcumulados,
+           ot.FechaUltimaPausa,
+           ot.MotivoPausa,
+           ot.AprobadoPorUsuarioId,
+           ot.AprobadoPorNombreUsuario,
+           ot.AprobadoEn,
+           ra.ImagenUrl AS BreakdownImageData,
+           -- Aliases camelCase
+           ot.OrdenTrabajoId AS WorkOrderId,
+           ot.CodigoActivo AS AssetCode,
+           ot.NombreActivo AS AssetName,
+           ot.Descripcion AS Description,
+           ot.Estado AS Status,
+           ot.Prioridad AS Priority
       FROM dbo.OrdenTrabajo ot
       LEFT JOIN dbo.ReporteAveria ra ON ot.ReporteId = ra.ReporteId
-     WHERE ot.Estado IN ('pending', 'inProgress', 'in_progress', 'paused')
+     WHERE ot.Estado IN ('pending', 'inProgress', 'paused', 'reviewPending')
      ORDER BY CASE ot.Prioridad WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
               ot.CreadoEn ASC;
 END;
@@ -4482,26 +3132,7 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        SET @AssetCode = NULLIF(LTRIM(RTRIM(@AssetCode)), N'');
-        SET @AreaId = NULLIF(LTRIM(RTRIM(@AreaId)), N'');
-        SET @AreaName = NULLIF(LTRIM(RTRIM(@AreaName)), N'');
-
-        -- Auto-resolución de Área si viene vacía pero viene el activo
-        IF @AreaId IS NULL AND @AssetCode IS NOT NULL
-        BEGIN
-            SELECT @AreaId = a.AreaId,
-                   @AreaName = COALESCE(@AreaName, ar.Nombre)
-              FROM dbo.Activo a
-              LEFT JOIN dbo.Area ar ON ar.AreaId = a.AreaId
-             WHERE a.CodigoActivo = @AssetCode;
-        END;
-
-        IF @AreaName IS NULL AND @AreaId IS NOT NULL
-        BEGIN
-            SELECT @AreaName = Nombre FROM dbo.Area WHERE AreaId = @AreaId;
-        END;
-
-        IF @AssetCode IS NOT NULL
+        IF NULLIF(@AssetCode, '') IS NOT NULL
         BEGIN
             DECLARE @OTExistenteId NVARCHAR(20);
             SELECT TOP 1 @OTExistenteId = OrdenTrabajoId
@@ -4516,63 +3147,23 @@ BEGIN
             END;
         END;
 
-        DECLARE @year INT = YEAR(SYSUTCDATETIME());
-        DECLARE @prefix NVARCHAR(10) = CONCAT('OT-', @year, '-');
-
-        -- Obtener el número correlativo máximo real en OrdenTrabajo para el año actual
-        DECLARE @maxNum INT = 0;
-        SELECT @maxNum = ISNULL(MAX(
-            TRY_CAST(SUBSTRING(OrdenTrabajoId, 9, 10) AS INT)
-        ), 0)
-        FROM dbo.OrdenTrabajo WITH (UPDLOCK, HOLDLOCK)
-        WHERE OrdenTrabajoId LIKE @prefix + '%';
-
-        DECLARE @seq INT;
         DECLARE @cCount TABLE (v INT NOT NULL);
+        UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
+           SET SiguienteNumero += 1
+         OUTPUT deleted.SiguienteNumero INTO @cCount(v)
+          WHERE Nombre = 'work_orders';
 
-        -- Sincronizar y avanzar Contador de forma atómica y auto-reparable
-        IF NOT EXISTS (SELECT 1 FROM dbo.Contador WITH (UPDLOCK, HOLDLOCK) WHERE Nombre = 'work_orders')
-        BEGIN
-            SET @seq = @maxNum + 1;
-            INSERT INTO dbo.Contador (Nombre, SiguienteNumero) VALUES ('work_orders', @seq + 1);
-        END
-        ELSE
-        BEGIN
-            UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
-               SET SiguienteNumero = CASE 
-                   WHEN SiguienteNumero <= @maxNum THEN @maxNum + 2
-                   ELSE SiguienteNumero + 1
-               END
-             OUTPUT deleted.SiguienteNumero INTO @cCount(v)
-              WHERE Nombre = 'work_orders';
-
-            SELECT @seq = v FROM @cCount;
-            IF @seq <= @maxNum
-            BEGIN
-                SET @seq = @maxNum + 1;
-            END;
-        END;
-
-        DECLARE @woId NVARCHAR(20) = CONCAT(@prefix, FORMAT(@seq, '0000'));
-
-        -- Bucle de seguridad anti-colisión estricto
-        WHILE EXISTS (SELECT 1 FROM dbo.OrdenTrabajo WHERE OrdenTrabajoId = @woId)
-        BEGIN
-            SET @seq += 1;
-            SET @woId = CONCAT(@prefix, FORMAT(@seq, '0000'));
-            UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
-               SET SiguienteNumero = @seq + 1
-             WHERE Nombre = 'work_orders';
-        END;
+        DECLARE @seq INT; SELECT @seq = v FROM @cCount;
+        DECLARE @woId NVARCHAR(20) = CONCAT('OT-', YEAR(SYSUTCDATETIME()), '-', FORMAT(@seq, '0000'));
 
         INSERT INTO dbo.OrdenTrabajo
             (OrdenTrabajoId, CodigoActivo, NombreActivo, AreaId, NombreArea, Descripcion,
              Estado, Prioridad, AsignadoA, CantidadPersonalAsignado, HorasEstimadas,
              FechaProgramada, ReporteId, CreadoPorUsuarioId, CreadoPorNombreUsuario, CreadoEn)
         VALUES
-            (@woId, @AssetCode, @AssetName, @AreaId, @AreaName, @Description,
+            (@woId, NULLIF(@AssetCode, ''), @AssetName, @AreaId, @AreaName, @Description,
              'pending', @Priority, @AssignedTo, @AssignedStaffCount, @EstimatedHours,
-             @ScheduledDate, @ReportId, @CreatedByUserId, COALESCE(NULLIF(LTRIM(RTRIM(@CreatedByUserName)), N''), N'SISTEMA'), SYSUTCDATETIME());
+             @ScheduledDate, @ReportId, @CreatedByUserId, @CreatedByUserName, SYSUTCDATETIME());
 
         INSERT INTO dbo.MaterialOrdenTrabajo (OrdenTrabajoId, NumeroLinea, Descripcion, Cantidad, Unidad)
         SELECT @woId, ROW_NUMBER() OVER (ORDER BY NumeroLinea), Descripcion, Cantidad, ISNULL(Unidad, 'pz')
@@ -4589,11 +3180,11 @@ BEGIN
         END;
 
         INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (@CreatedByUserId, COALESCE(NULLIF(LTRIM(RTRIM(@CreatedByUserName)), N''), N'SISTEMA'), 'WORK_ORDER_CREATED', 'WORK_ORDERS', @woId,
+        VALUES (@CreatedByUserId, @CreatedByUserName, 'WORK_ORDER_CREATED', 'WORK_ORDERS', @woId,
                 CONCAT(N'OT creada: ', @woId, N' para ', @AssetName, N' (Prioridad: ', @Priority, N').'));
 
         COMMIT TRANSACTION;
-        SELECT @woId AS WorkOrderId, @woId AS workOrderId, @woId AS id, @woId AS WorkOrderNumber, @woId AS workOrderNumber;
+        SELECT @woId AS WorkOrderId;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -4603,10 +3194,16 @@ END;
 GO
 
 CREATE OR ALTER PROCEDURE dbo.uspOrdenTrabajoActualizarEstado
-    @WorkOrderId NVARCHAR(20),
-    @NewStatus NVARCHAR(15),
-    @UserId INT = NULL,
-    @UserName NVARCHAR(100) = N''
+    @WorkOrderId           NVARCHAR(20),
+    @NewStatus             NVARCHAR(20),
+    @UserId                INT = NULL,
+    @UserName              NVARCHAR(100) = N'',
+    @MotivoPausa           NVARCHAR(500) = NULL,
+    @MotivoReprogramacion  NVARCHAR(500) = NULL,
+    @FechaReprogramacion   DATETIME2(3) = NULL,
+    @HorasReales           DECIMAL(6,2) = NULL,
+    @TrabajoRealizado      NVARCHAR(MAX) = NULL,
+    @Observaciones         NVARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -4614,12 +3211,112 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        UPDATE dbo.OrdenTrabajo
-           SET Estado = @NewStatus
+        DECLARE @EstadoActual NVARCHAR(20);
+        DECLARE @FInicio DATETIME2(3);
+        DECLARE @FUltimaPausa DATETIME2(3);
+        DECLARE @MinPausa INT;
+
+        SELECT @EstadoActual = Estado,
+               @FInicio = FechaInicioReal,
+               @FUltimaPausa = FechaUltimaPausa,
+               @MinPausa = COALESCE(MinutosPausaAcumulados, 0)
+          FROM dbo.OrdenTrabajo
          WHERE OrdenTrabajoId = @WorkOrderId;
 
-        IF @NewStatus = 'completed'
+        IF @EstadoActual IS NULL
         BEGIN
+            RAISERROR(N'La orden de trabajo no existe.', 16, 1);
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END;
+
+        DECLARE @KardexAccion NVARCHAR(50) = 'WORK_ORDER_STATUS_CHANGED';
+        DECLARE @KardexDetalle NVARCHAR(500) = CONCAT(N'Estado de OT ', @WorkOrderId, N' cambiado de ', @EstadoActual, N' a ', @NewStatus, N'.');
+
+        -- Transición: Iniciar o Reanudar ('inProgress')
+        IF @NewStatus = 'inProgress'
+        BEGIN
+            IF @FInicio IS NULL
+            BEGIN
+                -- Primera vez que inicia
+                UPDATE dbo.OrdenTrabajo
+                   SET Estado = 'inProgress',
+                       FechaInicioReal = SYSUTCDATETIME(),
+                       ActualizadoEn = SYSUTCDATETIME()
+                 WHERE OrdenTrabajoId = @WorkOrderId;
+                SET @KardexAccion = 'WORK_ORDER_STARTED';
+                SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' iniciada por técnico ', @UserName, N'.');
+            END
+            ELSE IF @EstadoActual = 'paused' AND @FUltimaPausa IS NOT NULL
+            BEGIN
+                -- Reanudar de pausa: acumular minutos transcurridos en pausa
+                DECLARE @MinPausaTranscurridos INT = DATEDIFF(MINUTE, @FUltimaPausa, SYSUTCDATETIME());
+                IF @MinPausaTranscurridos < 0 SET @MinPausaTranscurridos = 0;
+
+                UPDATE dbo.OrdenTrabajo
+                   SET Estado = 'inProgress',
+                       MinutosPausaAcumulados = @MinPausa + @MinPausaTranscurridos,
+                       FechaUltimaPausa = NULL,
+                       ActualizadoEn = SYSUTCDATETIME()
+                 WHERE OrdenTrabajoId = @WorkOrderId;
+                SET @KardexAccion = 'WORK_ORDER_RESUMED';
+                SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' reanudada por ', @UserName, N'.');
+            END
+            ELSE
+            BEGIN
+                UPDATE dbo.OrdenTrabajo
+                   SET Estado = 'inProgress',
+                       ActualizadoEn = SYSUTCDATETIME()
+                 WHERE OrdenTrabajoId = @WorkOrderId;
+            END;
+        END
+        -- Transición: Pausar ('paused')
+        ELSE IF @NewStatus = 'paused'
+        BEGIN
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = 'paused',
+                   FechaUltimaPausa = SYSUTCDATETIME(),
+                   MotivoPausa = COALESCE(@MotivoPausa, N'Pausa temporal'),
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            SET @KardexAccion = 'WORK_ORDER_PAUSED';
+            SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' pausada por ', @UserName, N'. Motivo: ', COALESCE(@MotivoPausa, N'Sin motivo'));
+        END
+        -- Transición: Enviar a Revisión / Finalizar Técnico ('reviewPending')
+        ELSE IF @NewStatus = 'reviewPending'
+        BEGIN
+            DECLARE @FInicioCalc DATETIME2(3) = COALESCE(@FInicio, SYSUTCDATETIME());
+            DECLARE @MinutosTotales INT = DATEDIFF(MINUTE, @FInicioCalc, SYSUTCDATETIME()) - @MinPausa;
+            IF @MinutosTotales < 1 SET @MinutosTotales = 1;
+
+            DECLARE @HorasCalculadas DECIMAL(6,2) = CAST(ROUND(CAST(@MinutosTotales AS DECIMAL(10,2)) / 60.0, 2) AS DECIMAL(6,2));
+            DECLARE @HorasFinales DECIMAL(6,2) = COALESCE(@HorasReales, @HorasCalculadas);
+
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = 'reviewPending',
+                   FechaFinReal = SYSUTCDATETIME(),
+                   HorasReales = @HorasFinales,
+                   DescripcionTrabajoRealizado = COALESCE(@TrabajoRealizado, @Observaciones, DescripcionTrabajoRealizado),
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            SET @KardexAccion = 'WORK_ORDER_SUBMITTED_FOR_REVIEW';
+            SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' finalizada por técnico ', @UserName, N'. Enviada a revisión (Horas reales: ', CAST(@HorasFinales AS VARCHAR(10)), N'h).');
+        END
+        -- Transición: Aprobar y Cerrar ('completed')
+        ELSE IF @NewStatus = 'completed'
+        BEGIN
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = 'completed',
+                   EstaCompletada = 1,
+                   AprobadoPorUsuarioId = @UserId,
+                   AprobadoPorNombreUsuario = @UserName,
+                   AprobadoEn = SYSUTCDATETIME(),
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            -- Resolver reporte de avería vinculado si aplica
             DECLARE @repId BIGINT;
             SELECT @repId = ReporteId FROM dbo.OrdenTrabajo WHERE OrdenTrabajoId = @WorkOrderId;
             IF @repId IS NOT NULL
@@ -4631,11 +3328,46 @@ BEGIN
                        ResueltoEn = SYSUTCDATETIME()
                  WHERE ReporteId = @repId;
             END;
+
+            SET @KardexAccion = 'WORK_ORDER_APPROVED';
+            SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' aprobada y cerrada definitivamente por ', @UserName, N'.');
+        END
+        -- Transición: Reprogramar ('rescheduled' o 'pending' con nueva fecha)
+        ELSE IF @NewStatus IN ('rescheduled', 'unfulfilled') OR @FechaReprogramacion IS NOT NULL
+        BEGIN
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = @NewStatus,
+                   FechaReprogramacion = COALESCE(@FechaReprogramacion, FechaReprogramacion),
+                   MotivoIncumplimiento = COALESCE(@MotivoReprogramacion, @Observaciones, MotivoIncumplimiento),
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            SET @KardexAccion = 'WORK_ORDER_RESCHEDULED';
+            SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' reprogramada por ', @UserName, N'. Motivo: ', COALESCE(@MotivoReprogramacion, N'Sin motivo'));
+        END
+        -- Cualquier otro cambio genérico (ej. 'cancelled', o reabierta a 'inProgress')
+        ELSE
+        BEGIN
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = @NewStatus,
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            IF @NewStatus = 'cancelled'
+            BEGIN
+                SET @KardexAccion = 'WORK_ORDER_CANCELLED';
+                SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' cancelada por ', @UserName, N'.');
+            END
+            ELSE IF @EstadoActual = 'reviewPending' AND @NewStatus = 'inProgress'
+            BEGIN
+                SET @KardexAccion = 'WORK_ORDER_REOPENED';
+                SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' reabierta con observaciones por ', @UserName, N'.');
+            END;
         END;
 
+        -- Registrar evento en Bitácora Kardex
         INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (@UserId, @UserName, 'WORK_ORDER_STATUS_CHANGED', 'WORK_ORDERS', @WorkOrderId,
-                CONCAT(N'Estado de OT ', @WorkOrderId, N' cambiado a: ', @NewStatus, N'.'));
+        VALUES (@UserId, @UserName, @KardexAccion, 'WORK_ORDERS', @WorkOrderId, @KardexDetalle);
 
         COMMIT TRANSACTION;
     END TRY
@@ -4829,51 +3561,14 @@ BEGIN
             RAISERROR(@MsgPrev, 16, 1);
         END;
 
-        DECLARE @yearPM INT = YEAR(SYSUTCDATETIME());
-        DECLARE @prefixPM NVARCHAR(10) = CONCAT('PM-', @yearPM, '-');
-
-        DECLARE @maxNumPM INT = 0;
-        SELECT @maxNumPM = ISNULL(MAX(
-            TRY_CAST(SUBSTRING(PlanId, 9, 10) AS INT)
-        ), 0)
-        FROM dbo.PlanPreventivo WITH (UPDLOCK, HOLDLOCK)
-        WHERE PlanId LIKE @prefixPM + '%';
-
-        DECLARE @seq INT;
         DECLARE @pCount TABLE (v INT NOT NULL);
+        UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
+           SET SiguienteNumero += 1
+         OUTPUT deleted.SiguienteNumero INTO @pCount(v)
+          WHERE Nombre = 'preventive_schedules';
 
-        IF NOT EXISTS (SELECT 1 FROM dbo.Contador WITH (UPDLOCK, HOLDLOCK) WHERE Nombre = 'preventive_schedules')
-        BEGIN
-            SET @seq = @maxNumPM + 1;
-            INSERT INTO dbo.Contador (Nombre, SiguienteNumero) VALUES ('preventive_schedules', @seq + 1);
-        END
-        ELSE
-        BEGIN
-            UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
-               SET SiguienteNumero = CASE 
-                   WHEN SiguienteNumero <= @maxNumPM THEN @maxNumPM + 2
-                   ELSE SiguienteNumero + 1
-               END
-             OUTPUT deleted.SiguienteNumero INTO @pCount(v)
-              WHERE Nombre = 'preventive_schedules';
-
-            SELECT @seq = v FROM @pCount;
-            IF @seq <= @maxNumPM
-            BEGIN
-                SET @seq = @maxNumPM + 1;
-            END;
-        END;
-
-        DECLARE @pId NVARCHAR(20) = CONCAT(@prefixPM, FORMAT(@seq, '0000'));
-
-        WHILE EXISTS (SELECT 1 FROM dbo.PlanPreventivo WHERE PlanId = @pId)
-        BEGIN
-            SET @seq += 1;
-            SET @pId = CONCAT(@prefixPM, FORMAT(@seq, '0000'));
-            UPDATE dbo.Contador WITH (UPDLOCK, HOLDLOCK)
-               SET SiguienteNumero = @seq + 1
-             WHERE Nombre = 'preventive_schedules';
-        END;
+        DECLARE @seq INT; SELECT @seq = v FROM @pCount;
+        DECLARE @pId NVARCHAR(20) = CONCAT('PM-', YEAR(SYSUTCDATETIME()), '-', FORMAT(@seq, '0000'));
 
         INSERT INTO dbo.PlanPreventivo
             (PlanId, Titulo, CodigoActivo, NombreActivo, AreaId, NombreArea,
@@ -5095,7 +3790,7 @@ BEGIN
                 CONCAT(N'OT Preventiva generada: ', @woId, N' a partir del plan ', @PlanId, N'. Próxima fecha programada: ', CONVERT(NVARCHAR(30), @NewNextDate, 120)));
 
         COMMIT TRANSACTION;
-        SELECT @woId AS WorkOrderId, @woId AS workOrderId, @woId AS id, @woId AS WorkOrderNumber, @woId AS workOrderNumber;
+        SELECT @woId AS WorkOrderId;
     END TRY
     BEGIN CATCH
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -5529,6 +4224,28 @@ BEGIN
 END;
 GO
 
+CREATE OR ALTER PROCEDURE dbo.uspEquipoProcesoListarPorArea
+    @AreaId NVARCHAR(15) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SELECT a.CodigoActivo,
+           a.Nombre,
+           a.Marca,
+           a.Modelo,
+           a.AreaId,
+           ar.Nombre AS NombreArea,
+           a.EsEquipoProceso
+      FROM dbo.Activo a
+      LEFT JOIN dbo.Area ar ON ar.AreaId = a.AreaId
+     WHERE (@AreaId IS NULL OR a.AreaId = @AreaId)
+       AND a.Nivel = 'equipment'
+       AND a.Estado <> 'deleted'
+       AND a.EsEquipoProceso = 1
+     ORDER BY a.CodigoActivo ASC;
+END;
+GO
+
 CREATE OR ALTER PROCEDURE dbo.uspReporteHistorialActivo
     @CodigoActivo NVARCHAR(60),
     @FechaDesde DATETIME2(3) = NULL,
@@ -5775,149 +4492,6 @@ BEGIN
 END;
 GO
 
--- ----------------------------------------------------------------------------
--- MÉTRICAS DE MANTENIMIENTO POR CENTRO DE COSTO Y TIPO
--- ----------------------------------------------------------------------------
-
-CREATE OR ALTER PROCEDURE dbo.uspReporteMantenimientosPorCentroCosto
-    @FechaInicio              DATETIME2(3) = NULL,
-    @FechaFin                 DATETIME2(3) = NULL,
-    @SoloConMantenimiento     BIT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    ;WITH OTMantenimiento AS (
-        SELECT 
-            ot.OrdenTrabajoId,
-            ot.AreaId,
-            ot.Estado,
-            ot.HorasReales,
-            ot.HorasEstimadas,
-            ot.CreadoEn,
-            CASE 
-                WHEN ot.PlanPreventivoId IS NOT NULL OR tt.EsPreventivo = 1 THEN 'preventive'
-                WHEN ot.ReporteId IS NOT NULL OR tt.EsCorrectivo = 1 THEN 'corrective'
-                ELSE COALESCE(tt.PrimerTipo, 'other')
-            END AS TipoMantenimientoPrincipal,
-            ISNULL(tt.EsCorrectivo, CASE WHEN ot.ReporteId IS NOT NULL THEN 1 ELSE 0 END) AS EsCorrectivo,
-            ISNULL(tt.EsPreventivo, CASE WHEN ot.PlanPreventivoId IS NOT NULL THEN 1 ELSE 0 END) AS EsPreventivo,
-            ISNULL(tt.EsPredictivo, 0) AS EsPredictivo,
-            ISNULL(tt.EsMejora, 0) AS EsMejora,
-            ISNULL(tt.EsOtro, 0) AS EsOtro
-        FROM dbo.OrdenTrabajo ot
-        OUTER APPLY (
-            SELECT 
-                MAX(CASE WHEN LOWER(TipoTrabajo) LIKE '%correctiv%' THEN 1 ELSE 0 END) AS EsCorrectivo,
-                MAX(CASE WHEN LOWER(TipoTrabajo) LIKE '%preventiv%' THEN 1 ELSE 0 END) AS EsPreventivo,
-                MAX(CASE WHEN LOWER(TipoTrabajo) LIKE '%predictiv%' THEN 1 ELSE 0 END) AS EsPredictivo,
-                MAX(CASE WHEN LOWER(TipoTrabajo) LIKE '%mejor%' OR LOWER(TipoTrabajo) LIKE '%improvement%' THEN 1 ELSE 0 END) AS EsMejora,
-                MAX(CASE WHEN LOWER(TipoTrabajo) NOT LIKE '%correctiv%' AND LOWER(TipoTrabajo) NOT LIKE '%preventiv%' THEN 1 ELSE 0 END) AS EsOtro,
-                MIN(TipoTrabajo) AS PrimerTipo
-            FROM dbo.TipoTrabajoOrdenTrabajo
-            WHERE OrdenTrabajoId = ot.OrdenTrabajoId
-        ) tt
-        WHERE (@FechaInicio IS NULL OR ot.CreadoEn >= @FechaInicio)
-          AND (@FechaFin IS NULL OR ot.CreadoEn <= @FechaFin)
-    )
-    SELECT 
-        ar.CentroCosto                                                          AS costCenter,
-        ar.CentroCosto,
-        ar.AreaId                                                               AS areaId,
-        ar.AreaId,
-        ar.Nombre                                                               AS areaName,
-        ar.Nombre,
-        COUNT(m.OrdenTrabajoId)                                                 AS totalMaintenance,
-        COUNT(m.OrdenTrabajoId)                                                 AS TotalMantenimientos,
-        SUM(CASE WHEN m.Estado = 'completed' THEN 1 ELSE 0 END)                 AS completed,
-        SUM(CASE WHEN m.Estado = 'completed' THEN 1 ELSE 0 END)                 AS Completados,
-        SUM(CASE WHEN m.Estado IN ('pending', 'inProgress', 'in_progress', 'paused') THEN 1 ELSE 0 END) AS inProgress,
-        SUM(CASE WHEN m.Estado IN ('pending', 'inProgress', 'in_progress', 'paused') THEN 1 ELSE 0 END) AS EnProceso,
-        SUM(CASE WHEN m.Estado = 'cancelled' THEN 1 ELSE 0 END)                 AS cancelled,
-        SUM(CASE WHEN m.Estado = 'cancelled' THEN 1 ELSE 0 END)                 AS Canceladas,
-        SUM(CASE WHEN m.EsCorrectivo = 1 THEN 1 ELSE 0 END)                     AS corrective,
-        SUM(CASE WHEN m.EsCorrectivo = 1 THEN 1 ELSE 0 END)                     AS Correctivos,
-        SUM(CASE WHEN m.EsPreventivo = 1 THEN 1 ELSE 0 END)                     AS preventive,
-        SUM(CASE WHEN m.EsPreventivo = 1 THEN 1 ELSE 0 END)                     AS Preventivos,
-        SUM(CASE WHEN m.EsPredictivo = 1 THEN 1 ELSE 0 END)                     AS predictive,
-        SUM(CASE WHEN m.EsPredictivo = 1 THEN 1 ELSE 0 END)                     AS Predictivos,
-        SUM(CASE WHEN m.EsMejora = 1 THEN 1 ELSE 0 END)                         AS improvement,
-        SUM(CASE WHEN m.EsMejora = 1 THEN 1 ELSE 0 END)                         AS Mejoras,
-        SUM(CASE WHEN (m.EsOtro = 1 AND m.EsCorrectivo = 0 AND m.EsPreventivo = 0) THEN 1 ELSE 0 END) AS otherTypes,
-        SUM(CASE WHEN (m.EsOtro = 1 AND m.EsCorrectivo = 0 AND m.EsPreventivo = 0) THEN 1 ELSE 0 END) AS OtrosTipos,
-        CAST(ISNULL(SUM(m.HorasReales), 0) AS DECIMAL(10, 2))                   AS totalRealHours,
-        CAST(ISNULL(SUM(m.HorasReales), 0) AS DECIMAL(10, 2))                   AS HorasRealesTotales,
-        CAST(ISNULL(SUM(m.HorasEstimadas), 0) AS DECIMAL(10, 2))                AS totalEstimatedHours
-    FROM dbo.Area ar
-    LEFT JOIN OTMantenimiento m ON m.AreaId = ar.AreaId
-    WHERE (@SoloConMantenimiento = 0 OR m.OrdenTrabajoId IS NOT NULL)
-    GROUP BY ar.CentroCosto, ar.AreaId, ar.Nombre
-    ORDER BY TotalMantenimientos DESC, ar.CentroCosto ASC;
-END;
-GO
-
-CREATE OR ALTER PROCEDURE dbo.uspReporteMantenimientosPorCentroCostoDetalle
-    @CentroCosto              NVARCHAR(50) = NULL,
-    @AreaId                   NVARCHAR(15) = NULL,
-    @FechaInicio              DATETIME2(3) = NULL,
-    @FechaFin                 DATETIME2(3) = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    SELECT 
-        ot.OrdenTrabajoId                                      AS workOrderId,
-        ot.OrdenTrabajoId,
-        ot.CodigoActivo                                        AS assetCode,
-        ot.CodigoActivo,
-        ot.NombreActivo                                        AS assetName,
-        ot.NombreActivo,
-        ar.AreaId                                              AS areaId,
-        ar.AreaId,
-        ar.Nombre                                              AS areaName,
-        ar.Nombre                                              AS NombreArea,
-        ar.CentroCosto                                         AS costCenter,
-        ar.CentroCosto,
-        ot.Descripcion                                         AS description,
-        ot.Descripcion,
-        ot.Estado                                              AS status,
-        ot.Estado,
-        ot.Prioridad                                           AS priority,
-        ot.Prioridad,
-        ot.AsignadoA                                           AS assignedTo,
-        ot.AsignadoA,
-        ot.HorasEstimadas                                      AS estimatedHours,
-        ot.HorasReales                                         AS actualHours,
-        ot.CreadoEn                                            AS createdAt,
-        ot.CreadoEn,
-        ot.FechaProgramada                                     AS scheduledDate,
-        ot.ReporteId                                           AS reportId,
-        ot.PlanPreventivoId                                    AS preventiveScheduleId,
-        CASE 
-            WHEN ot.PlanPreventivoId IS NOT NULL OR tt.EsPreventivo = 1 THEN 'preventive'
-            WHEN ot.ReporteId IS NOT NULL OR tt.EsCorrectivo = 1 THEN 'corrective'
-            ELSE COALESCE(tt.PrimerTipo, 'other')
-        END AS mainMaintenanceType,
-        tt.TiposTrabajoConcatenados AS workTypesText
-    FROM dbo.OrdenTrabajo ot
-    INNER JOIN dbo.Area ar ON ar.AreaId = ot.AreaId
-    OUTER APPLY (
-        SELECT 
-            MAX(CASE WHEN LOWER(TipoTrabajo) LIKE '%correctiv%' THEN 1 ELSE 0 END) AS EsCorrectivo,
-            MAX(CASE WHEN LOWER(TipoTrabajo) LIKE '%preventiv%' THEN 1 ELSE 0 END) AS EsPreventivo,
-            MIN(TipoTrabajo) AS PrimerTipo,
-            STRING_AGG(TipoTrabajo, ', ') AS TiposTrabajoConcatenados
-        FROM dbo.TipoTrabajoOrdenTrabajo
-        WHERE OrdenTrabajoId = ot.OrdenTrabajoId
-    ) tt
-    WHERE (@CentroCosto IS NULL OR UPPER(LTRIM(RTRIM(ar.CentroCosto))) = UPPER(LTRIM(RTRIM(@CentroCosto))))
-      AND (@AreaId IS NULL OR ar.AreaId = @AreaId)
-      AND (@FechaInicio IS NULL OR ot.CreadoEn >= @FechaInicio)
-      AND (@FechaFin IS NULL OR ot.CreadoEn <= @FechaFin)
-    ORDER BY ot.CreadoEn DESC;
-END;
-GO
-
 CREATE OR ALTER PROCEDURE dbo.uspActualizacionAndroidObtener
 AS
 BEGIN
@@ -5989,11 +4563,12 @@ BEGIN TRY
     VALUES
         (N'admin',      N'Administrador General'),
         (N'jefe',       N'Jefe de Mantenimiento'),
+        (N'tecnico',    N'Personal de Mantenimiento'),
         (N'jefe_area',  N'Jefe de Área / Operaciones'),
         (N'reportador', N'Supervisor (Reportador)'),
         (N'lector',     N'Gerente (Solo Lectura / Auditoría)');
 
-    -- 20.2 Catálogo de Permisos Granulares (20 Permisos)
+    -- 20.2 Catálogo de Permisos Granulares (22 Permisos)
     INSERT INTO dbo.Permiso (CodigoPermiso)
     VALUES
         (N'dashboard.view'),
@@ -6005,6 +4580,8 @@ BEGIN TRY
         (N'asset.delete.approve'),
         (N'work_order.view'),
         (N'work_order.create'),
+        (N'work_order.execute'),
+        (N'work_order.approve'),
         (N'work_order.print'),
         (N'preventive.view'),
         (N'preventive.manage'),
@@ -6033,6 +4610,8 @@ BEGIN TRY
         (N'jefe', N'asset.delete.request'),
         (N'jefe', N'work_order.view'),
         (N'jefe', N'work_order.create'),
+        (N'jefe', N'work_order.execute'),
+        (N'jefe', N'work_order.approve'),
         (N'jefe', N'work_order.print'),
         (N'jefe', N'preventive.view'),
         (N'jefe', N'preventive.manage'),
@@ -6043,6 +4622,16 @@ BEGIN TRY
         (N'jefe', N'operation_report.edit'),
         (N'jefe', N'kardex.view'),
         (N'jefe', N'employee.manage');
+
+    -- tecnico: Ejecución y Reporte Técnico en Campo
+    INSERT INTO dbo.RolPermiso (CodigoRol, CodigoPermiso)
+    VALUES
+        (N'tecnico', N'asset.view'),
+        (N'tecnico', N'work_order.view'),
+        (N'tecnico', N'work_order.execute'),
+        (N'tecnico', N'work_order.print'),
+        (N'tecnico', N'breakdown.report'),
+        (N'tecnico', N'breakdown.view');
 
     -- jefe_area: Operaciones y Supervisión Local
     INSERT INTO dbo.RolPermiso (CodigoRol, CodigoPermiso)
@@ -6132,88 +4721,6 @@ BEGIN TRY
         (N'Supervisor de Producción',             0, 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
         (N'Gerente General',                      0, 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
         (N'Gerente de Operaciones',               0, 1, SYSUTCDATETIME(), SYSUTCDATETIME());
-
-    -- 20.6.1 Catálogo Inicial de Unidades de Medida
-    IF NOT EXISTS (SELECT 1 FROM dbo.UnidadMedida)
-    BEGIN
-        INSERT INTO dbo.UnidadMedida (Codigo, Nombre, Activo, CreadoEn, ActualizadoEn)
-        VALUES
-            (N'kW',    N'Kilovatios',                  1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'HP',    N'Caballos de fuerza',          1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'V',     N'Voltios',                     1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'A',     N'Amperios',                    1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'PSI',   N'Libras por pulgada cuadrada', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'bar',   N'Bar',                         1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'RPM',   N'Revoluciones por minuto',     1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Hz',    N'Hertz',                       1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'°C',    N'Grados Celsius',              1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'°F',    N'Grados Fahrenheit',           1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'BTU/h', N'BTU por hora',                1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'TR',    N'Toneladas de refrigeración',  1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'CFM',   N'Pies cúbicos por minuto',     1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'm³/h',  N'Metros cúbicos por hora',     1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'GPM',   N'Galones por minuto',          1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'L',     N'Litros',                      1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'kg',    N'Kilogramos',                  1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'lb',    N'Libras',                      1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'm',     N'Metros',                      1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'mm',    N'Milímetros',                  1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'pulg',  N'Pulgadas',                    1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'kVA',   N'Kilovoltiamperios',           1, SYSUTCDATETIME(), SYSUTCDATETIME());
-    END;
-
-    -- 20.6.2 Catálogo Inicial de Atributos Técnicos
-    IF NOT EXISTS (SELECT 1 FROM dbo.AtributoCatalogo)
-    BEGIN
-        DECLARE @uKW INT  = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'kW');
-        DECLARE @uV  INT  = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'V');
-        DECLARE @uA  INT  = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'A');
-        DECLARE @uHz INT  = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'Hz');
-        DECLARE @uPSI INT = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'PSI');
-        DECLARE @uBTU INT = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'BTU/h');
-        DECLARE @uRPM INT = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'RPM');
-        DECLARE @uC   INT = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'°C');
-        DECLARE @uCFM INT = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'CFM');
-        DECLARE @uKG  INT = (SELECT TOP 1 UnidadMedidaId FROM dbo.UnidadMedida WHERE Codigo = N'kg');
-
-        INSERT INTO dbo.AtributoCatalogo (Nombre, Descripcion, UnidadMedidaIdDefecto, Activo, CreadoEn, ActualizadoEn)
-        VALUES
-            (N'Potencia',                    N'Potencia nominal del activo o motor',                  @uKW,  1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Voltaje',                     N'Tensión eléctrica de operación',                       @uV,   1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Corriente / Amperaje',        N'Consumo de corriente nominal',                         @uA,   1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Frecuencia',                  N'Frecuencia eléctrica nominal',                         @uHz,  1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Presión de Trabajo',          N'Presión operativa o de descarga',                      @uPSI, 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Capacidad Térmica',           N'Capacidad de enfriamiento / calefacción',              @uBTU, 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Velocidad de Giro',           N'Velocidad angular de rotación',                        @uRPM, 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Temperatura Máxima',          N'Límite térmico admisible',                             @uC,   1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Caudal de Aire / Fluido',     N'Flujo volumétrico nominal',                            @uCFM, 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Peso',                        N'Peso neto del equipo',                                 @uKG,  1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Tipo de Refrigerante',        N'Gas refrigerante utilizado (R-410A, R-134a, R-22...)', NULL,  1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Tipo de Lubricante / Aceite', N'Aceite o grasa recomendada para mantenimiento',        NULL,  1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Número de Fases',             N'Monofásico (1F), Bifásico (2F) o Trifásico (3F)',      NULL,  1, SYSUTCDATETIME(), SYSUTCDATETIME());
-    END;
-
-    -- 20.6.3 Catálogo de Marcas Inicial
-    IF NOT EXISTS (SELECT 1 FROM dbo.Marca)
-    BEGIN
-        INSERT INTO dbo.Marca (Nombre, Descripcion, Activo, CreadoEn, ActualizadoEn)
-        VALUES
-            (N'Siemens',              N'Equipos eléctricos, automatización, motores y variadores', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'ABB',                  N'Robótica, potencia, motores y accionamientos industriales', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Schneider Electric',   N'Tableros eléctricos, arrancadores y protecciones', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Danfoss',              N'Compresores, variadores de frecuencia y válvulas', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Caterpillar',          N'Generadores y motores diésel industriales', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Baldor',               N'Motores eléctricos industriales y reductores', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'WEG',                  N'Motores eléctricos, arrancadores y transformadores', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'York',                 N'Chillers, compresores y sistemas de refrigeración', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Carrier',              N'Sistemas de climatización y cuartos fríos', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Hobart',               N'Maquinaria de corte, empaque y procesamiento', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Mettler Toledo',       N'Básculas industriales, pesadoras y celdas de carga', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Festo',                N'Componentes y actuadores neumáticos industriales', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'SEW-Eurodrive',        N'Motorreductores y variadores mecánicos', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Ingersoll Rand',       N'Compresores de aire y bombas industriales', 1, SYSUTCDATETIME(), SYSUTCDATETIME()),
-            (N'Graco',                N'Bombas y sistemas de lubricación/fluido industrial', 1, SYSUTCDATETIME(), SYSUTCDATETIME());
-    END;
 
     -- 20.7 Empleado Administrador Oficial: Nixon Manuel Mendez Galo
     DECLARE @PuestoDevId INT;

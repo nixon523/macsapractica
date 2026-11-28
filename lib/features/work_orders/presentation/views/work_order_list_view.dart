@@ -953,8 +953,12 @@ class _CleanWorkOrderCard extends StatelessWidget {
     return switch (status) {
       WorkOrderStatus.pending => const Color(0xFFD97706), // Ámbar
       WorkOrderStatus.inProgress => const Color(0xFF0055A5), // Macsa Blue
+      WorkOrderStatus.paused => const Color(0xFFE65100), // Naranja oscuro
+      WorkOrderStatus.reviewPending => const Color(0xFF7C3AED), // Púrpura
       WorkOrderStatus.completed => const Color(0xFF059669), // Verde
       WorkOrderStatus.cancelled => const Color(0xFF64748B), // Pizarra
+      WorkOrderStatus.unfulfilled => const Color(0xFFDC2626), // Rojo
+      WorkOrderStatus.rescheduled => const Color(0xFF0284C7), // Azul cielo
     };
   }
 
@@ -962,8 +966,12 @@ class _CleanWorkOrderCard extends StatelessWidget {
     return switch (status) {
       WorkOrderStatus.pending => 'Pendiente',
       WorkOrderStatus.inProgress => 'En Progreso',
+      WorkOrderStatus.paused => 'Pausada',
+      WorkOrderStatus.reviewPending => 'Por Validar',
       WorkOrderStatus.completed => 'Completada',
       WorkOrderStatus.cancelled => 'Cancelada',
+      WorkOrderStatus.unfulfilled => 'No Cumplida',
+      WorkOrderStatus.rescheduled => 'Reprogramada',
     };
   }
 

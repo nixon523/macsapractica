@@ -77,12 +77,24 @@ class WorkOrderRepositoryImpl implements WorkOrderRepository {
     required WorkOrderStatus status,
     required String userId,
     required String userName,
+    String? motivoPausa,
+    String? motivoReprogramacion,
+    DateTime? fechaReprogramacion,
+    double? horasReales,
+    String? trabajoRealizado,
+    String? observaciones,
   }) {
     return _remoteDataSource.updateStatus(
       workOrderId: workOrderId,
       status: status,
       userId: userId,
       userName: userName,
+      motivoPausa: motivoPausa,
+      motivoReprogramacion: motivoReprogramacion,
+      fechaReprogramacion: fechaReprogramacion,
+      horasReales: horasReales,
+      trabajoRealizado: trabajoRealizado,
+      observaciones: observaciones,
     );
   }
 

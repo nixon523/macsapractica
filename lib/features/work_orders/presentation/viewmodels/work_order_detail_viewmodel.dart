@@ -30,6 +30,12 @@ class WorkOrderDetailViewModel extends ChangeNotifier {
     required WorkOrderStatus status,
     required String userId,
     required String userName,
+    String? motivoPausa,
+    String? motivoReprogramacion,
+    DateTime? fechaReprogramacion,
+    double? horasReales,
+    String? trabajoRealizado,
+    String? observaciones,
   }) async {
     _isProcessing = true;
     _errorMessage = '';
@@ -42,6 +48,12 @@ class WorkOrderDetailViewModel extends ChangeNotifier {
           status: status,
           userId: userId,
           userName: userName,
+          motivoPausa: motivoPausa,
+          motivoReprogramacion: motivoReprogramacion,
+          fechaReprogramacion: fechaReprogramacion,
+          horasReales: horasReales,
+          trabajoRealizado: trabajoRealizado,
+          observaciones: observaciones,
         ),
       );
 

@@ -201,7 +201,7 @@ END;
 GO
 
 CREATE OR ALTER PROCEDURE dbo.uspOrdenTrabajoObtenerTodas
-    @StatusFilter   NVARCHAR(15) = NULL,
+    @StatusFilter   NVARCHAR(20) = NULL,
     @AreaFilter     NVARCHAR(15) = NULL,
     @PriorityFilter NVARCHAR(10) = NULL,
     @Limit          INT = NULL,
@@ -236,9 +236,18 @@ BEGIN
            ot.CreadoPorUsuarioId AS CreatedByUserId,
            ot.CreadoPorNombreUsuario AS CreatedByUserName,
            ot.CreadoEn AS CreatedAt,
+           ot.FechaInicioReal,
+           ot.FechaFinReal,
+           ot.MinutosPausaAcumulados,
+           ot.FechaUltimaPausa,
+           ot.MotivoPausa,
+           ot.AprobadoPorUsuarioId,
+           ot.AprobadoPorNombreUsuario,
+           ot.AprobadoEn,
            ra.ImagenUrl AS BreakdownImageData,
            m.MaterialsJson,
            t.WorkTypesCsv,
+           -- Aliases de compatibilidad directa
            ot.OrdenTrabajoId,
            ot.CodigoActivo,
            ot.NombreActivo,
@@ -255,26 +264,26 @@ BEGIN
       FROM dbo.OrdenTrabajo ot
       LEFT JOIN dbo.Area ar ON ot.AreaId = ar.AreaId
       LEFT JOIN dbo.ReporteAveria ra ON ot.ReporteId = ra.ReporteId
-     OUTER APPLY (
-         SELECT (
-             SELECT NumeroLinea AS LineNum, Descripcion AS Description, Cantidad AS Quantity, Unidad AS Unit
-               FROM dbo.MaterialOrdenTrabajo
-              WHERE OrdenTrabajoId = ot.OrdenTrabajoId
-              ORDER BY NumeroLinea
-                FOR JSON PATH
-         ) AS MaterialsJson
-     ) m
-     OUTER APPLY (
-         SELECT STRING_AGG(TipoTrabajo, ',') AS WorkTypesCsv
-           FROM dbo.TipoTrabajoOrdenTrabajo
-          WHERE OrdenTrabajoId = ot.OrdenTrabajoId
-     ) t
+      OUTER APPLY (
+          SELECT (
+              SELECT NumeroLinea AS lineNum, Descripcion AS description, Cantidad AS quantity, Unidad AS unit
+                FROM dbo.MaterialOrdenTrabajo
+               WHERE OrdenTrabajoId = ot.OrdenTrabajoId
+               ORDER BY NumeroLinea ASC
+                 FOR JSON PATH
+          ) AS MaterialsJson
+      ) m
+      OUTER APPLY (
+          SELECT STRING_AGG(TipoTrabajo, ',') AS WorkTypesCsv
+            FROM dbo.TipoTrabajoOrdenTrabajo
+           WHERE OrdenTrabajoId = ot.OrdenTrabajoId
+      ) t
      WHERE (@StatusFilter IS NULL OR ot.Estado = @StatusFilter)
-       AND (@AreaFilter   IS NULL OR ot.AreaId = @AreaFilter)
+       AND (@AreaFilter IS NULL OR ot.AreaId = @AreaFilter)
        AND (@PriorityFilter IS NULL OR ot.Prioridad = @PriorityFilter)
      ORDER BY ot.CreadoEn DESC
-     OFFSET @Offset ROWS
-     FETCH NEXT CASE WHEN @Limit IS NULL OR @Limit <= 0 THEN 2147483647 ELSE @Limit END ROWS ONLY;
+    OFFSET @Offset ROWS
+    FETCH NEXT COALESCE(@Limit, 5000) ROWS ONLY;
 END;
 GO
 
@@ -307,10 +316,25 @@ BEGIN
            ot.CreadoPorUsuarioId,
            ot.CreadoPorNombreUsuario,
            ot.CreadoEn,
-           ra.ImagenUrl AS BreakdownImageData
+           ot.FechaInicioReal,
+           ot.FechaFinReal,
+           ot.MinutosPausaAcumulados,
+           ot.FechaUltimaPausa,
+           ot.MotivoPausa,
+           ot.AprobadoPorUsuarioId,
+           ot.AprobadoPorNombreUsuario,
+           ot.AprobadoEn,
+           ra.ImagenUrl AS BreakdownImageData,
+           -- Aliases camelCase
+           ot.OrdenTrabajoId AS WorkOrderId,
+           ot.CodigoActivo AS AssetCode,
+           ot.NombreActivo AS AssetName,
+           ot.Descripcion AS Description,
+           ot.Estado AS Status,
+           ot.Prioridad AS Priority
       FROM dbo.OrdenTrabajo ot
       LEFT JOIN dbo.ReporteAveria ra ON ot.ReporteId = ra.ReporteId
-     WHERE ot.Estado IN ('pending', 'inProgress', 'in_progress', 'paused')
+     WHERE ot.Estado IN ('pending', 'inProgress', 'paused', 'reviewPending')
      ORDER BY CASE ot.Prioridad WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
               ot.CreadoEn ASC;
 END;
@@ -401,10 +425,16 @@ END;
 GO
 
 CREATE OR ALTER PROCEDURE dbo.uspOrdenTrabajoActualizarEstado
-    @WorkOrderId NVARCHAR(20),
-    @NewStatus NVARCHAR(15),
-    @UserId INT = NULL,
-    @UserName NVARCHAR(100) = N''
+    @WorkOrderId           NVARCHAR(20),
+    @NewStatus             NVARCHAR(20),
+    @UserId                INT = NULL,
+    @UserName              NVARCHAR(100) = N'',
+    @MotivoPausa           NVARCHAR(500) = NULL,
+    @MotivoReprogramacion  NVARCHAR(500) = NULL,
+    @FechaReprogramacion   DATETIME2(3) = NULL,
+    @HorasReales           DECIMAL(6,2) = NULL,
+    @TrabajoRealizado      NVARCHAR(MAX) = NULL,
+    @Observaciones         NVARCHAR(MAX) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -412,12 +442,112 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        UPDATE dbo.OrdenTrabajo
-           SET Estado = @NewStatus
+        DECLARE @EstadoActual NVARCHAR(20);
+        DECLARE @FInicio DATETIME2(3);
+        DECLARE @FUltimaPausa DATETIME2(3);
+        DECLARE @MinPausa INT;
+
+        SELECT @EstadoActual = Estado,
+               @FInicio = FechaInicioReal,
+               @FUltimaPausa = FechaUltimaPausa,
+               @MinPausa = COALESCE(MinutosPausaAcumulados, 0)
+          FROM dbo.OrdenTrabajo
          WHERE OrdenTrabajoId = @WorkOrderId;
 
-        IF @NewStatus = 'completed'
+        IF @EstadoActual IS NULL
         BEGIN
+            RAISERROR(N'La orden de trabajo no existe.', 16, 1);
+            ROLLBACK TRANSACTION;
+            RETURN;
+        END;
+
+        DECLARE @KardexAccion NVARCHAR(50) = 'WORK_ORDER_STATUS_CHANGED';
+        DECLARE @KardexDetalle NVARCHAR(500) = CONCAT(N'Estado de OT ', @WorkOrderId, N' cambiado de ', @EstadoActual, N' a ', @NewStatus, N'.');
+
+        -- Transición: Iniciar o Reanudar ('inProgress')
+        IF @NewStatus = 'inProgress'
+        BEGIN
+            IF @FInicio IS NULL
+            BEGIN
+                -- Primera vez que inicia
+                UPDATE dbo.OrdenTrabajo
+                   SET Estado = 'inProgress',
+                       FechaInicioReal = SYSUTCDATETIME(),
+                       ActualizadoEn = SYSUTCDATETIME()
+                 WHERE OrdenTrabajoId = @WorkOrderId;
+                SET @KardexAccion = 'WORK_ORDER_STARTED';
+                SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' iniciada por técnico ', @UserName, N'.');
+            END
+            ELSE IF @EstadoActual = 'paused' AND @FUltimaPausa IS NOT NULL
+            BEGIN
+                -- Reanudar de pausa: acumular minutos transcurridos en pausa
+                DECLARE @MinPausaTranscurridos INT = DATEDIFF(MINUTE, @FUltimaPausa, SYSUTCDATETIME());
+                IF @MinPausaTranscurridos < 0 SET @MinPausaTranscurridos = 0;
+
+                UPDATE dbo.OrdenTrabajo
+                   SET Estado = 'inProgress',
+                       MinutosPausaAcumulados = @MinPausa + @MinPausaTranscurridos,
+                       FechaUltimaPausa = NULL,
+                       ActualizadoEn = SYSUTCDATETIME()
+                 WHERE OrdenTrabajoId = @WorkOrderId;
+                SET @KardexAccion = 'WORK_ORDER_RESUMED';
+                SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' reanudada por ', @UserName, N'.');
+            END
+            ELSE
+            BEGIN
+                UPDATE dbo.OrdenTrabajo
+                   SET Estado = 'inProgress',
+                       ActualizadoEn = SYSUTCDATETIME()
+                 WHERE OrdenTrabajoId = @WorkOrderId;
+            END;
+        END
+        -- Transición: Pausar ('paused')
+        ELSE IF @NewStatus = 'paused'
+        BEGIN
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = 'paused',
+                   FechaUltimaPausa = SYSUTCDATETIME(),
+                   MotivoPausa = COALESCE(@MotivoPausa, N'Pausa temporal'),
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            SET @KardexAccion = 'WORK_ORDER_PAUSED';
+            SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' pausada por ', @UserName, N'. Motivo: ', COALESCE(@MotivoPausa, N'Sin motivo'));
+        END
+        -- Transición: Enviar a Revisión / Finalizar Técnico ('reviewPending')
+        ELSE IF @NewStatus = 'reviewPending'
+        BEGIN
+            DECLARE @FInicioCalc DATETIME2(3) = COALESCE(@FInicio, SYSUTCDATETIME());
+            DECLARE @MinutosTotales INT = DATEDIFF(MINUTE, @FInicioCalc, SYSUTCDATETIME()) - @MinPausa;
+            IF @MinutosTotales < 1 SET @MinutosTotales = 1;
+
+            DECLARE @HorasCalculadas DECIMAL(6,2) = CAST(ROUND(CAST(@MinutosTotales AS DECIMAL(10,2)) / 60.0, 2) AS DECIMAL(6,2));
+            DECLARE @HorasFinales DECIMAL(6,2) = COALESCE(@HorasReales, @HorasCalculadas);
+
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = 'reviewPending',
+                   FechaFinReal = SYSUTCDATETIME(),
+                   HorasReales = @HorasFinales,
+                   DescripcionTrabajoRealizado = COALESCE(@TrabajoRealizado, @Observaciones, DescripcionTrabajoRealizado),
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            SET @KardexAccion = 'WORK_ORDER_SUBMITTED_FOR_REVIEW';
+            SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' finalizada por técnico ', @UserName, N'. Enviada a revisión (Horas reales: ', CAST(@HorasFinales AS VARCHAR(10)), N'h).');
+        END
+        -- Transición: Aprobar y Cerrar ('completed')
+        ELSE IF @NewStatus = 'completed'
+        BEGIN
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = 'completed',
+                   EstaCompletada = 1,
+                   AprobadoPorUsuarioId = @UserId,
+                   AprobadoPorNombreUsuario = @UserName,
+                   AprobadoEn = SYSUTCDATETIME(),
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            -- Resolver reporte de avería vinculado si aplica
             DECLARE @repId BIGINT;
             SELECT @repId = ReporteId FROM dbo.OrdenTrabajo WHERE OrdenTrabajoId = @WorkOrderId;
             IF @repId IS NOT NULL
@@ -429,11 +559,46 @@ BEGIN
                        ResueltoEn = SYSUTCDATETIME()
                  WHERE ReporteId = @repId;
             END;
+
+            SET @KardexAccion = 'WORK_ORDER_APPROVED';
+            SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' aprobada y cerrada definitivamente por ', @UserName, N'.');
+        END
+        -- Transición: Reprogramar ('rescheduled' o 'pending' con nueva fecha)
+        ELSE IF @NewStatus IN ('rescheduled', 'unfulfilled') OR @FechaReprogramacion IS NOT NULL
+        BEGIN
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = @NewStatus,
+                   FechaReprogramacion = COALESCE(@FechaReprogramacion, FechaReprogramacion),
+                   MotivoIncumplimiento = COALESCE(@MotivoReprogramacion, @Observaciones, MotivoIncumplimiento),
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            SET @KardexAccion = 'WORK_ORDER_RESCHEDULED';
+            SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' reprogramada por ', @UserName, N'. Motivo: ', COALESCE(@MotivoReprogramacion, N'Sin motivo'));
+        END
+        -- Cualquier otro cambio genérico (ej. 'cancelled', o reabierta a 'inProgress')
+        ELSE
+        BEGIN
+            UPDATE dbo.OrdenTrabajo
+               SET Estado = @NewStatus,
+                   ActualizadoEn = SYSUTCDATETIME()
+             WHERE OrdenTrabajoId = @WorkOrderId;
+
+            IF @NewStatus = 'cancelled'
+            BEGIN
+                SET @KardexAccion = 'WORK_ORDER_CANCELLED';
+                SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' cancelada por ', @UserName, N'.');
+            END
+            ELSE IF @EstadoActual = 'reviewPending' AND @NewStatus = 'inProgress'
+            BEGIN
+                SET @KardexAccion = 'WORK_ORDER_REOPENED';
+                SET @KardexDetalle = CONCAT(N'OT ', @WorkOrderId, N' reabierta con observaciones por ', @UserName, N'.');
+            END;
         END;
 
+        -- Registrar evento en Bitácora Kardex
         INSERT INTO dbo.BitacoraKardex (UsuarioId, NombreUsuario, Accion, Modulo, EntidadId, Detalles)
-        VALUES (@UserId, @UserName, 'WORK_ORDER_STATUS_CHANGED', 'WORK_ORDERS', @WorkOrderId,
-                CONCAT(N'Estado de OT ', @WorkOrderId, N' cambiado a: ', @NewStatus, N'.'));
+        VALUES (@UserId, @UserName, @KardexAccion, 'WORK_ORDERS', @WorkOrderId, @KardexDetalle);
 
         COMMIT TRANSACTION;
     END TRY

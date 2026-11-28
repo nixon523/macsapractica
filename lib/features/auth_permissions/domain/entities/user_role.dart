@@ -15,6 +15,8 @@ class AppPermissions {
   static const assetDeleteApprove = 'asset.delete.approve';
   static const workOrderView = 'work_order.view';
   static const workOrderCreate = 'work_order.create';
+  static const workOrderExecute = 'work_order.execute';
+  static const workOrderApprove = 'work_order.approve';
   static const workOrderPrint = 'work_order.print';
   static const preventiveView = 'preventive.view';
   static const preventiveManage = 'preventive.manage';
@@ -32,6 +34,7 @@ enum UserRole {
   admin('admin', 'Administrador'),
   jefe('jefe', 'Jefe de Mantenimiento'),
   jefeArea('jefe_area', 'Jefe de Área'),
+  tecnico('tecnico', 'Personal de Mantenimiento'),
   reportador('reportador', 'Supervisor (Reportador)'),
   lector('lector', 'Gerente (Solo Lectura / KPIs)');
 
@@ -55,9 +58,11 @@ enum UserRole {
         UserRole.admin =>
           'Acceso total absoluto del sistema. Único rol autorizado para gestionar usuarios y aprobar bajas definitivas.',
         UserRole.jefe =>
-          'Gestión integral de mantenimiento: activos, órdenes de trabajo, preventivos, averías, reportes de operación y personal técnico.',
+          'Gestión integral de mantenimiento: activos, órdenes de trabajo, preventivos, averías, reportes de operación y aprobación formal de cierres de OTs.',
         UserRole.jefeArea =>
           'Acceso operativo limitado: consulta dashboard, equipos, OTs y preventivos; reporta/ve averías y registra reportes de operación.',
+        UserRole.tecnico =>
+          'Personal técnico ejecutor: inicia, pausa, reporta ejecución y finaliza órdenes de trabajo asignadas desde su dispositivo.',
         UserRole.reportador =>
           'Enfocado en piso de planta: reportar averías con fotografía y dar seguimiento al estado de los reportes.',
         UserRole.lector =>
@@ -86,7 +91,10 @@ enum UserRole {
     if (p.contains('jefe') || p.contains('coordinador') || p.contains('encargado')) {
       return UserRole.jefeArea;
     }
-    if (p.contains('supervisor') || p.contains('operador') || p.contains('tecnico') || isMaintenance) {
+    if (p.contains('tecnico') || isMaintenance || p.contains('mecanico') || p.contains('electrico') || p.contains('electricista')) {
+      return UserRole.tecnico;
+    }
+    if (p.contains('supervisor') || p.contains('operador')) {
       return UserRole.reportador;
     }
     return UserRole.reportador;
@@ -104,6 +112,8 @@ enum UserRole {
             AppPermissions.assetDeleteApprove,
             AppPermissions.workOrderView,
             AppPermissions.workOrderCreate,
+            AppPermissions.workOrderExecute,
+            AppPermissions.workOrderApprove,
             AppPermissions.workOrderPrint,
             AppPermissions.preventiveView,
             AppPermissions.preventiveManage,
@@ -125,6 +135,8 @@ enum UserRole {
             AppPermissions.assetDeleteRequest,
             AppPermissions.workOrderView,
             AppPermissions.workOrderCreate,
+            AppPermissions.workOrderExecute,
+            AppPermissions.workOrderApprove,
             AppPermissions.workOrderPrint,
             AppPermissions.preventiveView,
             AppPermissions.preventiveManage,
@@ -146,6 +158,14 @@ enum UserRole {
             AppPermissions.breakdownView,
             AppPermissions.operationReportView,
             AppPermissions.operationReportEdit,
+          },
+        UserRole.tecnico => {
+            AppPermissions.workOrderView,
+            AppPermissions.workOrderExecute,
+            AppPermissions.workOrderPrint,
+            AppPermissions.assetView,
+            AppPermissions.breakdownView,
+            AppPermissions.breakdownReport,
           },
         UserRole.reportador => {
             AppPermissions.breakdownReport,

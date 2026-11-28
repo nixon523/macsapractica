@@ -501,8 +501,12 @@ class WorkOrderReportPdfBuilder {
     final (label, color) = switch (status) {
       WorkOrderStatus.pending => ('Pendiente', const PdfColor(0.85, 0.45, 0.0)),
       WorkOrderStatus.inProgress => ('En Curso', _primaryBlue),
+      WorkOrderStatus.paused => ('Pausada', const PdfColor(0.90, 0.40, 0.0)),
+      WorkOrderStatus.reviewPending => ('Por Validar', const PdfColor(0.48, 0.23, 0.93)),
       WorkOrderStatus.completed => ('Completada', const PdfColor(0.12, 0.60, 0.30)),
       WorkOrderStatus.cancelled => ('Cancelada', PdfColors.grey600),
+      WorkOrderStatus.unfulfilled => ('Incumplida', const PdfColor(0.86, 0.15, 0.15)),
+      WorkOrderStatus.rescheduled => ('Reprogramada', const PdfColor(0.01, 0.52, 0.78)),
     };
 
     return pw.Container(

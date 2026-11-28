@@ -31,11 +31,12 @@ BEGIN TRY
     VALUES
         (N'admin',      N'Administrador General'),
         (N'jefe',       N'Jefe de Mantenimiento'),
+        (N'tecnico',    N'Personal de Mantenimiento'),
         (N'jefe_area',  N'Jefe de Área / Operaciones'),
         (N'reportador', N'Supervisor (Reportador)'),
         (N'lector',     N'Gerente (Solo Lectura / Auditoría)');
 
-    -- 20.2 Catálogo de Permisos Granulares (20 Permisos)
+    -- 20.2 Catálogo de Permisos Granulares (22 Permisos)
     INSERT INTO dbo.Permiso (CodigoPermiso)
     VALUES
         (N'dashboard.view'),
@@ -47,6 +48,8 @@ BEGIN TRY
         (N'asset.delete.approve'),
         (N'work_order.view'),
         (N'work_order.create'),
+        (N'work_order.execute'),
+        (N'work_order.approve'),
         (N'work_order.print'),
         (N'preventive.view'),
         (N'preventive.manage'),
@@ -75,6 +78,8 @@ BEGIN TRY
         (N'jefe', N'asset.delete.request'),
         (N'jefe', N'work_order.view'),
         (N'jefe', N'work_order.create'),
+        (N'jefe', N'work_order.execute'),
+        (N'jefe', N'work_order.approve'),
         (N'jefe', N'work_order.print'),
         (N'jefe', N'preventive.view'),
         (N'jefe', N'preventive.manage'),
@@ -85,6 +90,16 @@ BEGIN TRY
         (N'jefe', N'operation_report.edit'),
         (N'jefe', N'kardex.view'),
         (N'jefe', N'employee.manage');
+
+    -- tecnico: Ejecución y Reporte Técnico en Campo
+    INSERT INTO dbo.RolPermiso (CodigoRol, CodigoPermiso)
+    VALUES
+        (N'tecnico', N'asset.view'),
+        (N'tecnico', N'work_order.view'),
+        (N'tecnico', N'work_order.execute'),
+        (N'tecnico', N'work_order.print'),
+        (N'tecnico', N'breakdown.report'),
+        (N'tecnico', N'breakdown.view');
 
     -- jefe_area: Operaciones y Supervisión Local
     INSERT INTO dbo.RolPermiso (CodigoRol, CodigoPermiso)

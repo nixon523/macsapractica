@@ -35,6 +35,14 @@ class WorkOrderModel extends WorkOrder {
     super.createdByUserId,
     super.createdByUserName,
     super.createdAt,
+    super.fechaInicioReal,
+    super.fechaFinReal,
+    super.minutosPausaAcumulados,
+    super.fechaUltimaPausa,
+    super.motivoPausa,
+    super.aprobadoPorUsuarioId,
+    super.aprobadoPorNombreUsuario,
+    super.aprobadoEn,
   });
 
   factory WorkOrderModel.fromJson(Map<String, dynamic> map, [String? docId]) {
@@ -219,6 +227,14 @@ class WorkOrderModel extends WorkOrder {
       createdByUserId: (map['createdByUserId'] ?? map['CreatedByUserId'])?.toString(),
       createdByUserName: (map['createdByUserName'] ?? map['CreatedByUserName'])?.toString(),
       createdAt: parseDate(map['createdAt'] ?? map['CreatedAt']),
+      fechaInicioReal: parseDate(map['fechaInicioReal'] ?? map['FechaInicioReal']),
+      fechaFinReal: parseDate(map['fechaFinReal'] ?? map['FechaFinReal']),
+      minutosPausaAcumulados: (map['minutosPausaAcumulados'] ?? map['MinutosPausaAcumulados'] as num?)?.toInt() ?? 0,
+      fechaUltimaPausa: parseDate(map['fechaUltimaPausa'] ?? map['FechaUltimaPausa']),
+      motivoPausa: (map['motivoPausa'] ?? map['MotivoPausa'])?.toString(),
+      aprobadoPorUsuarioId: (map['aprobadoPorUsuarioId'] ?? map['AprobadoPorUsuarioId'] as num?)?.toInt(),
+      aprobadoPorNombreUsuario: (map['aprobadoPorNombreUsuario'] ?? map['AprobadoPorNombreUsuario'])?.toString(),
+      aprobadoEn: parseDate(map['aprobadoEn'] ?? map['AprobadoEn']),
     );
   }
 
@@ -255,6 +271,12 @@ class WorkOrderModel extends WorkOrder {
       'reportId': reportId != null ? int.tryParse(reportId!) : null,
       'preventiveScheduleId': preventiveScheduleId,
       'planPreventivoId': preventiveScheduleId,
+      if (fechaInicioReal != null) 'fechaInicioReal': fechaInicioReal?.toIso8601String(),
+      if (fechaFinReal != null) 'fechaFinReal': fechaFinReal?.toIso8601String(),
+      'minutosPausaAcumulados': minutosPausaAcumulados,
+      if (motivoPausa != null) 'motivoPausa': motivoPausa,
+      if (aprobadoPorNombreUsuario != null) 'aprobadoPorNombreUsuario': aprobadoPorNombreUsuario,
+      if (aprobadoEn != null) 'aprobadoEn': aprobadoEn?.toIso8601String(),
       if (breakdownImageData != null && breakdownImageData!.isNotEmpty)
         'breakdownImageData': breakdownImageData,
     };

@@ -1,4 +1,13 @@
-enum WorkOrderStatus { pending, inProgress, completed, cancelled }
+enum WorkOrderStatus {
+  pending,
+  inProgress,
+  paused,
+  reviewPending,
+  completed,
+  cancelled,
+  unfulfilled,
+  rescheduled,
+}
 
 enum WorkOrderPriority { low, medium, high }
 
@@ -81,6 +90,14 @@ class WorkOrder {
     this.createdByUserId,
     this.createdByUserName,
     this.createdAt,
+    this.fechaInicioReal,
+    this.fechaFinReal,
+    this.minutosPausaAcumulados = 0,
+    this.fechaUltimaPausa,
+    this.motivoPausa,
+    this.aprobadoPorUsuarioId,
+    this.aprobadoPorNombreUsuario,
+    this.aprobadoEn,
   });
 
   final String id;
@@ -133,9 +150,20 @@ class WorkOrder {
   final String? createdByUserName;
   final DateTime? createdAt;
 
+  final DateTime? fechaInicioReal;
+  final DateTime? fechaFinReal;
+  final int minutosPausaAcumulados;
+  final DateTime? fechaUltimaPausa;
+  final String? motivoPausa;
+  final int? aprobadoPorUsuarioId;
+  final String? aprobadoPorNombreUsuario;
+  final DateTime? aprobadoEn;
+
   bool get isOpen =>
       status == WorkOrderStatus.pending ||
-      status == WorkOrderStatus.inProgress;
+      status == WorkOrderStatus.inProgress ||
+      status == WorkOrderStatus.paused ||
+      status == WorkOrderStatus.reviewPending;
 
   bool get isPreventive =>
       preventiveScheduleId != null ||
@@ -150,8 +178,12 @@ class WorkOrder {
   String get statusLabel => switch (status) {
         WorkOrderStatus.pending => 'Pendiente',
         WorkOrderStatus.inProgress => 'En Progreso',
+        WorkOrderStatus.paused => 'Pausada',
+        WorkOrderStatus.reviewPending => 'Por Validar',
         WorkOrderStatus.completed => 'Completada',
         WorkOrderStatus.cancelled => 'Cancelada',
+        WorkOrderStatus.unfulfilled => 'No Cumplida',
+        WorkOrderStatus.rescheduled => 'Reprogramada',
       };
 
   String get priorityLabel => switch (priority) {
@@ -191,6 +223,14 @@ class WorkOrder {
     String? createdByUserId,
     String? createdByUserName,
     DateTime? createdAt,
+    DateTime? fechaInicioReal,
+    DateTime? fechaFinReal,
+    int? minutosPausaAcumulados,
+    DateTime? fechaUltimaPausa,
+    String? motivoPausa,
+    int? aprobadoPorUsuarioId,
+    String? aprobadoPorNombreUsuario,
+    DateTime? aprobadoEn,
   }) {
     return WorkOrder(
       id: id ?? this.id,
@@ -225,6 +265,16 @@ class WorkOrder {
       createdByUserId: createdByUserId ?? this.createdByUserId,
       createdByUserName: createdByUserName ?? this.createdByUserName,
       createdAt: createdAt ?? this.createdAt,
+      fechaInicioReal: fechaInicioReal ?? this.fechaInicioReal,
+      fechaFinReal: fechaFinReal ?? this.fechaFinReal,
+      minutosPausaAcumulados:
+          minutosPausaAcumulados ?? this.minutosPausaAcumulados,
+      fechaUltimaPausa: fechaUltimaPausa ?? this.fechaUltimaPausa,
+      motivoPausa: motivoPausa ?? this.motivoPausa,
+      aprobadoPorUsuarioId: aprobadoPorUsuarioId ?? this.aprobadoPorUsuarioId,
+      aprobadoPorNombreUsuario:
+          aprobadoPorNombreUsuario ?? this.aprobadoPorNombreUsuario,
+      aprobadoEn: aprobadoEn ?? this.aprobadoEn,
     );
   }
 }

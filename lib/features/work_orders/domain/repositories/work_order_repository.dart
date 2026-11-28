@@ -36,6 +36,12 @@ abstract class WorkOrderRepository {
     required WorkOrderStatus status,
     required String userId,
     required String userName,
+    String? motivoPausa,
+    String? motivoReprogramacion,
+    DateTime? fechaReprogramacion,
+    double? horasReales,
+    String? trabajoRealizado,
+    String? observaciones,
   });
 
   /// Actualiza los detalles de ejecución de mantenimiento, materiales, informe y firmas.

@@ -6,6 +6,7 @@ import '../../../../app/di/get_it.dart';
 import '../../../../app/widgets/app_dialog.dart';
 import '../../../../app/widgets/app_feedback.dart';
 import '../../../assets/presentation/views/widgets/asset_image_widget.dart';
+import '../../../auth_permissions/domain/entities/user_role.dart';
 import '../../../auth_permissions/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../breakdown_reports/domain/usecases/resolve_breakdown_report.dart';
 import '../../../employees/presentation/viewmodels/employee_list_viewmodel.dart';
@@ -42,7 +43,15 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
     );
   }
 
-  Future<void> _changeStatus(WorkOrderStatus status) async {
+  Future<void> _changeStatus(
+    WorkOrderStatus status, {
+    String? motivoPausa,
+    String? motivoReprogramacion,
+    DateTime? fechaReprogramacion,
+    double? horasReales,
+    String? trabajoRealizado,
+    String? observaciones,
+  }) async {
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
@@ -51,12 +60,39 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
       status: status,
       userId: user.userId,
       userName: user.username,
+      motivoPausa: motivoPausa,
+      motivoReprogramacion: motivoReprogramacion,
+      fechaReprogramacion: fechaReprogramacion,
+      horasReales: horasReales,
+      trabajoRealizado: trabajoRealizado,
+      observaciones: observaciones,
     );
     if (!mounted) return;
 
     if (ok) {
       setState(() {
-        _currentOrder = _currentOrder.copyWith(status: status);
+        _currentOrder = _currentOrder.copyWith(
+          status: status,
+          motivoPausa: motivoPausa ?? (status == WorkOrderStatus.inProgress ? null : _currentOrder.motivoPausa),
+          unfulfillmentReason: motivoReprogramacion ?? _currentOrder.unfulfillmentReason,
+          reprogramDate: fechaReprogramacion ?? _currentOrder.reprogramDate,
+          actualHours: horasReales ?? _currentOrder.actualHours,
+          workDoneDescription: trabajoRealizado ?? _currentOrder.workDoneDescription,
+          fechaInicioReal: (status == WorkOrderStatus.inProgress && _currentOrder.fechaInicioReal == null)
+              ? DateTime.now()
+              : _currentOrder.fechaInicioReal,
+          fechaFinReal: (status == WorkOrderStatus.reviewPending || status == WorkOrderStatus.completed)
+              ? DateTime.now()
+              : _currentOrder.fechaFinReal,
+          aprobadoPorNombreUsuario: status == WorkOrderStatus.completed
+              ? (user.displayName != null && user.displayName!.isNotEmpty
+                  ? user.displayName!
+                  : user.username)
+              : _currentOrder.aprobadoPorNombreUsuario,
+          aprobadoEn: status == WorkOrderStatus.completed
+              ? DateTime.now()
+              : _currentOrder.aprobadoEn,
+        );
       });
 
       // Si se completó la OT y tiene un reporte de avería vinculado,
@@ -78,15 +114,9 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
       }
 
       if (!mounted) return;
-      final statusLabel = switch (status) {
-        WorkOrderStatus.pending => 'Pendiente',
-        WorkOrderStatus.inProgress => 'En Progreso',
-        WorkOrderStatus.completed => 'Completada',
-        WorkOrderStatus.cancelled => 'Cancelada',
-      };
       AppFeedback.showSuccess(
         context,
-        'Estado de la OT actualizado a $statusLabel.',
+        'Estado de la OT actualizado a ${_currentOrder.statusLabel}.',
       );
     } else {
       AppFeedback.showError(
@@ -120,17 +150,275 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
     }
   }
 
+  Future<void> _showPauseDialog() async {
+    final reasons = [
+      'Esperando refacción / material de almacén',
+      'Equipo requerido por producción temporalmente',
+      'Cambio de turno / hora de comida',
+      'Atención a avería de mayor urgencia',
+      'Otro motivo...',
+    ];
+    String selectedReason = reasons.first;
+    final customCtrl = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: const Row(
+            children: [
+              Icon(Icons.pause_circle_outline, color: Color(0xFFD97706)),
+              SizedBox(width: 8),
+              Text('Pausar Trabajo'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'El cronómetro de trabajo activo se detendrá. Selecciona o escribe el motivo:',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedReason,
+                decoration: InputDecoration(
+                  labelText: 'Motivo de la pausa',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                items: reasons.map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12.5)))).toList(),
+                onChanged: (val) {
+                  if (val != null) setDialogState(() => selectedReason = val);
+                },
+              ),
+              if (selectedReason == 'Otro motivo...') ...[
+                const SizedBox(height: 10),
+                TextField(
+                  controller: customCtrl,
+                  maxLines: 2,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Escribe el motivo específico *',
+                    hintText: 'Describe brevemente la razón de la pausa...',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.all(10),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFFD97706)),
+              onPressed: () {
+                if (selectedReason == 'Otro motivo...' && customCtrl.text.trim().isEmpty) {
+                  AppFeedback.showWarning(ctx, 'Por favor escribe el motivo de la pausa.');
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Pausar Trabajo'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final reason = selectedReason == 'Otro motivo...' ? customCtrl.text.trim() : selectedReason;
+      await _changeStatus(WorkOrderStatus.paused, motivoPausa: reason);
+    }
+  }
+
+  Future<void> _showRescheduleDialog() async {
+    DateTime selectedDate = _currentOrder.scheduledDate?.add(const Duration(days: 1)) ?? DateTime.now().add(const Duration(days: 1));
+    final reasonCtrl = TextEditingController(text: _currentOrder.unfulfillmentReason ?? '');
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          title: const Row(
+            children: [
+              Icon(Icons.calendar_month_outlined, color: Color(0xFF0055A5)),
+              SizedBox(width: 8),
+              Text('Reprogramar OT'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Indica la nueva fecha programada y el motivo:',
+                style: TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.date_range, size: 18),
+                label: Text(
+                  'Nueva Fecha: ${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: ctx,
+                    initialDate: selectedDate,
+                    firstDate: DateTime.now().subtract(const Duration(days: 1)),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (picked != null) {
+                    setDialogState(() => selectedDate = picked);
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Motivo de reprogramación *',
+                  hintText: 'Ej: Falta de refacciones, línea en producción...',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.all(10),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+            FilledButton(
+              onPressed: () {
+                if (reasonCtrl.text.trim().isEmpty) {
+                  AppFeedback.showWarning(ctx, 'Debes ingresar el motivo de la reprogramación.');
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Reprogramar OT'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _changeStatus(
+        WorkOrderStatus.rescheduled,
+        fechaReprogramacion: selectedDate,
+        motivoReprogramacion: reasonCtrl.text.trim(),
+      );
+    }
+  }
+
+  Future<void> _approveAndClose() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.verified_outlined, color: Color(0xFF059669)),
+            SizedBox(width: 8),
+            Text('Aprobar y Cerrar OT'),
+          ],
+        ),
+        content: Text(
+          '¿Confirmas la aprobación del informe técnico y el cierre formal de la orden ${_currentOrder.displayCorrelative}? Esta acción quedará registrada en Kardex.',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF059669)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Aprobar y Cerrar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _changeStatus(WorkOrderStatus.completed);
+    }
+  }
+
+  Future<void> _reopenOrder() async {
+    final obsCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.assignment_return_outlined, color: Color(0xFFDC2626)),
+            SizedBox(width: 8),
+            Text('Reabrir Orden de Trabajo'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Indica las observaciones o detalles que el personal técnico debe corregir o completar:',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: obsCtrl,
+              maxLines: 3,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Observaciones / Pendientes *',
+                hintText: 'Detalla qué falta por resolver...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.all(10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () {
+              if (obsCtrl.text.trim().isEmpty) {
+                AppFeedback.showWarning(ctx, 'Debes ingresar las observaciones.');
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Reabrir a En Progreso'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _changeStatus(WorkOrderStatus.inProgress, observaciones: obsCtrl.text.trim());
+    }
+  }
+
   Future<void> _editExecutionDetails() async {
     final user = context.read<AuthViewModel>().currentUser;
     if (user == null) return;
 
+    // Calcular horas reales automáticamente a partir de la fecha de inicio y pausas
+    double calculatedHours = _currentOrder.actualHours ?? _currentOrder.estimatedHours ?? 1.0;
+    if (_currentOrder.fechaInicioReal != null) {
+      final now = DateTime.now();
+      final totalMinutes = now.difference(_currentOrder.fechaInicioReal!).inMinutes - _currentOrder.minutosPausaAcumulados;
+      final positiveMins = totalMinutes > 0 ? totalMinutes : 1;
+      calculatedHours = double.parse((positiveMins / 60.0).toStringAsFixed(2));
+    }
+
     final workDoneCtrl = TextEditingController(text: _currentOrder.workDoneDescription);
-    final staffCtrl = TextEditingController(
-      text: _currentOrder.assignedStaffCount != null ? _currentOrder.assignedStaffCount.toString() : '',
-    );
-    final hoursCtrl = TextEditingController(
-      text: _currentOrder.estimatedHours != null ? _currentOrder.estimatedHours.toString() : '',
-    );
+    final hoursCtrl = TextEditingController(text: calculatedHours.toStringAsFixed(2));
+
     final initialMtn = (_currentOrder.maintenanceResponsible != null && _currentOrder.maintenanceResponsible!.trim().isNotEmpty)
         ? _currentOrder.maintenanceResponsible!
         : (_currentOrder.assignedTo ?? '');
@@ -140,6 +428,8 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
 
     bool isCompleted = _currentOrder.isCompleted ?? true;
     final unfulfillmentCtrl = TextEditingController(text: _currentOrder.unfulfillmentReason);
+
+    int getTechCount() => mtnCtrl.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).length;
 
     final saved = await showDialog<bool>(
       context: context,
@@ -152,7 +442,7 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Informe de Ejecución de Mantenimiento',
+                  'Informe Técnico de Ejecución',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -163,184 +453,189 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
             child: SizedBox(
               width: double.maxFinite,
               child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: staffCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'Personal asignado',
-                            hintText: 'Cant. técnicos',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Resumen automático de tiempo y personal
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.timer, size: 20, color: Color(0xFF16A34A)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Tiempo activo calculado: ${calculatedHours.toStringAsFixed(2)} h · Personal: ${getTechCount() > 0 ? getTechCount() : 1} técnico(s)',
+                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: hoursCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(
-                            labelText: 'Horas reales',
-                            hintText: 'Ej: 2.0',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          ),
-                        ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextField(
+                      controller: hoursCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Horas reales invertidas *',
+                        hintText: 'Ej: 1.75',
+                        suffixText: 'h',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: workDoneCtrl,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: 'Trabajo realizado y observaciones *',
-                      hintText: 'Detalla las reparaciones, ajustes o cambios de piezas ejecutados...',
-                      alignLabelWithHint: true,
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                      contentPadding: const EdgeInsets.all(12),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: SwitchListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      title: const Text('¿Trabajo 100% Completado?', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
-                      subtitle: Text(
-                        isCompleted
-                            ? 'La orden cumplió a cabalidad con lo solicitado.'
-                            : 'Hubo pendientes o no se completó totalmente.',
-                        style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
-                      ),
-                      value: isCompleted,
-                      onChanged: (val) => setDialogState(() => isCompleted = val),
-                    ),
-                  ),
-                  if (!isCompleted) ...[
                     const SizedBox(height: 12),
                     TextField(
-                      controller: unfulfillmentCtrl,
-                      maxLines: 2,
+                      controller: workDoneCtrl,
+                      maxLines: 3,
                       decoration: InputDecoration(
-                        labelText: 'Motivo del no cumplimiento *',
-                        hintText: 'Falta de repuestos, tiempo insuficiente...',
+                        labelText: 'Trabajo realizado y observaciones *',
+                        hintText: 'Detalla las reparaciones, ajustes o cambios de piezas ejecutados...',
+                        alignLabelWithHint: true,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                         contentPadding: const EdgeInsets.all(12),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 14),
-                  const Text('Firmas y Responsables:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: mtnCtrl,
-                    decoration: InputDecoration(
-                      labelText: '1. Responsable(s) Mantenimiento (Ejecutores)',
-                      hintText: 'Ej: Carlos Hernández, Jorge Morales...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      isDense: true,
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.people_alt_outlined, size: 18, color: Color(0xFF0055A5)),
-                        tooltip: 'Seleccionar del catálogo de técnicos',
-                        onPressed: () async {
-                          final empVm = context.read<EmployeeListViewModel>();
-                          if (empVm.employees.isEmpty) {
-                            await empVm.loadEmployees();
-                          }
-                          final techList = empVm.maintenanceTechnicians;
-                          if (techList.isEmpty || !context.mounted) return;
-
-                          final currentTechs = mtnCtrl.text
-                              .split(',')
-                              .map((s) => s.trim())
-                              .where((s) => s.isNotEmpty)
-                              .toSet();
-
-                          await showDialog(
-                            context: context,
-                            builder: (ctx) => StatefulBuilder(
-                              builder: (ctx, setMulti) => AppDialog(
-                                maxWidth: 440,
-                                icon: const Icon(Icons.engineering, color: Color(0xFF0055A5)),
-                                title: const Text('Seleccionar Ejecutores'),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: techList.map((t) {
-                                    final isChecked = currentTechs.contains(t.fullName);
-                                    return CheckboxListTile(
-                                      value: isChecked,
-                                      dense: true,
-                                      activeColor: const Color(0xFF0055A5),
-                                      title: Text(t.fullName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                                      subtitle: Text(t.position, style: const TextStyle(fontSize: 11)),
-                                      onChanged: (val) {
-                                        setMulti(() {
-                                          if (val == true) {
-                                            currentTechs.add(t.fullName);
-                                          } else {
-                                            currentTechs.remove(t.fullName);
-                                          }
-                                        });
-                                      },
-                                    );
-                                  }).toList(),
-                                ),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-                                  FilledButton(
-                                    style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
-                                    onPressed: () {
-                                      setDialogState(() {
-                                        mtnCtrl.text = currentTechs.join(', ');
-                                      });
-                                      Navigator.pop(ctx);
-                                    },
-                                    child: const Text('Aceptar'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: SwitchListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        title: const Text('¿Trabajo 100% Completado?', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          isCompleted
+                              ? 'La orden cumplió a cabalidad con lo solicitado.'
+                              : 'Hubo pendientes o no se completó totalmente.',
+                          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+                        ),
+                        value: isCompleted,
+                        onChanged: (val) => setDialogState(() => isCompleted = val),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: areaHeadCtrl,
-                    decoration: InputDecoration(
-                      labelText: '2. Jefe de Área (Recepción)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      isDense: true,
+                    if (!isCompleted) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: unfulfillmentCtrl,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Motivo del no cumplimiento *',
+                          hintText: 'Falta de repuestos, tiempo insuficiente...',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          contentPadding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    const Text('Técnicos Ejecutores y Firmas:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: mtnCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Personal Mantenimiento (Ejecutores)',
+                        hintText: 'Ej: Carlos Hernández, Jorge Morales...',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        isDense: true,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.people_alt_outlined, size: 18, color: Color(0xFF0055A5)),
+                          tooltip: 'Seleccionar / Modificar técnicos del catálogo',
+                          onPressed: () async {
+                            final empVm = context.read<EmployeeListViewModel>();
+                            if (empVm.employees.isEmpty) {
+                              await empVm.loadEmployees();
+                            }
+                            final techList = empVm.maintenanceTechnicians;
+                            if (techList.isEmpty || !context.mounted) return;
+
+                            final currentTechs = mtnCtrl.text
+                                .split(',')
+                                .map((s) => s.trim())
+                                .where((s) => s.isNotEmpty)
+                                .toSet();
+
+                            await showDialog(
+                              context: context,
+                              builder: (ctx) => StatefulBuilder(
+                                builder: (ctx, setMulti) => AppDialog(
+                                  maxWidth: 440,
+                                  icon: const Icon(Icons.engineering, color: Color(0xFF0055A5)),
+                                  title: const Text('Asignar Técnicos Ejecutores'),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: techList.map((t) {
+                                      final isChecked = currentTechs.contains(t.fullName);
+                                      return CheckboxListTile(
+                                        value: isChecked,
+                                        dense: true,
+                                        activeColor: const Color(0xFF0055A5),
+                                        title: Text(t.fullName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                        subtitle: Text(t.position, style: const TextStyle(fontSize: 11)),
+                                        onChanged: (val) {
+                                          setMulti(() {
+                                            if (val == true) {
+                                              currentTechs.add(t.fullName);
+                                            } else {
+                                              currentTechs.remove(t.fullName);
+                                            }
+                                          });
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                                    FilledButton(
+                                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
+                                      onPressed: () {
+                                        setDialogState(() {
+                                          mtnCtrl.text = currentTechs.join(', ');
+                                        });
+                                        Navigator.pop(ctx);
+                                      },
+                                      child: const Text('Aceptar'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: mtnHeadCtrl,
-                    decoration: InputDecoration(
-                      labelText: '3. Jefe de Mantenimiento (Aprobación)',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                      isDense: true,
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: areaHeadCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Jefe de Área (Recepción de conformidad)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        isDense: true,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: mtnHeadCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Jefe de Mantenimiento (Aprobación)',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                        isDense: true,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
             ),
           ),
           actions: [
@@ -348,7 +643,8 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text('Cancelar'),
             ),
-            FilledButton(
+            FilledButton.icon(
+              icon: const Icon(Icons.send_rounded, size: 16),
               onPressed: () {
                 if (workDoneCtrl.text.trim().isEmpty) {
                   AppFeedback.showWarning(
@@ -366,7 +662,7 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
                 }
                 Navigator.of(context).pop(true);
               },
-              child: const Text('Guardar Informe'),
+              label: const Text('Enviar Informe a Revisión'),
             ),
           ],
         ),
@@ -374,11 +670,11 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
     );
 
     if (saved == true && mounted) {
-      final hoursVal = double.tryParse(hoursCtrl.text.trim());
+      final hoursVal = double.tryParse(hoursCtrl.text.trim()) ?? calculatedHours;
+      final staffCount = getTechCount() > 0 ? getTechCount() : 1;
       final updated = _currentOrder.copyWith(
-        assignedStaffCount: int.tryParse(staffCtrl.text.trim()),
-        estimatedHours: hoursVal ?? _currentOrder.estimatedHours,
-        actualHours: hoursVal ?? _currentOrder.actualHours,
+        assignedStaffCount: staffCount,
+        actualHours: hoursVal,
         workDoneDescription: workDoneCtrl.text.trim(),
         isCompleted: isCompleted,
         unfulfillmentReason: !isCompleted ? unfulfillmentCtrl.text.trim() : null,
@@ -395,9 +691,11 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
 
       if (ok && mounted) {
         setState(() => _currentOrder = updated);
-        AppFeedback.showSuccess(
-          context,
-          'Informe de mantenimiento guardado exitosamente.',
+        // Transicionar automáticamente a reviewPending (enviada a revisión)
+        await _changeStatus(
+          WorkOrderStatus.reviewPending,
+          horasReales: hoursVal,
+          trabajoRealizado: workDoneCtrl.text.trim(),
         );
       } else if (mounted) {
         AppFeedback.showError(
@@ -414,8 +712,13 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
   Widget build(BuildContext context) {
     final order = _currentOrder;
     final authVm = context.watch<AuthViewModel>();
-    final canPrint = authVm.hasPermission('work_order.print');
-    final canManage = authVm.hasPermission('work_order.create');
+    final canPrint = authVm.hasPermission(AppPermissions.workOrderPrint);
+    final canExecute = authVm.hasPermission(AppPermissions.workOrderExecute) ||
+        authVm.hasPermission(AppPermissions.workOrderCreate);
+    final canApprove = authVm.hasPermission(AppPermissions.workOrderApprove) ||
+        authVm.currentUser?.role == UserRole.admin ||
+        authVm.currentUser?.role == UserRole.jefe;
+    final canCancel = authVm.hasPermission(AppPermissions.workOrderCreate);
 
     return ChangeNotifierProvider<WorkOrderDetailViewModel>.value(
       value: _viewModel,
@@ -453,13 +756,17 @@ class _WorkOrderDetailViewState extends State<WorkOrderDetailView> {
             child: _WorkOrderDetail(
               order: order,
               isProcessing: _viewModel.isProcessing,
-              canManage: canManage,
+              canExecute: canExecute,
+              canApprove: canApprove,
+              canCancel: canCancel,
               onStart: () => _changeStatus(WorkOrderStatus.inProgress),
-              onComplete: () async {
-                await _changeStatus(WorkOrderStatus.completed);
-              },
+              onPause: _showPauseDialog,
+              onResume: () => _changeStatus(WorkOrderStatus.inProgress),
+              onFinishReport: _editExecutionDetails,
+              onReschedule: _showRescheduleDialog,
+              onApprove: _approveAndClose,
+              onReopen: _reopenOrder,
               onCancel: _confirmCancel,
-              onEditExecution: _editExecutionDetails,
               onPrint: canPrint ? _printWorkOrder : null,
             ),
           ),
@@ -473,21 +780,33 @@ class _WorkOrderDetail extends StatelessWidget {
   const _WorkOrderDetail({
     required this.order,
     required this.isProcessing,
-    required this.canManage,
+    required this.canExecute,
+    required this.canApprove,
+    required this.canCancel,
     required this.onStart,
-    required this.onComplete,
+    required this.onPause,
+    required this.onResume,
+    required this.onFinishReport,
+    required this.onReschedule,
+    required this.onApprove,
+    required this.onReopen,
     required this.onCancel,
-    required this.onEditExecution,
     this.onPrint,
   });
 
   final WorkOrder order;
   final bool isProcessing;
-  final bool canManage;
+  final bool canExecute;
+  final bool canApprove;
+  final bool canCancel;
   final VoidCallback onStart;
-  final VoidCallback onComplete;
+  final VoidCallback onPause;
+  final VoidCallback onResume;
+  final VoidCallback onFinishReport;
+  final VoidCallback onReschedule;
+  final VoidCallback onApprove;
+  final VoidCallback onReopen;
   final VoidCallback onCancel;
-  final VoidCallback onEditExecution;
   final VoidCallback? onPrint;
 
   void _showImageDialog(BuildContext context, String imageUrl) {
@@ -538,8 +857,12 @@ class _WorkOrderDetail extends StatelessWidget {
     final statusColor = switch (order.status) {
       WorkOrderStatus.pending => const Color(0xFFD97706),
       WorkOrderStatus.inProgress => const Color(0xFF0284C7),
+      WorkOrderStatus.paused => const Color(0xFFE65100),
+      WorkOrderStatus.reviewPending => const Color(0xFF7C3AED),
       WorkOrderStatus.completed => const Color(0xFF16A34A),
       WorkOrderStatus.cancelled => const Color(0xFF64748B),
+      WorkOrderStatus.unfulfilled => const Color(0xFFDC2626),
+      WorkOrderStatus.rescheduled => const Color(0xFF0284C7),
     };
     final priorityColor = switch (order.priority) {
       WorkOrderPriority.low => const Color(0xFF16A34A),
@@ -840,6 +1163,33 @@ class _WorkOrderDetail extends StatelessWidget {
                       label: 'Cumplimiento',
                       value: order.isCompleted! ? '100% Completado' : 'Incompleto / Pendiente',
                     ),
+                  if (order.actualHours != null && order.actualHours! > 0)
+                    _InfoTile(
+                      icon: Icons.timer_outlined,
+                      label: 'Tiempo Real Invertido',
+                      value: '${order.actualHours} horas' +
+                          (order.minutosPausaAcumulados > 0
+                              ? ' (${order.minutosPausaAcumulados} min pausados)'
+                              : ''),
+                    ),
+                  if (order.fechaInicioReal != null)
+                    _InfoTile(
+                      icon: Icons.play_circle_outline,
+                      label: 'Inicio Real',
+                      value: _formatDateTime(order.fechaInicioReal),
+                    ),
+                  if (order.fechaFinReal != null)
+                    _InfoTile(
+                      icon: Icons.flag_outlined,
+                      label: 'Fin Real',
+                      value: _formatDateTime(order.fechaFinReal),
+                    ),
+                  if (order.aprobadoPorNombreUsuario != null)
+                    _InfoTile(
+                      icon: Icons.verified_user_outlined,
+                      label: 'Aprobado Por',
+                      value: '${order.aprobadoPorNombreUsuario!}${order.aprobadoEn != null ? " (${_formatDateTime(order.aprobadoEn)})" : ""}',
+                    ),
                   if (order.unfulfillmentReason != null)
                     _InfoTile(icon: Icons.warning_amber_outlined, label: 'Motivo No Cumplimiento', value: order.unfulfillmentReason!),
                   if (order.maintenanceResponsible != null && order.maintenanceResponsible!.isNotEmpty)
@@ -855,8 +1205,8 @@ class _WorkOrderDetail extends StatelessWidget {
           const SizedBox(height: 16),
         ],
 
-        // Botones de Acción
-        if (onPrint != null)
+        // Botones de Acción y Estados de Flujo
+        if (onPrint != null) ...[
           SizedBox(
             height: 44,
             child: OutlinedButton.icon(
@@ -865,83 +1215,369 @@ class _WorkOrderDetail extends StatelessWidget {
               label: const Text('Imprimir Orden de Trabajo Oficial (PDF)', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
-
-        const SizedBox(height: 10),
-
-        if (canManage && order.status == WorkOrderStatus.inProgress) ...[
-          SizedBox(
-            height: 44,
-            child: OutlinedButton.icon(
-              onPressed: onEditExecution,
-              icon: const Icon(Icons.edit_note, size: 18),
-              label: const Text('Registrar Informe de Ejecución / Firmas'),
-            ),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
         ],
 
-        if (canManage && order.status == WorkOrderStatus.pending) ...[
-          SizedBox(
-            height: 46,
-            child: FilledButton.icon(
-              onPressed: isProcessing ? null : onStart,
-              icon: const Icon(Icons.play_arrow_rounded, size: 20),
-              label: const Text('Iniciar Trabajo (Pasar a En Progreso)', style: TextStyle(fontWeight: FontWeight.bold)),
+        // 1. Estado: PENDIENTE
+        if (order.status == WorkOrderStatus.pending) ...[
+          if (canExecute) ...[
+            SizedBox(
+              height: 46,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
+                onPressed: isProcessing ? null : onStart,
+                icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                label: const Text('Iniciar Trabajo (Pasar a En Progreso)', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 40,
-            child: TextButton.icon(
-              style: TextButton.styleFrom(foregroundColor: const Color(0xFFDC2626)),
-              onPressed: isProcessing ? null : onCancel,
-              icon: const Icon(Icons.cancel_outlined, size: 18),
-              label: const Text('Cancelar Orden de Trabajo'),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 42,
+              child: OutlinedButton.icon(
+                onPressed: isProcessing ? null : onReschedule,
+                icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                label: const Text('Reprogramar Trabajo'),
+              ),
             ),
-          ),
+          ],
+          if (canCancel) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 38,
+              child: TextButton.icon(
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFFDC2626)),
+                onPressed: isProcessing ? null : onCancel,
+                icon: const Icon(Icons.cancel_outlined, size: 18),
+                label: const Text('Cancelar Orden de Trabajo'),
+              ),
+            ),
+          ],
         ],
 
-        if (canManage && order.status == WorkOrderStatus.inProgress) ...[
-          if (order.workDoneDescription == null || order.workDoneDescription!.trim().isEmpty)
+        // 2. Estado: EN PROGRESO
+        if (order.status == WorkOrderStatus.inProgress) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F2FE),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF7DD3FC)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.timer_outlined, color: Color(0xFF0369A1), size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Trabajo en progreso activo',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0369A1), fontSize: 13),
+                      ),
+                      Text(
+                        order.fechaInicioReal != null
+                            ? 'Iniciado: ${_formatDateTime(order.fechaInicioReal)}' +
+                                (order.minutosPausaAcumulados > 0
+                                    ? ' (${order.minutosPausaAcumulados} min pausados)'
+                                    : '')
+                            : 'El contador de tiempo está corriendo.',
+                        style: TextStyle(color: Colors.blue.shade900, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (canExecute) ...[
+            SizedBox(
+              height: 46,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),
+                onPressed: isProcessing ? null : onFinishReport,
+                icon: const Icon(Icons.assignment_turned_in_outlined, size: 20),
+                label: const Text(
+                  'Finalizar Informe Técnico (Enviar a Revisión)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 42,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFE65100)),
+                      onPressed: isProcessing ? null : onPause,
+                      icon: const Icon(Icons.pause_circle_outline, size: 18),
+                      label: const Text('Pausar Trabajo'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SizedBox(
+                    height: 42,
+                    child: OutlinedButton.icon(
+                      onPressed: isProcessing ? null : onReschedule,
+                      icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                      label: const Text('Reprogramar'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+
+        // 3. Estado: PAUSADO
+        if (order.status == WorkOrderStatus.paused) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF7ED),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFDBA74)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.pause_circle_filled, color: Color(0xFFC2410C), size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Trabajo Pausado',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC2410C), fontSize: 13),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Motivo: ${order.motivoPausa ?? "Sin motivo especificado"}',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                      ),
+                      if (order.fechaUltimaPausa != null)
+                        Text(
+                          'Pausado desde: ${_formatDateTime(order.fechaUltimaPausa)}',
+                          style: TextStyle(color: Colors.grey.shade700, fontSize: 11.5),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (canExecute) ...[
+            SizedBox(
+              height: 46,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
+                onPressed: isProcessing ? null : onResume,
+                icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                label: const Text('Reanudar Trabajo', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 42,
+              child: OutlinedButton.icon(
+                onPressed: isProcessing ? null : onReschedule,
+                icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                label: const Text('Reprogramar Trabajo'),
+              ),
+            ),
+          ],
+        ],
+
+        // 4. Estado: REVISIÓN PENDIENTE (POR VALIDAR)
+        if (order.status == WorkOrderStatus.reviewPending) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAF5FF),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFD8B4FE)),
+            ),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.hourglass_top_rounded, color: Color(0xFF7C3AED), size: 22),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Informe Técnico Enviado — Pendiente de Aprobación',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6B21A8), fontSize: 13),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'El trabajo fue concluido por el personal técnico. Requiere validación y cierre formal por parte de la Jefatura de Mantenimiento.',
+                        style: TextStyle(color: Color(0xFF581C87), fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (canApprove) ...[
+            SizedBox(
+              height: 46,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),
+                onPressed: isProcessing ? null : onApprove,
+                icon: const Icon(Icons.check_circle_outline, size: 22),
+                label: const Text(
+                  'Aprobar y Cerrar Orden de Trabajo',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 42,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFDC2626)),
+                      onPressed: isProcessing ? null : onReopen,
+                      icon: const Icon(Icons.replay_outlined, size: 18),
+                      label: const Text('Reabrir / Devolver'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SizedBox(
+                    height: 42,
+                    child: OutlinedButton.icon(
+                      onPressed: isProcessing ? null : onFinishReport,
+                      icon: const Icon(Icons.edit_note, size: 18),
+                      label: const Text('Editar Informe'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
             Container(
-              padding: const EdgeInsets.all(10),
-              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
+                color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFDE68A)),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline, size: 18, color: Color(0xFFD97706)),
+                  Icon(Icons.info_outline, size: 18, color: Colors.grey),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Debes registrar el informe de ejecución antes de marcar la OT como completada.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                      'Tu informe técnico fue registrado. Espera a que el Jefe de Mantenimiento revise y apruebe el cierre.',
+                      style: TextStyle(fontSize: 12, color: Colors.black87),
                     ),
                   ),
                 ],
               ),
             ),
-          SizedBox(
-            height: 46,
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
-              onPressed: isProcessing
-                  ? null
-                  : (order.workDoneDescription == null ||
-                          order.workDoneDescription!.trim().isEmpty
-                      ? () {
-                          AppFeedback.showWarning(
-                            context,
-                            'Primero debes registrar el informe de ejecución.',
-                          );
-                          onEditExecution();
-                        }
-                      : onComplete),
-              icon: const Icon(Icons.check_circle_outline, size: 20),
-              label: const Text('Completar y Cerrar Orden de Trabajo', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ],
+
+        // 5. Estado: REPROGRAMADO
+        if (order.status == WorkOrderStatus.rescheduled) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F9FF),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFBAE6FD)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.event_repeat_outlined, color: Color(0xFF0284C7), size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Orden de Trabajo Reprogramada',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0369A1), fontSize: 13),
+                      ),
+                      if (order.scheduledDate != null)
+                        Text(
+                          'Nueva Fecha: ${_formatDateTime(order.scheduledDate)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (canExecute) ...[
+            SizedBox(
+              height: 46,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0055A5)),
+                onPressed: isProcessing ? null : onStart,
+                icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                label: const Text('Iniciar Trabajo Reprogramado', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 42,
+              child: OutlinedButton.icon(
+                onPressed: isProcessing ? null : onReschedule,
+                icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                label: const Text('Reprogramar Nuevamente'),
+              ),
+            ),
+          ],
+        ],
+
+        // 6. Estado: COMPLETADO
+        if (order.status == WorkOrderStatus.completed) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF86EFAC)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.verified, color: Color(0xFF16A34A), size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Orden de Trabajo Aprobada y Cerrada',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF14532D), fontSize: 13),
+                      ),
+                      if (order.aprobadoPorNombreUsuario != null)
+                        Text(
+                          'Aprobada por: ${order.aprobadoPorNombreUsuario}${order.aprobadoEn != null ? " el ${_formatDateTime(order.aprobadoEn)}" : ""}',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF15803D)),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1010,4 +1646,14 @@ class _Tag extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatDateTime(DateTime? dt) {
+  if (dt == null) return '';
+  final d = dt.day.toString().padLeft(2, '0');
+  final m = dt.month.toString().padLeft(2, '0');
+  final y = dt.year;
+  final hh = dt.hour.toString().padLeft(2, '0');
+  final mm = dt.minute.toString().padLeft(2, '0');
+  return '$d/$m/$y $hh:$mm';
 }

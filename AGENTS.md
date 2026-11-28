@@ -1,85 +1,65 @@
-# AGENTS.md
+# AGENTS.md — Sistema CMMS Grupo Macsa
 
-Sistema CMMS de **Grupo Macsa** (gestión de mantenimiento). Flutter + Clean Architecture + MVVM con **Firebase Firestore** como backend (proyecto `practica-macsa`, sin Firebase Auth). Detalle extendido en `README.md`.
+Sistema CMMS de **Grupo Macsa** (gestión de mantenimiento). Cliente **Flutter** con **Clean Architecture + MVVM**, backend **API REST Node.js** y persistencia en **SQL Server**. Detalle integral y fuentes de verdad en `README.md`.
+
+> Backend actual: `Flutter → API REST (macsa-api, repo externo) → SQL Server (MacsaCMMS)`. El antiguo backend Firestore ya no está en runtime y no aparece en `pubspec.yaml`, `lib/main.dart` ni `lib/`. Los restos de nomenclatura Firestore son deuda técnica documentada en `README.md` §11.
 
 ## Comandos
 
 ```bash
 flutter pub get
-flutter analyze   # hoy: ~70 warnings/info preexistentes, 0 errores; no introducir nuevos errores/warnings
-flutter test      # 128 tests, todos offline con mocks (mocktail); NO requieren Firebase ni red
+flutter analyze   # 2026-11-27: errores preexistentes en el flujo OT sin commitear (work_order_detail_view.dart, work_order_report_pdf_builder.dart); no introducir nuevos errores/warnings
+flutter test      # 47 archivos de test, ~208 casos declarados; offline con mocktail, sin red ni Firebase
 flutter test test/features/assets/data/models/asset_model_test.dart  # un archivo
 flutter test --name "transfer"                                       # por nombre
 ```
 
-- Ejecutar: `flutter run -d chrome` / `-d windows`. Builds: `flutter build apk|web`.
-- Reglas/índices: `firebase deploy --only firestore:rules,indexes`
-- Reconectar Firebase: `flutterfire configure --project=practica-macsa --platforms=android,web`
-- Sembrar datos: `powershell -ExecutionPolicy Bypass -File scripts\seed_firestore.ps1` (idempotente vía REST; los hashes los genera `dart run tool/hash_password.dart`, misma implementación que la app).
+- Ejecutar: `flutter run -d chrome` / `-d windows`; override de API: `flutter run -d chrome --dart-define=API_URL=http://localhost:3000/api`.
+- Builds: `flutter build apk` / `flutter build web`.
+- API Node (externa): `C:\Users\user\Documents\macsa-api`, `npm run dev` en `:3000`.
+- SQL: aplicar migraciones incrementales desde `database/` (nunca reejecutar `init.sql` sobre una BD ya migrada sin revisar los parches); ver `database/CHANGELOG.md` y `REGLAS_PRODUCCION.md`.
+- Utilidades: `dart run tool/hash_password.dart`, `node scripts/audit_sp_parameters.js`.
 
 ## Arquitectura
 
-- Entrada: `lib/main.dart` → `Firebase.initializeApp` → `configureDependencies()` → `MacsaApp`.
-- **La DI es manual**: todo use case/repositorio/ViewModel nuevo DEBE registrarse en `lib/app/di/get_it.dart` o nunca se instanciará.
+- Entrada: `lib/main.dart` → `AppVersion.initialize()` → `SessionManager.instance.init()` → `configureDependencies()` → `MacsaApp`. **No hay `Firebase.initializeApp`.**
+- **La DI es manual**: todo use case/repositorio/ViewModel nuevo DEBE registrarse en `lib/app/di/get_it.dart` (133 registros; `registerLazySingleton` / `registerFactory`) o nunca se instanciará. Los providers globales están en `lib/app/di/providers.dart` (18).
+- Navegación: `lib/app/router/app_router.dart` con `Navigator` clásico (no `go_router`); la navegación principal ocurre en `lib/app/screens/main_shell_screen.dart` (13 secciones, 4 grupos, badges, inactividad 55/60 min).
 - Features en `lib/features/<módulo>/{domain,data,presentation}`:
-  - `domain`: Dart puro, sin Flutter/Firebase (entidades, contratos, use cases).
-  - `data`: modelos (`fromFirestore`/`toFirestore`), datasources remoto+caché local, repos impl. Cache-first SOLO en nativo (`kIsWeb` salta caché; la caché solo se usa si trae resultados).
+  - `domain`: Dart puro, sin Flutter ni red (entidades, contratos, use cases).
+  - `data`: modelos JSON (`fromJson`/`toJson`, compatibles con claves `PascalCase`), datasources REST (uno por módulo) e implementaciones de repositorio. `AssetLocalDataSource` es un caché en memoria por área, no persistente.
   - `presentation`: ViewModels `ChangeNotifier` que consumen SOLO use cases; Views con `Provider`.
-- Excepción: 3 ViewModels reciben `FirebaseFirestore` directo para listeners `.snapshots()` en tiempo real (`breakdown_alerts`, `my_reports_notifications`, `password_reset_alerts`).
-- El ID del documento en `assets` ES el código relacional del activo (`assets/{A3-002}`), no hay campo `id`.
+- Módulos vigentes: `assets`, `asset_deletion`, `auth_permissions`, `breakdown_reports`, `dashboard`, `employees`, `kardex`, `operation_reports`, `preventive_schedules`, `work_orders`, `app_update`.
+- Cliente HTTP: `lib/core/network/api_client.dart` (JWT Bearer, timeout 15 s, multipart, resolución de URL base y errores). Rutas centralizadas en `lib/core/network/api_endpoints.dart` (74). Sesión JWT en `SharedPreferences` vía `lib/core/network/session_manager.dart`.
+- Tiempo "real": polling en ViewModels (averías/mis reportes/OTs 10 s, resets 15 s, versión Android 30 s) + notificaciones locales; no hay `.snapshots()`.
 
-## Mapa Firestore y reglas de integridad
+## API REST (repo externo)
 
-Colecciones: `users`, `areas`, `assets`, `counters` (docs `areas`/`work_orders`/`preventive_schedules`), `kardex_logs`, `deletion_requests`, `deletion_request_states`, `work_orders`, `breakdown_reports`, `preventive_schedules`, `password_reset_requests`.
+- Código: `C:\Users\user\Documents\macsa-api`. Rutas en `src/routes/*.routes.js`, llamadas a SP en `src/services/*.service.js`.
+- Autenticación: login propio contra SQL, **PBKDF2-HMAC-SHA256 server-side** (`src/security/password.js`, 16 B salt / 32 B hash / 20.000 iteraciones), JWT (`src/security/jwt.js`), sesiones concurrentes limitadas a 2 con política FIFO y `jti`.
+- RBAC: 6 roles (`admin`, `jefe`, `jefe_area`, `tecnico`, `reportador`, `lector`) y 22 permisos `modulo.accion` (`src/security/rolePermissions.js`, middleware `permission.middleware.js`). `admin` pasa todas las verificaciones; la UI usa `AuthViewModel.hasPermission`.
+- Bloqueo: 5 intentos fallidos → 15 min. Reset genera contraseña temporal y registra la solicitud.
+- La API expone alias en inglés de las rutas en español; el cliente consume las españolas.
 
-**`firestore.rules` es la fuente ejecutable de verdad de las restricciones:**
-- Ninguna colección permite borrado físico (`delete: if false`): todas las bajas son lógicas.
-- `kardex_logs` es append-only (solo create/read); toda mutación escribe su evento ahí en la MISMA transacción (`ASSET_CREATED`, `ASSET_UPDATED`, `ASSET_TRANSFER`, `ASSET_REACTIVATE`, `WORK_ORDER_CREATED`, …).
-- `assets`: inmutables `areaId`, `parentAssetId`, `level`, `ancestors` y `serial` (si existe); enums restringidos (status: `active/transferredDeactivated/inactive/deleted`; level: `equipment/subEquipment/part/subPart`); `imageData` < 1.1 MiB (base64).
-- `users`: prohibido el campo `password`; `username` inmutable.
+## SQL Server y reglas de integridad
 
-**IDs y correlativos se generan DENTRO de transacciones** (contadores, no UUID):
-- Áreas: `A{n}` desde `counters/areas.nextNumber`.
-- Activos: equipo `{área}-00N` (contador `areas.assetCounter`); hijo `{padre}-NN` (contador `assets.childCounter`); `ancestors` = ruta materializada.
-- OTs: `OT-{año}-0001` desde `counters/work_orders`. Preventivos: `PM-{año}-0001` desde `counters/preventive_schedules`.
-- Candado transaccional `deletion_request_states/{assetId}`: TODA transacción (alta, edición, traspaso, reactivación, cambio de estado, aprobar/rechazar baja) lo lee primero y aborta si está `pending`.
-- Transferencia: duplica el subárbol completo al área destino con nuevos IDs (BFS determinístico) y desactiva el origen (`transferredDeactivated`, `transferredToId` en la raíz) en una sola transacción. Reactivar solo aplica a ese estado.
-- Búsqueda: array tokenizado `searchTerms` con `arrayContainsAny` (máx 10 tokens) refinado AND en cliente. Índices compuestos requeridos en `firestore.indexes.json`.
-- Serial único global para equipos raíz (validado contra no eliminados).
-
-## Auth y RBAC
-
-- Login propio contra `/users` (NO Firebase Auth). PBKDF2-HMAC-SHA256: salt base64 16 B, hash base64 32 B, iteraciones por usuario (`passwordIterations`, hoy 20000). Implementación única en `lib/core/security/password_hasher.dart`.
-- Bloqueo: 5 intentos fallidos → `lockedUntil` (+5 min) vía transacción sobre `failedLoginAttempts`/`lockedUntil`; reset al acertar. El lookup de usuario prueba tal cual → minúsculas → MAYÚSCULAS.
-- Campos extra de sesión: `disabled`, `mustChangePassword`, `passwordResetRequested(At)`; el reset también registra en `password_reset_requests`.
-- Roles `admin|jefe|reportador|lector` con permisos por defecto en `lib/features/auth_permissions/domain/entities/user_role.dart`. Permisos tipo `modulo.accion` (`asset.create`, `asset.delete.approve`, `user.manage`, …). `admin` pasa todas las verificaciones por rol en `AppUser.hasPermission`.
-- La autorización RBAC vive SOLO en la UI (`AuthViewModel.hasPermission`): las rules garantizan integridad, no autorización (no hay identidad de servidor).
-
-## Migración a SQL Server (objetivo activo del repo)
-
-Se está migrando de Firestore a **SQL Server (T-SQL)**. Entregable: script(s) init funcionales y exactos (BD, tablas, relaciones, SPs, índices, seed) cubriendo TODO el flujo: login/bloqueo, desglose de permisos RBAC, áreas, jerarquía de activos (CRUD por niveles), traspaso/reactivación de subárboles, flujo de bajas con aprobación, kardex append-only, OTs, averías, preventivos, dashboard y resets de contraseña.
-
-Derivar el esquema SIEMPRE de estas fuentes (no inventar):
-- `firestore.rules` → cada restricción = CHECK/FK/trigger/permiso SQL.
-- `lib/features/*/data/models/*.dart` (`fromFirestore`/`toFirestore`) → campos y tipos exactos.
-- `data/repositories/` y `data/datasources/` → cada consulta/transacción = un SP (conservar atomicidad).
-- `firestore.indexes.json` → índices. `user_role.dart` → catálogo de roles/permisos.
-
-Decisiones de mapeo ya implicadas por el dominio:
-- IDs-documento con significado de negocio → PKs naturales (código jerárquico de activo, correlativos OT/PM).
-- Docs `counters` → tabla de contadores o SEQUENCE actualizada dentro de la MISMA transacción del SP.
-- Candado `deletion_request_states` → lógica del SP con `UPDLOCK/HOLDLOCK`.
-- `ancestors` → columna de ruta o CTE recursiva. `statusHistory` embebido → tabla hija `asset_status_history`.
-- `kardex_logs` append-only → revocar UPDATE/DELETE o trigger.
-- `imageData` (data-URL < 1.1 MiB) → `NVARCHAR(MAX)` o `VARBINARY(MAX)`; `searchTerms` → columna calculada + LIKE o FULLTEXT con semántica AND.
-- PBKDF2 sigue en cliente Dart (salvo mover verificación a servidor): conservar columnas salt/hash/iteraciones.
-- Los 3 listeners `.snapshots()` requieren polling o SignalR.
-
-Artefactos SQL van en `database/` (crear; p. ej. `database/init.sql`).
+- Fuente ejecutable: `database/init.sql` (baseline generado el 2026-11-13 desde `scripts/sql_modules/01..07`), con 29 tablas `dbo.*`, ~104 SPs, TVPs, funciones, índices, checks, trigger y seed. Encima se aplican los parches cronológicos en `database/` (hasta 2026-11-27).
+- Nombres reales en español: `Activo`, `Area`, `Usuario`, `SesionUsuario`, `SolicitudBaja`, `CandadoBaja`, `BitacoraKardex`, `OrdenTrabajo`, `ReporteAveria`, `PlanPreventivo`, `ReporteOperacionDiaria`, `Empleado`, `Puesto`, etc.
+- IDs con significado de negocio (PKs naturales): áreas `A001`…`A030`, activos `{área}-00N` y `{padre}-NN`, OTs `OT-{año}-NNNN`, preventivos `PM-{año}-NNNN`.
+- Contadores en `dbo.Contador` / `Area.ContadorActivos` / `Activo.ContadorHijos`, reclamados con `UPDLOCK, HOLDLOCK` **dentro de la misma transacción** del SP.
+- Candado de bajas: `dbo.CandadoBaja` se lee con `UPDLOCK, HOLDLOCK` en toda mutación de un activo (alta, edición, traspaso, reactivación, cambio de estado, resolución de baja).
+- `BitacoraKardex` es append-only por trigger (`TR_BitacoraKardex_SoloInsercion`); cada mutación registra su evento en la misma transacción. No hay borrado físico de negocio: las bajas son lógicas (`Estado = 'deleted'` / `'inactive'`).
+- `Activo` e `HistorialEstadoActivo`: campos jerárquicos inmutables (`AreaId`, `CodigoActivoPadre`, `Nivel`, `RutaAncestros`, `Serie`), enums CHECK y `TextoBusqueda` calculada persistida para búsqueda AND. `trActivo_Inmutable` vive en `fix_disponibilidad_sql.sql`.
+- Usuario: prohibida cualquier columna de contraseña en claro; `Username` inmutable. Contraseñas: salt/hash/iteraciones.
+- Transferencia: duplica el subárbol al área destino con nuevos IDs y desactiva el origen (`transferredDeactivated` + `TraspasadoACodigo`) en una transacción. Reactivación solo desde ese estado.
+- SPs se nombran `usp...`; cada consulta/transacción del antiguo datasource corresponde hoy a un SP. Catálogo completo en `README.md` §7.3.
 
 ## Gotchas
 
-- Sin CI: verificar con `flutter analyze && flutter test` antes de terminar.
-- El README dice "49 pruebas": desactualizado (128 hoy).
+- Sin CI: verificar `flutter analyze && flutter test` antes de terminar.
 - Idioma de dominio/UI: español; mantener los strings de usuario en español.
-- `lib/firebase_options.dart` es generado por flutterfire CLI: no editarlo a mano.
+- `pubspec.yaml` = `1.0.4+5`; `AppVersion` tiene fallback `1.0.3+4` corregido en runtime con `package_info_plus`.
+- `README.md` §11 contiene el estado de migración y deuda técnica: documentación heredada, `CHANGELOG.md` desactualizado, residuos Firestore en comentarios/modelos, `init.sql` no re-ejecutable tal cual, parche 2026-11-27 sin commitear, `.gitignore` sin `.env`.
+- No editar artefactos generados ni consolidados SQL sin revisar los parches posteriores: `database/init.sql`, `deploy_produccion_2026-11-13.sql` y `update_produccion_2026-11-18.sql` se regeneran desde `scripts/sql_modules/` y `scripts/build_*.js`.
+- No hay `lib/firebase_options.dart` (no editar/generar). No hay `seed_firestore.ps1` ni `firestore.rules` / `firestore.indexes.json`.
+- Credenciales de demo: `ADMIN/ADMIN123`, `NMENDEZ/ADMIN123`, `JEFE/ADMIN123` (solo demo/desarrollo). Ver `GUIA_DEMO_GERENCIA_15MIN.md`.
